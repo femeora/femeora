@@ -1,0 +1,25 @@
+/**
+ * Single entry point for icons. Product icons come from lucide (one stroke family);
+ * brand marks that lucide does not ship live in this folder. No text glyphs or emoji.
+ */
+export {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
+  BadgeCheck,
+  CandlestickChart,
+  Ellipsis,
+  Eye,
+  Heart,
+  LayoutList,
+  MessageCircle,
+  Repeat2,
+  Share2,
+  TriangleAlert,
+  Trophy,
+  Wallet,
+  X as Close,
+} from 'lucide-react';
+export type { LucideIcon as Icon } from 'lucide-react';
+export { XLogo } from './XLogo';

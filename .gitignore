@@ -1,0 +1,69 @@
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Build and distribution
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+
+# Environment files & Credentials (Strict - Never push secrets)
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Secrets, Wallets, Keystores & Private Keys
+*.pem
+*.key
+*.keystore
+*.p12
+*.pfx
+id_rsa*
+*.secret
+secrets.*
+credentials.*
+.secret*
+service-account*.json
+*credentials*.json
+
+# Documentation (Internal specs, briefs, roadmaps)
+docs/
+
+# Foundry & Smart contracts
+cache/
+artifacts/
+out/
+broadcast/
+typechain/
+typechain-types/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/

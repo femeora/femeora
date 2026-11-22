@@ -1,0 +1,12 @@
+{
+  "name": "@fomeora/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vvv",
+    "test:fuzz": "forge test --match-test testFuzz",
+    "test:invariant": "forge test --match-test invariant",
+    "clean": "forge clean"
+  }
+}

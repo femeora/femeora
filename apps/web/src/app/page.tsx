@@ -1,0 +1,42 @@
+import { AppSection } from '@/components/landing/AppSection';
+import { CalloutsSection } from '@/components/landing/CalloutsSection';
+import { ChartBand } from '@/components/landing/ChartBand';
+import { CtaSection } from '@/components/landing/CtaSection';
+import { Hero } from '@/components/landing/Hero';
+import { IntegritySection } from '@/components/landing/IntegritySection';
+import { LoopSection } from '@/components/landing/LoopSection';
+import { Marquee } from '@/components/landing/Marquee';
+import { SafetySection } from '@/components/landing/SafetySection';
+import { SiteFooter } from '@/components/landing/SiteFooter';
+import { SiteHeader } from '@/components/landing/SiteHeader';
+import { Statement } from '@/components/landing/Statement';
+import { Grain } from '@/components/ui/Grain';
+import { marquee } from '@/content/landing';
+
+export default function LandingPage() {
+  return (
+    <>
+      <a
+        href="#main"
+        className="t-label sr-only z-[90] bg-fg px-4 py-3 text-bg focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to content
+      </a>
+      <SiteHeader />
+      <main id="main" className="pt-header">
+        <Hero />
+        <Statement />
+        <AppSection />
+        <CalloutsSection />
+        <ChartBand />
+        <LoopSection />
+        <Marquee items={marquee} label="Shapes and presets" />
+        <IntegritySection />
+        <SafetySection />
+        <CtaSection />
+      </main>
+      <SiteFooter />
+      <Grain />
+    </>
+  );
+}

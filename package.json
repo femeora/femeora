@@ -1,0 +1,41 @@
+{
+  "name": "fomeora-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fomeora: Meteora-style DLMM + DAMM liquidity with FOMO-style social LP trading",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:contracts": "pnpm --filter @fomeora/contracts test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" && (cd apps/contracts && forge fmt)",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" && (cd apps/contracts && forge fmt --check)",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @fomeora/database generate",
+    "db:migrate": "pnpm --filter @fomeora/database migrate:dev",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@fomeora/eslint-config": "workspace:*",
+    "@fomeora/config-prettier": "workspace:*",
+    "@fomeora/config-typescript": "workspace:*",
+    "@types/node": "^20.14.10",
+    "prettier": "^3.3.3",
+    "prettier-plugin-solidity": "^1.4.1",
+    "turbo": "^2.0.0",
+    "typescript": "~5.5.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "~5.5.4"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

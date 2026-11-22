@@ -1,0 +1,220 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 10.1 Chain Tables
+// ==========================================
+
+model Pool {
+  id           String     @id @default(uuid()) @db.Uuid
+  chainId      Int        @map("chain_id")
+  address      String     @db.VarChar(42)
+  type         String     @db.VarChar(10) // 'DLMM' | 'DAMM'
+  tokenX       String     @map("token_x")
+  tokenY       String     @map("token_y")
+  quoteToken   String     @map("quote_token")
+  binStep      Int        @map("bin_step")
+  baseFeeBps   Int        @map("base_fee_bps")
+  createdBlock BigInt     @map("created_block")
+
+  positions    Position[]
+  callouts     Callout[]
+  bins         Bin[]
+
+  @@unique([chainId, address])
+  @@map("pools")
+}
+
+model Bin {
+  poolId       String   @map("pool_id") @db.Uuid
+  binId        Int      @map("bin_id")
+  reserveX     Decimal  @map("reserve_x") @db.Decimal(78, 0)
+  reserveY     Decimal  @map("reserve_y") @db.Decimal(78, 0)
+  totalShares  Decimal  @map("total_shares") @db.Decimal(78, 0)
+  updatedBlock BigInt   @map("updated_block")
+
+  pool         Pool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  @@id([poolId, binId])
+  @@map("bins")
+}
+
+model Position {
+  id              BigInt   @map("id")
+  chainId         Int      @map("chain_id")
+  poolId          String   @map("pool_id") @db.Uuid
+  owner           String   @db.VarChar(42)
+  lowerBin        Int      @map("lower_bin")
+  upperBin        Int      @map("upper_bin")
+  shape           Int      @db.SmallInt
+  tag             String?  @db.VarChar(66) // 0x... bytes32
+  referrer        String?  @db.VarChar(42)
+  status          String   @db.VarChar(20) // 'open' | 'closed' | 'transferred'
+  depositedQuote  Decimal  @default(0) @map("deposited_quote") @db.Decimal(36, 18)
+  withdrawnQuote  Decimal  @default(0) @map("withdrawn_quote") @db.Decimal(36, 18)
+  earnedQuote     Decimal  @default(0) @map("earned_quote") @db.Decimal(36, 18)
+  valueQuote      Decimal  @default(0) @map("value_quote") @db.Decimal(36, 18)
+  inRangeSeconds  BigInt   @default(0) @map("in_range_seconds")
+  openSeconds     BigInt   @default(0) @map("open_seconds")
+  openedAt        DateTime @default(now()) @map("opened_at")
+  closedAt        DateTime? @map("closed_at")
+
+  pool            Pool     @relation(fields: [poolId], references: [id])
+  callouts        Callout[]
+
+  @@id([chainId, id])
+  @@index([owner])
+  @@index([poolId])
+  @@map("positions")
+}
+
+// ==========================================
+// 10.2 Social Tables (Global Schema)
+// ==========================================
+
+model User {
+  id          String    @id @default(uuid()) @db.Uuid
+  xId         String    @unique @map("x_id")
+  handle      String    @unique
+  name        String?
+  avatarUrl   String?   @map("avatar_url")
+  xVerified   Boolean   @default(false) @map("x_verified")
+  xFollowers  Int       @default(0) @map("x_followers")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  banned      Boolean   @default(false)
+
+  wallets     Wallet[]
+  callouts    Callout[]
+  likes       Like[]
+  reposts     Repost[]
+  replies     Reply[]
+  stats       UserStat[]
+
+  @@map("users")
+}
+
+model Wallet {
+  address   String   @id @db.VarChar(42)
+  userId    String   @map("user_id") @db.Uuid
+  linkedAt  DateTime @default(now()) @map("linked_at")
+  siweSig   String   @map("siwe_sig")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+model Callout {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  chainId          Int       @map("chain_id")
+  positionId       BigInt    @map("position_id")
+  poolId           String    @map("pool_id") @db.Uuid
+  caption          String?   @db.VarChar(280)
+  captionEditedAt  DateTime? @map("caption_edited_at")
+  showSize         Boolean   @default(true) @map("show_size")
+  deletedAt        DateTime? @map("deleted_at")
+  mcAtPost         Decimal   @map("mc_at_post") @db.Decimal(36, 18)
+  priceAtPost      Decimal   @map("price_at_post") @db.Decimal(36, 18)
+  sizeAtPost       Decimal   @map("size_at_post") @db.Decimal(36, 18)
+  side             String    @db.VarChar(30)
+  shape            Int       @db.SmallInt
+  lowerBin         Int       @map("lower_bin")
+  upperBin         Int       @map("upper_bin")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  status           String    @db.VarChar(20)
+  hidden           Boolean   @default(false)
+
+  user             User      @relation(fields: [userId], references: [id])
+  pool             Pool      @relation(fields: [poolId], references: [id])
+  position         Position  @relation(fields: [chainId, positionId], references: [chainId, id])
+  likes            Like[]
+  reposts          Repost[]
+  replies          Reply[]
+  tails            Tail[]
+
+  @@unique([chainId, positionId])
+  @@index([userId])
+  @@index([poolId])
+  @@map("callouts")
+}
+
+model Tail {
+  calloutId     String   @map("callout_id") @db.Uuid
+  chainId       Int      @map("chain_id")
+  positionId    BigInt   @map("position_id")
+  tailerUserId  String?  @map("tailer_user_id") @db.Uuid
+  tailerWallet  String   @map("tailer_wallet") @db.VarChar(42)
+  mode          String   @db.VarChar(30)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  callout       Callout  @relation(fields: [calloutId], references: [id], onDelete: Cascade)
+
+  @@id([chainId, positionId])
+  @@index([calloutId])
+  @@map("tails")
+}
+
+model Like {
+  userId     String   @map("user_id") @db.Uuid
+  calloutId  String   @map("callout_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callout    Callout  @relation(fields: [calloutId], references: [id], onDelete: Cascade)
+
+  @@id([userId, calloutId])
+  @@map("likes")
+}
+
+model Repost {
+  userId     String   @map("user_id") @db.Uuid
+  calloutId  String   @map("callout_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callout    Callout  @relation(fields: [calloutId], references: [id], onDelete: Cascade)
+
+  @@id([userId, calloutId])
+  @@map("reposts")
+}
+
+model Reply {
+  id        String   @id @default(uuid()) @db.Uuid
+  calloutId String   @map("callout_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  body      String   @db.VarChar(280)
+  createdAt DateTime @default(now()) @map("created_at")
+  hidden    Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id])
+  callout   Callout  @relation(fields: [calloutId], references: [id], onDelete: Cascade)
+
+  @@map("replies")
+}
+
+model UserStat {
+  userId       String   @map("user_id") @db.Uuid
+  window       String   @db.VarChar(10) // '24h', '7d', '30d', 'all'
+  callouts     Int      @default(0)
+  earnedQuote  Decimal  @default(0) @map("earned_quote") @db.Decimal(36, 18)
+  avgInRange   Decimal  @default(0) @map("avg_in_range") @db.Decimal(5, 2)
+  tailers      Int      @default(0)
+  quickExits   Int      @default(0) @map("quick_exits")
+  score        Decimal  @default(0) @db.Decimal(36, 18)
+  rank         Int      @default(0)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, window])
+  @@map("user_stats")
+}
