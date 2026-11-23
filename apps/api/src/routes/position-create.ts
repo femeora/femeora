@@ -49,8 +49,8 @@ async function safeBlock(chainId: number): Promise<bigint> {
 
 async function canonicalPool(chainId: number, address: Address) {
   return prisma.pool.findFirst({
-    where: { chainId, address, canonical: true, type: 'DLMM' },
-    select: { id: true, address: true, tokenX: true, tokenY: true, tokenXDecimals: true, tokenYDecimals: true, binStep: true },
+    where: { chainId, address, canonical: true },
+    select: { id: true, address: true, type: true, tokenX: true, tokenY: true, tokenXDecimals: true, tokenYDecimals: true, binStep: true },
   });
 }
 
@@ -80,6 +80,16 @@ async function buildQuote(
   }
   if (amount0 === 0n && amount1 === 0n) throw new PositionCreateError(400, 'INVALID_TOKEN_AMOUNT');
   const blockNumber = await blockProvider(chainId);
+  if (pool.type === 'DAMM') {
+    if (amount0 === 0n || amount1 === 0n) throw new PositionCreateError(400, 'DAMM_REQUIRES_BOTH_TOKENS');
+    return {
+      pool: pool.address, tokenX: pool.tokenX, tokenY: pool.tokenY,
+      amountX: formatUnits(amount0, pool.tokenXDecimals), amountY: formatUnits(amount1, pool.tokenYDecimals),
+      amountXRaw: amount0.toString(), amountYRaw: amount1.toString(), shape: input.shape,
+      activeBin: 0, bins: [0], amountsXRaw: [amount0.toString()], amountsYRaw: [amount1.toString()],
+      minimumSharesRaw: ['0'], slippageBps: input.slippageBps, blockNumber: blockNumber.toString(),
+    };
+  }
   const poolAddress = pool.address as Address;
   const activeBin = await client.readContract({
     address: poolAddress, abi: dlmmPoolV2Abi, functionName: 'activeBin', blockNumber,
@@ -133,20 +143,20 @@ export async function registerPositionCreateRoutes(
   });
 
   app.post('/v1/pools/:pool/position-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {
-    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
-    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
     const params = paramsSchema.safeParse(request.params);
     const body = prepareSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_POSITION_PREPARATION' });
-    if (!session.user.wallets.some(wallet => wallet.address.toLowerCase() === body.data.walletAddress)) {
-      return reply.status(403).send({ error: 'WALLET_NOT_LINKED' });
-    }
     try {
       const pool = await canonicalPool(chainId, params.data.pool);
       if (!pool) throw new PositionCreateError(404, 'POOL_NOT_FOUND');
       const quote = await buildQuote(chainId, client, pool, body.data, blockProvider);
       let tag = ZERO_TAG;
       if (body.data.intentId) {
+        const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
+        if (!session) throw new PositionCreateError(401, 'AUTHENTICATION_REQUIRED');
+        if (!session.user.wallets.some(wallet => wallet.address.toLowerCase() === body.data.walletAddress)) {
+          throw new PositionCreateError(403, 'WALLET_NOT_LINKED');
+        }
         const intent = await prisma.calloutIntent.findFirst({
           where: { id: body.data.intentId, userId: session.userId, chainId, poolId: pool.id, consumedAt: null, expiresAt: { gt: new Date() } },
           select: { tag: true },
@@ -167,15 +177,20 @@ export async function registerPositionCreateRoutes(
         return { chainId, to: token, data, value: '0x0', gas: toHex(gas) };
       }));
       const deadline = BigInt(Math.floor(Date.now() / 1_000) + DEADLINE_SECONDS);
-      const data = encodeFunctionData({
-        abi: positionManagerV2Abi, functionName: 'createRangePosition',
-        args: [{
-          pool: pool.address as Address, shape: shapeCode(quote.shape), tag, referrer: ZERO_ADDRESS,
-          expectedActiveBin: quote.activeBin, bins: quote.bins,
-          amountsX: quote.amountsXRaw.map(BigInt), amountsY: quote.amountsYRaw.map(BigInt),
-          minShares: quote.minimumSharesRaw.map(BigInt), deadline,
-        }],
-      });
+      const data = pool.type === 'DAMM'
+        ? encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createDammPosition', args: [{
+            pool: pool.address as Address, amountX: BigInt(quote.amountXRaw), amountY: BigInt(quote.amountYRaw),
+            minShares: 0n, tag, referrer: ZERO_ADDRESS, deadline,
+          }] })
+        : encodeFunctionData({
+            abi: positionManagerV2Abi, functionName: 'createRangePosition',
+            args: [{
+              pool: pool.address as Address, shape: shapeCode(quote.shape), tag, referrer: ZERO_ADDRESS,
+              expectedActiveBin: quote.activeBin, bins: quote.bins,
+              amountsX: quote.amountsXRaw.map(BigInt), amountsY: quote.amountsYRaw.map(BigInt),
+              minShares: quote.minimumSharesRaw.map(BigInt), deadline,
+            }],
+          });
       let gas: bigint | null = null;
       if (approvals.every(approval => approval === null)) {
         try { gas = await client.estimateGas({ account: body.data.walletAddress, to: manager, data, value: 0n }); }

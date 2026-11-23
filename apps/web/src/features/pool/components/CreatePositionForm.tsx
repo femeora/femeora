@@ -52,6 +52,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
   const [transactionStage, setTransactionStage] = useState('Preparing transaction…');
   const { account, config } = useWallet();
   const { user, openSignIn } = useSession();
+  const damm = pool.type === 'DAMM';
 
   const at = (pct: number) => formatUnit(toUnit(applyPct(pool.priceUsd, pct), unit, pool), unit);
   const invalidateQuote = () => {
@@ -63,8 +64,8 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     shape: draft.shape,
     minPct: draft.minPct,
     maxPct: draft.maxPct,
-    amountX: needs.base ? draft.baseAmount : '0',
-    amountY: needs.quote ? draft.quoteAmount : '0',
+    amountX: damm || needs.base ? draft.baseAmount : '0',
+    amountY: damm || needs.quote ? draft.quoteAmount : '0',
     slippageBps: 50,
   });
   const setPostAsCallout = (value: boolean) => {
@@ -117,7 +118,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
 
   return (
     <form className="flex flex-col gap-4" onSubmit={event => event.preventDefault()} noValidate>
-      <div className="flex flex-col gap-2">
+      {!damm ? <><div className="flex flex-col gap-2">
         <span className="t-label text-muted">Presets</span>
         <div className="grid grid-cols-3 gap-2">
           {PRESETS.map(preset => (
@@ -187,6 +188,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         pricePosition={pricePosition(draft)}
         priceLabel={`${unit === 'mcap' ? 'MC' : 'price'} ${at(0)}`}
       />
+      </> : <div className="glass rounded-[2px] p-3 text-sm text-muted">DAMM initial liquidity requires both tokens. The deposited ratio establishes the pool&apos;s starting price.</div>}
 
       <div className="grid gap-2">
         <AmountField
@@ -194,7 +196,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
           tokenAddress={pool.tokenY}
           value={draft.quoteAmount}
           usdPerToken={1}
-          enabled={needs.quote}
+          enabled={damm || needs.quote}
           onChange={value => { invalidateQuote(); dispatch({ type: 'amount', token: 'quoteAmount', value }); }}
         />
         <AmountField
@@ -202,7 +204,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
           tokenAddress={pool.tokenX}
           value={draft.baseAmount}
           usdPerToken={pool.priceUsd}
-          enabled={needs.base}
+          enabled={damm || needs.base}
           onChange={value => { invalidateQuote(); dispatch({ type: 'amount', token: 'baseAmount', value }); }}
         />
         <p className="t-label flex justify-between text-muted">
@@ -223,13 +225,13 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
 
       {quote ? (
         <dl className="glass grid gap-1.5 rounded-[2px] p-3">
-          <div className="t-label flex justify-between gap-4"><dt className="text-muted">Canonical bins</dt><dd>{quote.bins[0]} to {quote.bins.at(-1)} · {quote.bins.length}</dd></div>
+          <div className="t-label flex justify-between gap-4"><dt className="text-muted">{damm ? 'Liquidity model' : 'Canonical bins'}</dt><dd>{damm ? 'DAMM · both tokens' : `${quote.bins[0]} to ${quote.bins.at(-1)} · ${quote.bins.length}`}</dd></div>
           <div className="t-label flex justify-between gap-4"><dt className="text-muted">Deposit</dt><dd>{quote.amountX} {pool.base} + {quote.amountY} {pool.quote}</dd></div>
           <div className="t-label flex justify-between gap-4"><dt className="text-muted">Slippage limit</dt><dd>{quote.slippageBps / 100}%</dd></div>
         </dl>
       ) : null}
       <Button type="button" block onClick={() => void requestQuote()} disabled={Boolean(error) || quoting}>
-        {quoting ? 'Reading canonical bins…' : 'Review live position'}
+        {quoting ? (damm ? 'Reading pool state…' : 'Reading canonical bins…') : 'Review live position'}
       </Button>
       <p role="alert" className="t-label min-h-4 text-down">{quoteError}</p>
       <TxButton

@@ -44,6 +44,22 @@ export function priceFromBinX18(binId: number, binStepBps: number): bigint {
   return binId >= 0 ? result : mulDiv(PRICE_SCALE, PRICE_SCALE, result);
 }
 
+/** Finds the closest valid bin for an X18 price using the exact on-chain price function. */
+export function binForPriceX18(priceX18: bigint, binStepBps: number): number {
+  if (priceX18 <= 0n) throw new RangeError('priceX18 must be positive');
+  let low = MIN_BIN_ID;
+  let high = MAX_BIN_ID;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (priceFromBinX18(middle, binStepBps) < priceX18) low = middle + 1;
+    else high = middle;
+  }
+  if (low === MIN_BIN_ID) return low;
+  const upper = priceFromBinX18(low, binStepBps);
+  const lower = priceFromBinX18(low - 1, binStepBps);
+  return priceX18 - lower <= upper - priceX18 ? low - 1 : low;
+}
+
 /** Mirrors Solidity BinPriceMath.quoteAtPrice. */
 export function quoteAtPrice(amountIn: bigint, priceX18: bigint, token0ToToken1: boolean): bigint {
   assertNonNegative(amountIn, 'amountIn');

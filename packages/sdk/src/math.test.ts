@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   amountsForShares,
+  binForPriceX18,
   classifyRangeSide,
   computePositionQuotePerformance,
   convertTokenAmountAtPrice,
@@ -23,6 +24,12 @@ test('matches Solidity BinPriceMath golden vectors exactly', () => {
   assert.equal(priceFromBinX18(2, 25), 1_005_006_250_000_000_000n);
   assert.equal(priceFromBinX18(-2, 25), 995_018_687_694_728_266n);
   assert.equal(priceFromBinX18(20, 100), 1_220_190_039_947_966_823n);
+});
+
+test('selects the closest valid bin for an initial price', () => {
+  assert.equal(binForPriceX18(priceFromBinX18(37, 25), 25), 37);
+  assert.equal(binForPriceX18(PRICE_SCALE, 25), 0);
+  assert.equal(binForPriceX18(priceFromBinX18(-12, 100), 100), -12);
 });
 
 test('matches Solidity quote and decimal-normalized token1 value rounding', () => {

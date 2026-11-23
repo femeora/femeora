@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { TokenPair } from '@/components/ui/TokenPair';
 import { getPools } from '@/lib/api/server';
 
@@ -30,18 +31,19 @@ export default async function PoolsPage() {
 
   return (
     <section className="px-gutter py-8">
-      <header className="border-b border-line pb-5">
-        <p className="t-label text-signal">Canonical index</p>
+      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-line pb-5">
+        <div><p className="t-label text-signal">Canonical index</p>
         <h1 className="mt-2 text-3xl font-medium tracking-tight">Liquidity pools</h1>
-        <p className="mt-2 text-muted">Only pools confirmed by the active network indexer appear here.</p>
+        <p className="mt-2 text-muted">Only pools confirmed by the active network indexer appear here.</p></div>
+        <ButtonLink href="/pools/create" variant="primary">Create pool</ButtonLink>
       </header>
 
       {result.data.length === 0 ? (
         <div className="glass mt-6 rounded-[2px] p-8 text-center">
           <h2 className="text-lg font-medium">No testnet pools indexed yet</h2>
           <p className="mx-auto mt-2 max-w-xl text-muted">
-            Contract deployment is ready, but the first governance-approved pool has not been created.
-            This page will populate automatically after its creation event reaches the safe block.
+            Pool creation is permissionless on the deployed factory. A pool will appear here automatically
+            after its creation transaction is confirmed and indexed at the safe block.
           </p>
         </div>
       ) : (

@@ -5,6 +5,58 @@ const HashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 const IntegerStringSchema = z.string().regex(/^\d+$/);
 const DecimalStringSchema = z.string().regex(/^\d+(?:\.\d+)?$/);
 
+export const ApiPoolAssetSchema = z.object({
+  address: AddressSchema,
+  symbol: z.string().min(1).max(64),
+  name: z.string().min(1).max(128),
+  decimals: z.number().int().min(0).max(36),
+  chainId: z.number().int().positive(),
+  logoUrl: z.string().url().nullable(),
+  category: z.enum(['crypto', 'stablecoin', 'stock', 'etf']),
+  executable: z.boolean(),
+  source: z.enum(['chain', 'robinhood']),
+  isin: z.string().nullable(),
+  tradingStatus: z.object({ market: z.string().nullable(), extended: z.string().nullable(), overnight: z.string().nullable() }).nullable(),
+  currentMultiplier: z.string().nullable(),
+});
+export const ApiPoolAssetListSchema = z.object({ data: z.array(ApiPoolAssetSchema) });
+export type ApiPoolAsset = z.infer<typeof ApiPoolAssetSchema>;
+
+export const ApiAssetReferencePriceSchema = z.object({
+  symbol: z.string(),
+  priceUsd: DecimalStringSchema,
+  bidUsd: DecimalStringSchema,
+  askUsd: DecimalStringSchema,
+  generatedAt: z.string().datetime(),
+  halted: z.boolean(),
+  source: z.literal('robinhood'),
+  multiplierAdjusted: z.literal(true),
+});
+
+export const ApiPoolCreationPreparationSchema = z.object({
+  chainId: z.number().int().positive(),
+  factory: AddressSchema,
+  poolId: HashSchema,
+  model: z.enum(['DAMM', 'DLMM']),
+  token0: ApiPoolAssetSchema,
+  token1: ApiPoolAssetSchema,
+  feePips: z.number().int().min(1).max(999_999),
+  binStepBps: z.number().int().min(0).max(1_000),
+  initialActiveBin: z.number().int().min(-10_000).max(10_000).nullable(),
+  representedPrice: DecimalStringSchema.nullable(),
+  existingPool: AddressSchema.nullable(),
+  predictedPool: AddressSchema,
+  transaction: z.object({
+    chainId: z.number().int().positive(),
+    to: AddressSchema,
+    data: z.string().regex(/^0x[a-fA-F0-9]*$/),
+    value: z.string().regex(/^0x[a-fA-F0-9]+$/),
+    gas: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
+  }),
+  expiresAt: z.string().datetime(),
+});
+export type ApiPoolCreationPreparation = z.infer<typeof ApiPoolCreationPreparationSchema>;
+
 export const ApiPoolSchema = z.object({
   id: z.string().uuid(),
   chainId: z.number().int().positive(),

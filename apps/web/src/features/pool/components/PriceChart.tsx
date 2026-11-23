@@ -9,6 +9,8 @@ import {
 } from 'lightweight-charts';
 import { useEffect, useMemo, useState } from 'react';
 
+import { CandlestickChart } from '@/components/ui/icons';
+import { TokenPair } from '@/components/ui/TokenPair';
 import { calloutStatus, rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
 import { cn } from '@/lib/cn';
 import { tokenColor } from '@/lib/theme';
@@ -62,6 +64,7 @@ export function PriceChart({
   const { containerRef, handles } = useLightweightChart();
   const [hovered, setHovered] = useState<Ohlc | null>(null);
   const [popover, setPopover] = useState<{ callout: Callout; x: number; y: number } | null>(null);
+  const hasCandles = candles.length > 0;
 
   const convert = (priceUsd: number) => toUnit(priceUsd, unit, pool);
   const format = (value: number) => formatUnit(value, unit);
@@ -248,11 +251,37 @@ export function PriceChart({
       <div
         ref={containerRef}
         role="img"
-        aria-label={`${pool.base} / ${pool.quote} chart, last ${format(current)}. Drag to pan, scroll or pinch to zoom.`}
+        aria-label={hasCandles
+          ? `${pool.base} / ${pool.quote} chart, last ${format(current)}. Drag to pan, scroll or pinch to zoom.`
+          : `${pool.base} / ${pool.quote} chart. No indexed price history yet.`}
         className="h-full w-full font-mono"
       />
 
-      {projection ? (
+      {!hasCandles ? (
+        <div className="absolute inset-0 z-20 grid place-items-center overflow-hidden bg-bg/90 px-6 text-center">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgb(var(--fg)/0.12)_1px,transparent_1px),linear-gradient(90deg,rgb(var(--fg)/0.12)_1px,transparent_1px)] [background-size:44px_44px]"
+          />
+          <div className="relative flex max-w-md flex-col items-center">
+            <span className="grid size-12 place-items-center rounded-full border border-line bg-panel-2 text-muted">
+              <CandlestickChart aria-hidden="true" className="size-5" strokeWidth={1.5} />
+            </span>
+            <div className="mt-4">
+              <TokenPair tokenX={pool.tokenX} tokenY={pool.tokenY} compact />
+            </div>
+            <h2 className="mt-4 text-lg font-medium">No price history yet</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              This pool has no confirmed swaps in the selected interval. The chart will appear automatically after the first indexed trade.
+            </p>
+            <p className="t-label mt-5 border border-line bg-panel-2 px-3 py-2 text-faint">
+              Waiting for the first swap · no demo data
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {hasCandles && projection ? (
         <ChartOverlay
           projection={projection}
           band={band}
@@ -264,7 +293,7 @@ export function PriceChart({
         />
       ) : null}
 
-      {popover ? <CalloutPopover {...popover} /> : null}
+      {hasCandles && popover ? <CalloutPopover {...popover} /> : null}
 
       {showCallouts ? (
         <ul className="sr-only">

@@ -6,7 +6,6 @@ import { IntegritySection } from '@/components/landing/IntegritySection';
 import { LoopSection } from '@/components/landing/LoopSection';
 import { Marquee } from '@/components/landing/Marquee';
 import { SafetySection } from '@/components/landing/SafetySection';
-import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { Statement } from '@/components/landing/Statement';
 import { Ambient } from '@/components/ui/Ambient';
@@ -35,7 +34,6 @@ export default function LandingPage() {
         <SafetySection />
         <CtaSection />
       </main>
-      <SiteFooter />
       <Grain />
     </>
   );

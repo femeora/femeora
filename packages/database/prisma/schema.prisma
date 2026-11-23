@@ -44,6 +44,31 @@ model Pool {
   @@map("pools")
 }
 
+model AssetCatalog {
+  chainId         Int      @map("chain_id")
+  address         String   @db.VarChar(42)
+  source          String   @db.VarChar(20)
+  sourceAssetId   String?  @map("source_asset_id") @db.VarChar(80)
+  symbol          String   @db.VarChar(64)
+  name            String   @db.VarChar(160)
+  decimals        Int
+  logoUrl         String?  @map("logo_url") @db.Text
+  category        String   @db.VarChar(20)
+  isin            String?  @db.VarChar(32)
+  status          String   @db.VarChar(64)
+  currentMultiplier String? @map("current_multiplier") @db.VarChar(80)
+  marketStatus    String?  @map("market_status") @db.VarChar(64)
+  extendedStatus  String?  @map("extended_status") @db.VarChar(64)
+  overnightStatus String?  @map("overnight_status") @db.VarChar(64)
+  sourceUpdatedAt DateTime @map("source_updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@id([chainId, address])
+  @@index([chainId, category, status])
+  @@map("asset_catalog")
+}
+
 model ChainCursor {
   chainId            Int      @id @map("chain_id")
   nextBlock          BigInt   @map("next_block")

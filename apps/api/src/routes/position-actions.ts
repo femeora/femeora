@@ -4,7 +4,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { encodeFunctionData, parseAbi, parseUnits, toHex, type Address } from 'viem';
 import { z } from 'zod';
 
-import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import type { ApiChainClient } from '../core/chain-client.js';
 import { allocateRangeAmounts, minimumShares, type PositionShape } from '../core/positions/allocation.js';
 
@@ -67,12 +66,8 @@ async function exactApprovals(
 }
 
 async function authorizedPosition(
-  chainId: number, id: bigint, wallet: Address,
-  session: NonNullable<Awaited<ReturnType<typeof resolveSession>>>, client: ApiChainClient,
+  chainId: number, id: bigint, wallet: Address, client: ApiChainClient,
 ) {
-  if (!session.user.wallets.some(linked => linked.address.toLowerCase() === wallet)) {
-    throw new PositionActionError(403, 'WALLET_NOT_LINKED');
-  }
   const position = await loadPosition(chainId, id);
   if (!position || position.status !== 'open') throw new PositionActionError(404, 'OPEN_POSITION_NOT_FOUND');
   if (position.owner.toLowerCase() !== wallet) throw new PositionActionError(403, 'POSITION_OWNERSHIP_REQUIRED');
@@ -94,13 +89,11 @@ export async function registerPositionActionRoutes(
   // DAMM and DLMM intentionally share authorization and response invariants.
   // eslint-disable-next-line complexity
   app.post('/v1/positions/:id/increase-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {
-    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
-    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
     const params = paramsSchema.safeParse(request.params);
     const body = increaseSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_POSITION_INCREASE' });
     try {
-      const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, session, client);
+      const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, client);
       if (position.pool.tokenXDecimals === null || position.pool.tokenYDecimals === null) throw new PositionActionError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
       let amount0: bigint;
       let amount1: bigint;
@@ -159,13 +152,11 @@ export async function registerPositionActionRoutes(
 
   // eslint-disable-next-line complexity
   const removal = (close: boolean) => async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
-    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
     const params = paramsSchema.safeParse(request.params);
     const body = (close ? commonSchema : decreaseSchema).safeParse(request.body);
     if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_POSITION_REMOVAL' });
     try {
-      const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, session, client);
+      const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, client);
       const blockNumber = await blockProvider(chainId);
       const bps = close ? 10_000 : (body.data as z.infer<typeof decreaseSchema>).bps;
       let amount0 = 0n;

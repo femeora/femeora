@@ -9,7 +9,7 @@ import { footer, site } from '@/content/landing';
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line pb-6 pt-[clamp(3rem,6vw,5rem)]">
+    <footer className="relative z-10 border-t border-line bg-bg pb-6 pt-[clamp(3rem,6vw,5rem)]">
       <div className="wrap">
         <div className="grid-12 gap-y-10">
           <div className="col-span-12 lg:col-span-4">

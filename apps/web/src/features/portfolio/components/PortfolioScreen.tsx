@@ -33,14 +33,12 @@ function sumDecimal(values: readonly string[]): string {
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
-function SignedOut({ onSignIn }: { onSignIn: () => void }) {
+function WalletRequired({ onConnect }: { onConnect: () => void }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-gutter py-24 text-center">
       <h1 className="text-h3 font-medium">Your positions live here.</h1>
-      <p className="text-muted">Sign in with X and link a wallet to see canonical indexed positions.</p>
-      <Button variant="primary" onClick={onSignIn}>
-        <XLogo className="size-3.5" /> Sign in<span className="sr-only"> with X</span>
-      </Button>
+      <p className="text-muted">Connect the wallet that owns your positions. An X account is only needed for social actions such as posting a callout.</p>
+      <Button variant="primary" onClick={onConnect}>Connect wallet</Button>
     </div>
   );
 }
@@ -55,13 +53,13 @@ function positionStatus(position: ApiIndexedPosition): string {
 /** Canonical owner portfolio. The indexer/API is the only position source of truth. */
 export function PortfolioScreen() {
   const { user, openSignIn, signOut } = useSession();
-  const { config } = useWallet();
+  const { account, config, connect } = useWallet();
   const { data, error, isLoading, mutate } = usePositions();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [managingId, setManagingId] = useState<string | null>(null);
   const showToast = useToast(state => state.show);
 
-  if (!user) return <SignedOut onSignIn={openSignIn} />;
+  if (!account) return <WalletRequired onConnect={() => void connect()} />;
   const positions = data?.data ?? [];
   const openPositions = positions.filter(position => position.status === 'open');
   const totals = [
@@ -72,6 +70,10 @@ export function PortfolioScreen() {
   ];
 
   const postCallout = async (position: ApiIndexedPosition) => {
+    if (!user) {
+      openSignIn();
+      return;
+    }
     if (!config) throw new Error('CHAIN_CONFIG_UNAVAILABLE');
     setPostingId(position.id);
     try {
@@ -89,11 +91,15 @@ export function PortfolioScreen() {
   return (
     <div className="mx-auto max-w-[72rem] px-gutter py-8">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
-        <div className="flex items-center gap-4"><Avatar seed={user.handle} size="xl" self /><div>
-          <h1 className="text-2xl font-medium">@{user.handle}</h1>
-          <p className="t-label mt-1 break-all text-muted">{user.wallet ? `Wallet ${user.wallet} · indexed on-chain positions` : 'No wallet linked yet'}</p>
+        <div className="flex items-center gap-4"><Avatar seed={user?.handle ?? account} size="xl" self /><div>
+          <h1 className="text-2xl font-medium">{user ? `@${user.handle}` : short(account)}</h1>
+          <p className="t-label mt-1 break-all text-muted">Wallet {account} · indexed on-chain positions</p>
         </div></div>
-        <Button onClick={signOut} className="min-h-9">Sign out</Button>
+        {user ? (
+          <Button onClick={signOut} className="min-h-9">Disconnect X</Button>
+        ) : (
+          <Button onClick={openSignIn} className="min-h-9"><XLogo className="size-3.5" /> Connect X <span className="text-muted">· optional</span></Button>
+        )}
       </header>
       <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">{totals.map(total => (
         <div key={total.label} className="glass rounded-[2px] p-4"><dt className="t-label text-muted">{total.label}</dt><dd className="mt-1 break-all text-xl font-medium tabular-nums">{total.value}</dd></div>
@@ -115,7 +121,7 @@ export function PortfolioScreen() {
               <td className={cell}>{position.valueQuote ?? 'Unavailable'}</td><td className={cell}>{position.earnedQuote}</td>
               <td className={`${cell} capitalize`}>{positionStatus(position)}</td><td className={cell}>{position.calloutId ? 'Posted' : 'Not posted'}</td>
               <td className={cell}><div className="flex gap-2">
-                {!position.calloutId && position.status === 'open' ? <Button className="min-h-9" disabled={postingId === position.id} onClick={() => void postCallout(position)}>{postingId === position.id ? 'Posting…' : 'Post callout'}</Button> : null}
+                {!position.calloutId && position.status === 'open' ? <Button className="min-h-9" disabled={postingId === position.id} onClick={() => void postCallout(position)}>{postingId === position.id ? 'Posting…' : user ? 'Post callout' : 'Connect X to post'}</Button> : null}
                 {position.status === 'open' ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
               </div></td>
             </tr>

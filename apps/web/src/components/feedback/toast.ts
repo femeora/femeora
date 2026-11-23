@@ -2,6 +2,8 @@
 
 import { create } from 'zustand';
 
+import { friendlyErrorMessage } from './friendlyError';
+
 interface ToastState {
   message: string | null;
   title: string;
@@ -29,8 +31,8 @@ export const useToast = create<ToastState>(set => ({
   show: (message, options = {}) => {
     const tone = options.tone ?? (looksLikeError(message) ? 'error' : 'success');
     set({
-      message,
-      title: options.title ?? (tone === 'error' ? 'Activity failed' : tone === 'success' ? 'Activity successful' : 'Notification'),
+      message: tone === 'error' ? friendlyErrorMessage(message) : message,
+      title: options.title ?? (tone === 'error' ? 'We could not complete that' : tone === 'success' ? 'Activity successful' : 'Notification'),
       tone,
       transactionHash: options.transactionHash ?? null,
       explorerUrl: options.explorerUrl ?? null,

@@ -21,7 +21,8 @@ import { AppBottomNav, AppTopNav } from './AppNav';
 
 /**
  * Frame for every in-app screen. Separate from the landing chrome: one compact
- * top bar with tabs and identity, a bottom bar on mobile, no marketing footer.
+ * top bar with tabs and identity plus a bottom bar on mobile. The shared root
+ * layout renders the site footer after this shell on every route.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   useRehydrateStores();

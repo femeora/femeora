@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { SiteFooter } from '@/components/landing/SiteFooter';
 import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { Grain } from '@/components/ui/Grain';
@@ -183,7 +182,6 @@ export default function TestnetGuidePage() {
           </div>
         </section>
       </main>
-      <SiteFooter />
       <Grain />
     </>
   );

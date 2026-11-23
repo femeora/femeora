@@ -56,7 +56,7 @@ const initialDraft: PositionDraft = {
   presetId: defaultPreset?.id ?? null,
   quoteAmount: '',
   baseAmount: '',
-  postAsCallout: true,
+  postAsCallout: false,
   caption: '',
   showSize: true,
 };
@@ -105,7 +105,7 @@ export function usePositionDraft(pool: Pool) {
 
   const derived = useMemo(() => {
     const side = rangeSide(draft);
-    const needs = requiredTokens(side);
+    const needs = pool.type === 'DAMM' ? { quote: true, base: true } : requiredTokens(side);
     const quote = needs.quote ? toAmount(draft.quoteAmount) : 0;
     const base = needs.base ? toAmount(draft.baseAmount) : 0;
     const depositUsd = quote + base * pool.priceUsd;
@@ -117,8 +117,8 @@ export function usePositionDraft(pool: Pool) {
         : null;
 
     const error =
-      rangeError(draft, pool.binStepBps) ??
-      (depositUsd <= 0 ? 'Enter an amount' : null) ??
+      (pool.type === 'DAMM' ? null : rangeError(draft, pool.binStepBps)) ??
+      (pool.type === 'DAMM' && (quote <= 0 || base <= 0) ? 'Enter both token amounts' : depositUsd <= 0 ? 'Enter an amount' : null) ??
       captionError;
 
     return {

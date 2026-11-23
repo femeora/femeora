@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
+import { SiteFooter } from '@/components/landing/SiteFooter';
 import { site } from '@/content/landing';
 
 import './globals.css';
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }

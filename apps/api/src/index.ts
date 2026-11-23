@@ -15,6 +15,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerCalloutRoutes } from './routes/callouts.js';
 import { registerFeedRoutes } from './routes/feed.js';
 import { registerPoolRoutes } from './routes/pools.js';
+import { registerPoolCreationRoutes } from './routes/pool-creation.js';
 import { registerPositionActionRoutes } from './routes/position-actions.js';
 import { registerPositionCreateRoutes } from './routes/position-create.js';
 import { registerPositionRoutes } from './routes/positions.js';
@@ -134,6 +135,7 @@ export async function createServer(environment = loadApiEnvironment()) {
   await registerCalloutRoutes(app, environment.CHAIN_ID);
   await registerFeedRoutes(app, environment.CHAIN_ID);
   await registerPoolRoutes(app, environment.CHAIN_ID);
+  await registerPoolCreationRoutes(app, environment.CHAIN_ID, chainClient);
   await registerPositionRoutes(app, environment.CHAIN_ID);
   await registerPositionCreateRoutes(app, environment.CHAIN_ID, chainClient);
   await registerPositionActionRoutes(app, environment.CHAIN_ID, chainClient);
