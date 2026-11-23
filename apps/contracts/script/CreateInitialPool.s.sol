@@ -57,10 +57,13 @@ contract CreateInitialPool {
 
         uint256 feeRaw = vm.envUint("INITIAL_POOL_FEE_PIPS");
         uint256 stepRaw = vm.envUint("INITIAL_POOL_BIN_STEP_BPS");
+        uint256 baseReserveCap = vm.envUint("INITIAL_POOL_BASE_RESERVE_CAP");
+        uint256 quoteReserveCap = vm.envUint("INITIAL_POOL_QUOTE_RESERVE_CAP");
         int256 activeRaw = vm.envInt("INITIAL_POOL_ACTIVE_BIN");
         require(feeRaw > 0 && feeRaw < 1_000_000, "invalid fee");
         require(stepRaw > 0 && stepRaw <= 1_000, "invalid bin step");
         require(activeRaw >= type(int24).min && activeRaw <= type(int24).max, "invalid active bin");
+        require(baseReserveCap != 0 && quoteReserveCap != 0, "reserve cap missing");
 
         string memory root = vm.projectRoot();
         string memory deployment = vm.readFile(string.concat(root, "/deployments/", network, ".json"));
@@ -81,6 +84,8 @@ contract CreateInitialPool {
         require(!factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), oldAdmin), "old admin retained");
         require(!factory.hasRole(factory.UPGRADER_ROLE(), oldUpgrader), "old upgrader retained");
         require(address(factory.dlmmDeployer()) == upgradedDlmmDeployer, "accounting deployer inactive");
+        require(factory.tokenReserveCaps(baseToken) == baseReserveCap, "base reserve cap inactive");
+        require(factory.tokenReserveCaps(quoteToken) == quoteReserveCap, "quote reserve cap inactive");
 
         PoolKey memory key =
             PoolKeyLib.normalize(baseToken, quoteToken, PoolModel.DLMM, uint24(feeRaw), uint16(stepRaw));
@@ -105,6 +110,8 @@ contract CreateInitialPool {
         vm.serializeAddress(manifestKey, "quoteToken", quoteToken);
         vm.serializeUint(manifestKey, "feePips", feeRaw);
         vm.serializeUint(manifestKey, "binStepBps", stepRaw);
+        vm.serializeUint(manifestKey, "baseReserveCap", baseReserveCap);
+        vm.serializeUint(manifestKey, "quoteReserveCap", quoteReserveCap);
         vm.serializeAddress(manifestKey, "governanceTimelock", timelock);
         string memory json = vm.serializeInt(manifestKey, "initialActiveBin", activeRaw);
         if (vm.envBool("WRITE_INITIAL_POOL_MANIFEST")) {

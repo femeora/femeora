@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import { DlmmPoolV2 } from "../src/core/DlmmPoolV2.sol";
-import { DammPool } from "../src/core/DammPool.sol";
-import { PoolRegistry } from "../src/core/PoolRegistry.sol";
-import { PoolKey, PoolKeyLib, PoolModel } from "../src/core/PoolTypes.sol";
-import { IPositionManagerV2 } from "../src/interfaces/IPositionManagerV2.sol";
-import { PositionManagerV2 } from "../src/liquidity/PositionManagerV2.sol";
-import { DlmmLens } from "../src/periphery/DlmmLens.sol";
-import { ERC1967Proxy } from "../src/proxy/ERC1967Proxy.sol";
-import { MockERC20 } from "./mocks/MockERC20.sol";
+import {DlmmPoolV2} from "../src/core/DlmmPoolV2.sol";
+import {DammPool} from "../src/core/DammPool.sol";
+import {PoolRegistry} from "../src/core/PoolRegistry.sol";
+import {PoolKey, PoolKeyLib, PoolModel} from "../src/core/PoolTypes.sol";
+import {IPositionManagerV2} from "../src/interfaces/IPositionManagerV2.sol";
+import {PositionManagerV2} from "../src/liquidity/PositionManagerV2.sol";
+import {DlmmLens} from "../src/periphery/DlmmLens.sol";
+import {ERC1967Proxy} from "../src/proxy/ERC1967Proxy.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
 
 interface VmTest {
     function warp(uint256 timestamp) external;
@@ -31,16 +31,27 @@ contract PositionManagerV2Test {
         token1 = MockERC20(key.token1);
 
         PoolRegistry implementation = new PoolRegistry();
-        registry = PoolRegistry(address(new ERC1967Proxy(
-            address(implementation), abi.encodeCall(PoolRegistry.initialize, (address(this), address(this), address(this)))
-        )));
+        registry = PoolRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(implementation),
+                    abi.encodeCall(PoolRegistry.initialize, (address(this), address(this), address(this)))
+                )
+            )
+        );
         pool = new DlmmPoolV2(key, address(this), 0);
+        pool.setReserveCaps(type(uint256).max, type(uint256).max);
         registry.registerPool(PoolKeyLib.id(key), address(pool), key);
 
         PositionManagerV2 managerImplementation = new PositionManagerV2();
-        manager = PositionManagerV2(address(new ERC1967Proxy(
-            address(managerImplementation), abi.encodeCall(PositionManagerV2.initialize, (address(this), address(this), registry))
-        )));
+        manager = PositionManagerV2(
+            address(
+                new ERC1967Proxy(
+                    address(managerImplementation),
+                    abi.encodeCall(PositionManagerV2.initialize, (address(this), address(this), registry))
+                )
+            )
+        );
         token0.mint(address(this), 100 ether);
         token1.mint(address(this), 100 ether);
         token0.approve(address(manager), type(uint256).max);
@@ -96,9 +107,7 @@ contract PositionManagerV2Test {
     function testRejectsSelfReferrer() public {
         IPositionManagerV2.CreateParams memory p = _params(false, bytes32(0));
         p.referrer = address(this);
-        (bool success,) = address(manager).call(
-            abi.encodeCall(PositionManagerV2.createRangePosition, (p))
-        );
+        (bool success,) = address(manager).call(abi.encodeCall(PositionManagerV2.createRangePosition, (p)));
         require(!success, "self referrer accepted");
     }
 
@@ -107,9 +116,8 @@ contract PositionManagerV2Test {
         token0.approve(address(pool), type(uint256).max);
         uint256 beforeInput = token0.balanceOf(address(this));
         uint256 beforeOutput = token1.balanceOf(address(this));
-        (uint256 amountIn, uint16 crossed) = pool.swapExactOutput(
-            true, 2 ether, 3 ether, 4, address(this), block.timestamp + 1
-        );
+        (uint256 amountIn, uint16 crossed) =
+            pool.swapExactOutput(true, 2 ether, 3 ether, 4, address(this), block.timestamp + 1);
         require(amountIn <= 3 ether && crossed >= 2, "execution bounds");
         require(beforeInput - token0.balanceOf(address(this)) == amountIn, "exact input");
         require(token1.balanceOf(address(this)) - beforeOutput == 2 ether, "exact output");
@@ -119,10 +127,12 @@ contract PositionManagerV2Test {
         manager.createRangePosition(_params(false, bytes32(0)));
         token0.approve(address(pool), type(uint256).max);
         uint256 beforeInput = token0.balanceOf(address(this));
-        (bool success,) = address(pool).call(abi.encodeCall(
-            DlmmPoolV2.swapExactOutput,
-            (true, 2 ether, 1, uint16(4), address(this), block.timestamp + 1)
-        ));
+        (bool success,) = address(pool)
+            .call(
+                abi.encodeCall(
+                    DlmmPoolV2.swapExactOutput, (true, 2 ether, 1, uint16(4), address(this), block.timestamp + 1)
+                )
+            );
         require(!success && token0.balanceOf(address(this)) == beforeInput, "atomic slippage");
     }
 
@@ -138,10 +148,9 @@ contract PositionManagerV2Test {
     }
 
     function testDammPositionCarriesTagReferrerAndCloses() public {
-        PoolKey memory key = PoolKeyLib.normalize(
-            address(token0), address(token1), PoolModel.DAMM, 3_000, 0
-        );
+        PoolKey memory key = PoolKeyLib.normalize(address(token0), address(token1), PoolModel.DAMM, 3_000, 0);
         DammPool damm = new DammPool(key, address(this));
+        damm.setReserveCaps(type(uint112).max, type(uint112).max);
         registry.registerPool(PoolKeyLib.id(key), address(damm), key);
         IPositionManagerV2.CreateDammParams memory p = IPositionManagerV2.CreateDammParams({
             pool: address(damm),
@@ -160,9 +169,7 @@ contract PositionManagerV2Test {
         require(manager.dammShares(id) == 0 && manager.balanceOf(address(this)) == 0, "damm close");
     }
 
-    function _params(bool above, bytes32 tag)
-        private view returns (IPositionManagerV2.CreateParams memory p)
-    {
+    function _params(bool above, bytes32 tag) private view returns (IPositionManagerV2.CreateParams memory p) {
         p.pool = address(pool);
         p.shape = uint8(IPositionManagerV2.Shape.BidAsk);
         p.tag = tag;

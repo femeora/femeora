@@ -30,6 +30,10 @@ import { registerTailRoutes } from './routes/tail.js';
 export async function createServer(environment = loadApiEnvironment()) {
   const app = Fastify({
     disableRequestLogging: true,
+    // Railway terminates TLS at the edge and forwards one client hop. Trusting
+    // exactly that hop keeps IP-based abuse limits useful without accepting an
+    // arbitrary client-supplied X-Forwarded-For chain.
+    trustProxy: 1,
     logger: {
       base: null,
       level: environment.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -43,6 +47,9 @@ export async function createServer(environment = loadApiEnvironment()) {
           '*.RPC_FALLBACK_URL',
           '*.RPC_INDEXER',
           '*.X_CLIENT_SECRET',
+          '*.X_APP_BEARER_TOKEN',
+          '*.DEPLOYER_PRIVATE_KEY',
+          '*.PRIVATE_KEY',
         ],
         censor: '[REDACTED]',
       },
@@ -100,6 +107,14 @@ export async function createServer(environment = loadApiEnvironment()) {
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json')) {
       return reply.status(415).send({ error: 'JSON_REQUIRED' });
     }
+  });
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (request.url === '/v1/me' || request.url.startsWith('/v1/auth/')) {
+      reply.header('cache-control', 'no-store, max-age=0');
+      reply.header('pragma', 'no-cache');
+    }
+    return payload;
   });
 
   app.get('/health', async (_request, reply) => {

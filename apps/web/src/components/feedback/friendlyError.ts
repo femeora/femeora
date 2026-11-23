@@ -26,6 +26,9 @@ export function friendlyErrorMessage(error: string): string {
   if (includesAny(value, ['RATE_LIMIT', 'TOO_MANY_REQUESTS', '429'])) {
     return 'Too many requests were made in a short time. Wait a moment, then try again.';
   }
+  if (value.includes('TOKEN_RESERVE_CAP_NOT_CONFIGURED')) {
+    return 'This asset is not enabled for new liquidity pools yet. Choose another pair or wait for the governance cap to become active.';
+  }
   if (includesAny(value, ['TIMEOUT', 'NETWORK_ERROR', 'FETCH_FAILED', 'FAILED TO FETCH', 'RPC', 'UNAVAILABLE', '502', '503', '504'])) {
     return 'Fomeora could not reach the network service. Check your connection and try again in a moment.';
   }

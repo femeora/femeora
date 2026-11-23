@@ -1,4 +1,9 @@
-import { dammPoolAbi, positionManagerV2Abi, type FomeoraDeployment } from '@fomeora/contracts-sdk';
+import {
+  dammPoolAbi,
+  dlmmPoolV2Abi,
+  positionManagerV2Abi,
+  type FomeoraDeployment,
+} from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import { priceFromBinX18 } from '@fomeora/sdk';
 import type { Address } from 'viem';
@@ -11,6 +16,114 @@ import {
 } from './processors/position-value.js';
 
 const VALUE_REFRESH_INTERVAL_MS = 30_000;
+
+type ReserveCapLevel = 'normal' | 'warning' | 'critical';
+
+function reserveCapLevel(reserveX: bigint, reserveY: bigint, capX: bigint, capY: bigint) {
+  const utilizationX = reserveX * 10_000n / capX;
+  const utilizationY = reserveY * 10_000n / capY;
+  const utilizationBps = Number(utilizationX > utilizationY ? utilizationX : utilizationY);
+  const level: ReserveCapLevel = utilizationBps >= 9_000
+    ? 'critical'
+    : utilizationBps >= 8_000
+      ? 'warning'
+      : 'normal';
+  return { utilizationBps, level };
+}
+
+export async function refreshPoolReserveSnapshots(
+  client: IndexerClient,
+  chainId: number,
+  safeBlock: bigint,
+  now = new Date(),
+): Promise<{ pools: number; warning: number; critical: number }> {
+  const refreshBefore = new Date(now.getTime() - VALUE_REFRESH_INTERVAL_MS);
+  const pools = await prisma.pool.findMany({
+    where: {
+      chainId,
+      canonical: true,
+      reserveCapX: { not: null },
+      reserveCapY: { not: null },
+      OR: [
+        { lastReserveRefreshAt: null },
+        { lastReserveRefreshAt: { lte: refreshBefore } },
+      ],
+    },
+    select: {
+      id: true,
+      address: true,
+      type: true,
+      reserveCapX: true,
+      reserveCapY: true,
+      reserveX: true,
+      reserveY: true,
+    },
+  });
+  let warning = 0;
+  let critical = 0;
+  for (const pool of pools) {
+    const address = pool.address as Address;
+    const [reserveX, reserveY] = pool.type === 'DAMM'
+      ? await Promise.all([
+          client.readContract({ address, abi: dammPoolAbi, functionName: 'reserve0', blockNumber: safeBlock }),
+          client.readContract({ address, abi: dammPoolAbi, functionName: 'reserve1', blockNumber: safeBlock }),
+        ])
+      : await Promise.all([
+          client.readContract({ address, abi: dlmmPoolV2Abi, functionName: 'totalReserve0', blockNumber: safeBlock }),
+          client.readContract({ address, abi: dlmmPoolV2Abi, functionName: 'totalReserve1', blockNumber: safeBlock }),
+        ]);
+    const capX = BigInt(pool.reserveCapX!.toString());
+    const capY = BigInt(pool.reserveCapY!.toString());
+    const current = reserveCapLevel(reserveX, reserveY, capX, capY);
+    if (current.level === 'critical') critical += 1;
+    else if (current.level === 'warning') warning += 1;
+    const previous = pool.reserveX === null || pool.reserveY === null
+      ? null
+      : reserveCapLevel(
+          BigInt(pool.reserveX.toString()),
+          BigInt(pool.reserveY.toString()),
+          capX,
+          capY,
+        );
+    await prisma.$transaction(async transaction => {
+      await transaction.pool.update({
+        where: { id: pool.id },
+        data: {
+          reserveX: reserveX.toString(),
+          reserveY: reserveY.toString(),
+          reserveUpdatedBlock: safeBlock,
+          lastReserveRefreshAt: now,
+        },
+      });
+      if ((previous?.level ?? 'normal') !== current.level) {
+        const dedupKey = `${chainId}:${pool.address.toLowerCase()}:pool.cap:${safeBlock}:${current.level}`;
+        await transaction.outboxEvent.upsert({
+          where: { dedupKey },
+          create: {
+            dedupKey,
+            topic: 'pool.cap',
+            aggregateId: pool.address.toLowerCase(),
+            chainId,
+            blockNumber: safeBlock,
+            payload: {
+              pool: pool.address.toLowerCase(),
+              previousStatus: previous?.level ?? 'unavailable',
+              status: current.level,
+              utilizationBps: current.utilizationBps,
+              reserveX: reserveX.toString(),
+              reserveY: reserveY.toString(),
+              reserveCapX: capX.toString(),
+              reserveCapY: capY.toString(),
+              blockNumber: safeBlock.toString(),
+            },
+          },
+          update: { canonical: true },
+        });
+      }
+    });
+  }
+  return { pools: pools.length, warning, critical };
+}
 
 function quoteConfiguration(pool: {
   tokenX: string;

@@ -892,6 +892,43 @@ export const poolFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "setTokenReserveCap",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "reserveCap",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "tokenReserveCaps",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "reserveCap",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "upgradeToAndCall",
     "inputs": [
       {
@@ -1050,6 +1087,25 @@ export const poolFactoryAbi = [
   },
   {
     "type": "event",
+    "name": "TokenReserveCapUpdated",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "reserveCap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -1104,6 +1160,11 @@ export const poolFactoryAbi = [
   {
     "type": "error",
     "name": "PoolAlreadyExists",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TokenReserveCapMissing",
     "inputs": []
   },
   {
@@ -1472,6 +1533,32 @@ export const dammPoolAbi = [
   },
   {
     "type": "function",
+    "name": "reserveCap0",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint112",
+        "internalType": "uint112"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "reserveCap1",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint112",
+        "internalType": "uint112"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "setAdministrator",
     "inputs": [
       {
@@ -1509,6 +1596,24 @@ export const dammPoolAbi = [
         "name": "sharePips",
         "type": "uint24",
         "internalType": "uint24"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setReserveCaps",
+    "inputs": [
+      {
+        "name": "reserveCap0_",
+        "type": "uint112",
+        "internalType": "uint112"
+      },
+      {
+        "name": "reserveCap1_",
+        "type": "uint112",
+        "internalType": "uint112"
       }
     ],
     "outputs": [],
@@ -1802,6 +1907,25 @@ export const dammPoolAbi = [
   },
   {
     "type": "event",
+    "name": "ReserveCapsUpdated",
+    "inputs": [
+      {
+        "name": "reserveCap0",
+        "type": "uint112",
+        "indexed": false,
+        "internalType": "uint112"
+      },
+      {
+        "name": "reserveCap1",
+        "type": "uint112",
+        "indexed": false,
+        "internalType": "uint112"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Swap",
     "inputs": [
       {
@@ -1911,6 +2035,11 @@ export const dammPoolAbi = [
   {
     "type": "error",
     "name": "ReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReserveCapExceeded",
     "inputs": []
   },
   {
@@ -2517,6 +2646,32 @@ export const dlmmPoolV2Abi = [
   },
   {
     "type": "function",
+    "name": "reserveCap0",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "reserveCap1",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "setAdministrator",
     "inputs": [
       {
@@ -2554,6 +2709,24 @@ export const dlmmPoolV2Abi = [
         "name": "sharePips",
         "type": "uint24",
         "internalType": "uint24"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setReserveCaps",
+    "inputs": [
+      {
+        "name": "reserveCap0_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "reserveCap1_",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -2729,6 +2902,32 @@ export const dlmmPoolV2Abi = [
         "name": "",
         "type": "uint8",
         "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalReserve0",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalReserve1",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -3115,6 +3314,25 @@ export const dlmmPoolV2Abi = [
   },
   {
     "type": "event",
+    "name": "ReserveCapsUpdated",
+    "inputs": [
+      {
+        "name": "reserveCap0",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "reserveCap1",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Swap",
     "inputs": [
       {
@@ -3253,6 +3471,11 @@ export const dlmmPoolV2Abi = [
   {
     "type": "error",
     "name": "ReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReserveCapExceeded",
     "inputs": []
   },
   {

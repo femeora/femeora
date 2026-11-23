@@ -12,6 +12,11 @@ const validStats = {
   amountOut: '9',
   totalFee: '0.1',
   protocolFee: '0.01',
+  reserveX: '500',
+  reserveY: '800',
+  reserveUpdatedBlock: '123',
+  reserveUtilizationBps: 8000,
+  reserveCapStatus: 'warning',
 };
 
 test('browser API client uses only the same-origin proxy and validates responses', async () => {

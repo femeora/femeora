@@ -95,7 +95,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance, chainId: numb
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
     return streamEvents(request, reply, wakeup, {
       chainId,
-      topics: ['pool.swap'],
+      topics: ['pool.swap', 'pool.cap'],
       aggregateId: parsed.data.pool,
     });
   });

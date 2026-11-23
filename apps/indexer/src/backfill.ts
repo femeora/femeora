@@ -1,4 +1,9 @@
-import { poolFactoryAbi, type FomeoraDeployment } from '@fomeora/contracts-sdk';
+import {
+  dammPoolAbi,
+  dlmmPoolV2Abi,
+  poolFactoryAbi,
+  type FomeoraDeployment,
+} from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import type { IndexerEnvironment } from '@fomeora/env';
 import {
@@ -129,6 +134,24 @@ function projectedPositionStatus(
   return 'open';
 }
 
+async function readPoolReserveCaps(
+  client: IndexerClient,
+  address: Address,
+  type: 'DAMM' | 'DLMM',
+  blockNumber: bigint
+): Promise<readonly [bigint, bigint]> {
+  if (type === 'DAMM') {
+    return Promise.all([
+      client.readContract({ address, abi: dammPoolAbi, functionName: 'reserveCap0', blockNumber }),
+      client.readContract({ address, abi: dammPoolAbi, functionName: 'reserveCap1', blockNumber }),
+    ]);
+  }
+  return Promise.all([
+    client.readContract({ address, abi: dlmmPoolV2Abi, functionName: 'reserveCap0', blockNumber }),
+    client.readContract({ address, abi: dlmmPoolV2Abi, functionName: 'reserveCap1', blockNumber }),
+  ]);
+}
+
 export async function backfillPoolRegistry(
   client: IndexerClient,
   environment: IndexerEnvironment,
@@ -236,6 +259,24 @@ export async function backfillPoolRegistry(
         tokenDecimals.set(token, decimals);
       })
     );
+    const poolCaps = new Map<string, { reserveCapX: string; reserveCapY: string }>();
+    await Promise.all(
+      logs.map(async log => {
+        const blockNumber = requireMinedValue(log.blockNumber, 'BLOCK_NUMBER');
+        const type = Number(log.args.key.model) === 0 ? 'DAMM' : 'DLMM';
+        const caps = await readPoolReserveCaps(
+          client,
+          log.args.pool,
+          type,
+          blockNumber
+        ).catch(() => null);
+        if (!caps) return;
+        poolCaps.set(log.args.pool.toLowerCase(), {
+          reserveCapX: caps[0].toString(),
+          reserveCapY: caps[1].toString(),
+        });
+      })
+    );
     const [poolEvents, positionEvents, positionShareEvents] = await Promise.all([
       collectPoolEvents(client, [...descriptorByAddress.values()], nextBlock, endBlock),
       collectPositionEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
@@ -283,6 +324,7 @@ export async function backfillPoolRegistry(
             key.token1,
             environment.QUOTE_TOKEN_ADDRESS
           );
+          const caps = poolCaps.get(pool.toLowerCase());
           const storedPool = await transaction.pool.upsert({
             where: {
               chainId_address: { chainId: chain.chainId, address: pool.toLowerCase() },
@@ -298,6 +340,8 @@ export async function backfillPoolRegistry(
               quoteToken,
               binStep: Number(key.binStepBps),
               baseFeePips: Number(key.feePips),
+              reserveCapX: caps?.reserveCapX ?? null,
+              reserveCapY: caps?.reserveCapY ?? null,
               initialActiveBin: activeBinByAddress.get(pool.toLowerCase()) ?? null,
               activeBin: activeBinByAddress.get(pool.toLowerCase()) ?? null,
               createdBlock: blockNumber,
@@ -308,6 +352,9 @@ export async function backfillPoolRegistry(
               tokenYDecimals: tokenDecimals.get(key.token1.toLowerCase()) ?? null,
               binStep: Number(key.binStepBps),
               baseFeePips: Number(key.feePips),
+              ...(caps
+                ? { reserveCapX: caps.reserveCapX, reserveCapY: caps.reserveCapY }
+                : {}),
               activeBin: activeBinByAddress.get(pool.toLowerCase()) ?? null,
               canonical: true,
             },

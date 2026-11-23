@@ -56,6 +56,8 @@ function serializePool(pool: {
   quoteToken: string | null;
   binStep: number;
   baseFeePips: number;
+  reserveCapX: { toString(): string } | null;
+  reserveCapY: { toString(): string } | null;
   createdBlock: bigint;
 }) {
   return {
@@ -63,6 +65,8 @@ function serializePool(pool: {
     baseIsTokenX: pool.quoteToken
       ? pool.quoteToken.toLowerCase() === pool.tokenY.toLowerCase()
       : null,
+    reserveCapX: pool.reserveCapX?.toString() ?? null,
+    reserveCapY: pool.reserveCapY?.toString() ?? null,
     createdBlock: pool.createdBlock.toString(),
   };
 }
@@ -103,6 +107,46 @@ export function binQuoteValues(pool: {
   };
 }
 
+function reserveCapStatus(pool: {
+  reserveX: { toString(): string } | null;
+  reserveY: { toString(): string } | null;
+  reserveCapX: { toString(): string } | null;
+  reserveCapY: { toString(): string } | null;
+  reserveUpdatedBlock: bigint | null;
+}) {
+  if (!pool.reserveX || !pool.reserveY || !pool.reserveCapX || !pool.reserveCapY) {
+    return {
+      reserveX: null,
+      reserveY: null,
+      reserveUpdatedBlock: null,
+      reserveUtilizationBps: null,
+      reserveCapStatus: 'unavailable' as const,
+    };
+  }
+  const reserveX = BigInt(pool.reserveX.toString());
+  const reserveY = BigInt(pool.reserveY.toString());
+  const capX = BigInt(pool.reserveCapX.toString());
+  const capY = BigInt(pool.reserveCapY.toString());
+  const utilizationX = capX === 0n ? null : reserveX * 10_000n / capX;
+  const utilizationY = capY === 0n ? null : reserveY * 10_000n / capY;
+  const utilization = utilizationX === null || utilizationY === null
+    ? null
+    : Number(utilizationX > utilizationY ? utilizationX : utilizationY);
+  return {
+    reserveX: reserveX.toString(),
+    reserveY: reserveY.toString(),
+    reserveUpdatedBlock: pool.reserveUpdatedBlock?.toString() ?? null,
+    reserveUtilizationBps: utilization,
+    reserveCapStatus: utilization === null
+      ? 'unavailable' as const
+      : utilization >= 9_000
+        ? 'critical' as const
+        : utilization >= 8_000
+          ? 'warning' as const
+          : 'normal' as const,
+  };
+}
+
 export async function registerPoolRoutes(app: FastifyInstance, chainId: number) {
   app.get('/v1/pools', async (request, reply) => {
     const parsed = z.object({ limit: limitSchema }).safeParse(request.query);
@@ -139,7 +183,14 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     if (!parsed.success) return reply.status(400).send({ error: 'INVALID_POOL_ADDRESS' });
     const pool = await prisma.pool.findFirst({
       where: { chainId, address: parsed.data.pool, canonical: true },
-      select: { id: true },
+      select: {
+        id: true,
+        reserveX: true,
+        reserveY: true,
+        reserveCapX: true,
+        reserveCapY: true,
+        reserveUpdatedBlock: true,
+      },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
     const [swaps, openPositions] = await Promise.all([
@@ -157,6 +208,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       amountOut: swaps._sum.amountOut?.toString() ?? '0',
       totalFee: swaps._sum.totalFee?.toString() ?? '0',
       protocolFee: swaps._sum.protocolFee?.toString() ?? '0',
+      ...reserveCapStatus(pool),
     };
   });
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
+import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { TokenIcon } from '@/components/ui/TokenPair';
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
 import { useWallet } from '@/features/wallet/store';
@@ -46,7 +47,9 @@ export function CreatePoolForm() {
         method: 'POST',
         body: { tokenA, tokenB, model, feePips, binStepBps: model === 'DLMM' ? Number(binStep) : 0, ...(model === 'DLMM' ? { initialPrice } : {}), wallet: account },
       }));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'POOL_PREPARATION_FAILED'); }
+    } catch (cause) {
+      setError(friendlyErrorMessage(cause instanceof Error ? cause.message : 'POOL_PREPARATION_FAILED'));
+    }
     finally { setBusy(false); }
   };
   const execute = async () => {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import { DlmmPoolV2 } from "../../src/core/DlmmPoolV2.sol";
-import { PoolKey, PoolKeyLib, PoolModel } from "../../src/core/PoolTypes.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
+import {DlmmPoolV2} from "../../src/core/DlmmPoolV2.sol";
+import {PoolKey, PoolKeyLib, PoolModel} from "../../src/core/PoolTypes.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract DlmmSwapHandler {
     DlmmPoolV2 public immutable pool;
@@ -42,6 +42,7 @@ contract DlmmPoolInvariant {
         token0 = MockERC20(key.token0);
         token1 = MockERC20(key.token1);
         pool = new DlmmPoolV2(key, address(this), 0);
+        pool.setReserveCaps(type(uint256).max, type(uint256).max);
         token0.mint(address(this), 1_000 ether);
         token1.mint(address(this), 1_000 ether);
         token0.approve(address(pool), type(uint256).max);
@@ -73,14 +74,8 @@ contract DlmmPoolInvariant {
             reserves0 += reserve0;
             reserves1 += reserve1;
         }
-        require(
-            token0.balanceOf(address(pool)) == reserves0 + pool.protocolFees0(),
-            "token0 conservation"
-        );
-        require(
-            token1.balanceOf(address(pool)) == reserves1 + pool.protocolFees1(),
-            "token1 conservation"
-        );
+        require(token0.balanceOf(address(pool)) == reserves0 + pool.protocolFees0(), "token0 conservation");
+        require(token1.balanceOf(address(pool)) == reserves1 + pool.protocolFees1(), "token1 conservation");
     }
 
     function invariant_DynamicFeeNeverExceedsHardCap() public view {

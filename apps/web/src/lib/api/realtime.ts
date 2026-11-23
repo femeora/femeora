@@ -19,7 +19,7 @@ export function openApiEventStream(path: string, options: ApiEventStreamOptions)
   }
 
   const source = new EventSource(`/api${path}`, { withCredentials: true });
-  const topics = ['callout.new', 'callout.update', 'callout.stats', 'pool.swap'];
+  const topics = ['callout.new', 'callout.update', 'callout.stats', 'pool.swap', 'pool.cap'];
 
   const handle = (event: Event) => {
     const message = event as MessageEvent<string>;

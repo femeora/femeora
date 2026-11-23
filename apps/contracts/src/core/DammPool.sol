@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import { IERC20Minimal } from "../interfaces/IERC20Minimal.sol";
-import { TokenTransfer } from "../libraries/TokenTransfer.sol";
-import { ConstantProductMath } from "../math/ConstantProductMath.sol";
-import { FullMath } from "../math/FullMath.sol";
-import { LiquidityMath } from "../math/LiquidityMath.sol";
-import { ReentrancyGuard } from "../security/ReentrancyGuard.sol";
-import { PoolKey } from "./PoolTypes.sol";
+import {IERC20Minimal} from "../interfaces/IERC20Minimal.sol";
+import {TokenTransfer} from "../libraries/TokenTransfer.sol";
+import {ConstantProductMath} from "../math/ConstantProductMath.sol";
+import {FullMath} from "../math/FullMath.sol";
+import {LiquidityMath} from "../math/LiquidityMath.sol";
+import {ReentrancyGuard} from "../security/ReentrancyGuard.sol";
+import {PoolKey} from "./PoolTypes.sol";
 
 contract DammPool is ReentrancyGuard {
     using TokenTransfer for address;
@@ -25,6 +25,7 @@ contract DammPool is ReentrancyGuard {
     error InvalidRecipient();
     error InvalidAdministrator();
     error InvalidProtocolFeeShare();
+    error ReserveCapExceeded();
 
     address public immutable factory;
     address public immutable token0;
@@ -38,22 +39,16 @@ contract DammPool is ReentrancyGuard {
     uint112 public reserve1;
     uint128 public protocolFees0;
     uint128 public protocolFees1;
+    uint112 public reserveCap0;
+    uint112 public reserveCap1;
     uint256 public totalShares;
     mapping(address account => uint256 shares) public sharesOf;
 
     event LiquidityAdded(
-        address indexed sender,
-        address indexed recipient,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 shares
+        address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares
     );
     event LiquidityRemoved(
-        address indexed sender,
-        address indexed recipient,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 shares
+        address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares
     );
     event Swap(
         address indexed sender,
@@ -67,6 +62,7 @@ contract DammPool is ReentrancyGuard {
     event PauseUpdated(bool paused);
     event ProtocolFeeConfigurationUpdated(address indexed recipient, uint24 sharePips);
     event AdministratorUpdated(address indexed previousAdministrator, address indexed administrator);
+    event ReserveCapsUpdated(uint112 reserveCap0, uint112 reserveCap1);
 
     modifier onlyAdministrator() {
         if (msg.sender != administrator) revert Unauthorized();
@@ -88,13 +84,12 @@ contract DammPool is ReentrancyGuard {
         protocolFeeRecipient = administrator_;
     }
 
-    function addLiquidity(
-        uint256 amount0,
-        uint256 amount1,
-        uint256 minimumShares,
-        address recipient,
-        uint256 deadline
-    ) external nonReentrant whenNotPaused returns (uint256 shares) {
+    function addLiquidity(uint256 amount0, uint256 amount1, uint256 minimumShares, address recipient, uint256 deadline)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 shares)
+    {
         _validateCall(recipient, deadline);
         if (amount0 == 0 || amount1 == 0) revert InsufficientInput();
         token0.pullExact(msg.sender, amount0);
@@ -148,15 +143,12 @@ contract DammPool is ReentrancyGuard {
         if (tokenIn == token0) zeroForOne = true;
         else if (tokenIn != token1) revert InsufficientInput();
 
-        (uint256 reserveIn, uint256 reserveOut) = zeroForOne
-            ? (uint256(reserve0), uint256(reserve1))
-            : (uint256(reserve1), uint256(reserve0));
+        (uint256 reserveIn, uint256 reserveOut) =
+            zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
         uint256 totalFee;
-        (amountOut, totalFee) =
-            ConstantProductMath.quoteExactInput(amountIn, reserveIn, reserveOut, feePips);
+        (amountOut, totalFee) = ConstantProductMath.quoteExactInput(amountIn, reserveIn, reserveOut, feePips);
         if (amountOut < minimumAmountOut) revert SlippageExceeded();
-        uint256 protocolFee =
-            FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
+        uint256 protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
 
         tokenIn.pullExact(msg.sender, amountIn);
         address tokenOut = zeroForOne ? token1 : token0;
@@ -179,9 +171,8 @@ contract DammPool is ReentrancyGuard {
         bool zeroForOne;
         if (tokenIn == token0) zeroForOne = true;
         else if (tokenIn != token1) revert InsufficientInput();
-        (uint256 reserveIn, uint256 reserveOut) = zeroForOne
-            ? (uint256(reserve0), uint256(reserve1))
-            : (uint256(reserve1), uint256(reserve0));
+        (uint256 reserveIn, uint256 reserveOut) =
+            zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
         return ConstantProductMath.quoteExactOutput(amountOut, reserveIn, reserveOut, feePips);
     }
 
@@ -199,12 +190,10 @@ contract DammPool is ReentrancyGuard {
         uint256 totalFee;
         (amountIn, totalFee) = quoteExactOutput(tokenIn, amountOut);
         if (amountIn > maximumAmountIn) revert SlippageExceeded();
-        uint256 protocolFee =
-            FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
+        uint256 protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
         tokenIn.pullExact(msg.sender, amountIn);
-        (uint256 reserveIn, uint256 reserveOut) = zeroForOne
-            ? (uint256(reserve0), uint256(reserve1))
-            : (uint256(reserve1), uint256(reserve0));
+        (uint256 reserveIn, uint256 reserveOut) =
+            zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
         (zeroForOne ? token1 : token0).pushExact(recipient, amountOut);
         if (zeroForOne) {
             protocolFees0 += _toUint128(protocolFee);
@@ -221,10 +210,7 @@ contract DammPool is ReentrancyGuard {
         emit PauseUpdated(paused_);
     }
 
-    function setProtocolFeeConfiguration(address recipient, uint24 sharePips)
-        external
-        onlyAdministrator
-    {
+    function setProtocolFeeConfiguration(address recipient, uint24 sharePips) external onlyAdministrator {
         if (recipient == address(0)) revert InvalidRecipient();
         if (sharePips > PROTOCOL_FEE_SHARE_DENOMINATOR) revert InvalidProtocolFeeShare();
         protocolFeeRecipient = recipient;
@@ -239,11 +225,16 @@ contract DammPool is ReentrancyGuard {
         emit AdministratorUpdated(previous, administrator_);
     }
 
-    function collectProtocolFees()
-        external
-        nonReentrant
-        returns (uint256 amount0, uint256 amount1)
-    {
+    function setReserveCaps(uint112 reserveCap0_, uint112 reserveCap1_) external onlyAdministrator {
+        if (reserveCap0_ == 0 || reserveCap1_ == 0 || reserve0 > reserveCap0_ || reserve1 > reserveCap1_) {
+            revert ReserveCapExceeded();
+        }
+        reserveCap0 = reserveCap0_;
+        reserveCap1 = reserveCap1_;
+        emit ReserveCapsUpdated(reserveCap0_, reserveCap1_);
+    }
+
+    function collectProtocolFees() external nonReentrant returns (uint256 amount0, uint256 amount1) {
         if (msg.sender != protocolFeeRecipient) {
             revert Unauthorized();
         }
@@ -262,8 +253,11 @@ contract DammPool is ReentrancyGuard {
     }
 
     function _updateReserves(uint256 nextReserve0, uint256 nextReserve1) private {
-        if (nextReserve0 > type(uint112).max || nextReserve1 > type(uint112).max) {
-            revert InsufficientLiquidity();
+        if (
+            nextReserve0 > type(uint112).max || nextReserve1 > type(uint112).max || reserveCap0 == 0 || reserveCap1 == 0
+                || nextReserve0 > reserveCap0 || nextReserve1 > reserveCap1
+        ) {
+            revert ReserveCapExceeded();
         }
         // Bounds are checked immediately above.
         // forge-lint: disable-next-line(unsafe-typecast)

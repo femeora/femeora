@@ -69,6 +69,8 @@ export const ApiPoolSchema = z.object({
   quoteToken: AddressSchema.nullable(),
   binStep: z.number().int().min(0),
   baseFeePips: z.number().int().min(0),
+  reserveCapX: IntegerStringSchema.nullable(),
+  reserveCapY: IntegerStringSchema.nullable(),
   initialActiveBin: z.number().int().nullable(),
   activeBin: z.number().int().nullable(),
   baseIsTokenX: z.boolean().nullable(),
@@ -92,6 +94,11 @@ export const ApiPoolStatsSchema = z.object({
   amountOut: DecimalStringSchema,
   totalFee: DecimalStringSchema,
   protocolFee: DecimalStringSchema,
+  reserveX: IntegerStringSchema.nullable(),
+  reserveY: IntegerStringSchema.nullable(),
+  reserveUpdatedBlock: IntegerStringSchema.nullable(),
+  reserveUtilizationBps: z.number().int().nonnegative().nullable(),
+  reserveCapStatus: z.enum(['normal', 'warning', 'critical', 'unavailable']),
 });
 export type ApiPoolStats = z.infer<typeof ApiPoolStatsSchema>;
 

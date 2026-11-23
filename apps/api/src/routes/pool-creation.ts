@@ -111,11 +111,26 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       const aFirst = BigInt(input.tokenA) < BigInt(input.tokenB);
       const token0Address = aFirst ? input.tokenA : input.tokenB;
       const token1Address = aFirst ? input.tokenB : input.tokenA;
-      const [token0, token1, permissionless] = await Promise.all([
+      const [token0, token1, permissionless, reserveCap0, reserveCap1] = await Promise.all([
         metadata(client, token0Address), metadata(client, token1Address),
         client.readContract({ address: deployment.poolFactory, abi: poolFactoryAbi, functionName: 'permissionlessCreation' }),
+        client.readContract({
+          address: deployment.poolFactory,
+          abi: poolFactoryAbi,
+          functionName: 'tokenReserveCaps',
+          args: [token0Address],
+        }).catch(() => null),
+        client.readContract({
+          address: deployment.poolFactory,
+          abi: poolFactoryAbi,
+          functionName: 'tokenReserveCaps',
+          args: [token1Address],
+        }).catch(() => null),
       ]);
       if (!permissionless) return reply.status(403).send({ error: 'POOL_CREATION_NOT_PERMISSIONLESS' });
+      if (reserveCap0 === 0n || reserveCap1 === 0n) {
+        return reply.status(409).send({ error: 'TOKEN_RESERVE_CAP_NOT_CONFIGURED' });
+      }
       const model = input.model === 'DAMM' ? 0 : 1;
       const key = { token0: token0Address, token1: token1Address, model, feePips: input.feePips, binStepBps: input.binStepBps } as const;
       const poolId = keccak256(encodeAbiParameters([{ type: 'tuple', components: [

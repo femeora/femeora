@@ -31,6 +31,7 @@ contract DlmmFeeEventTest {
         token0 = MockERC20(key.token0);
         token1 = MockERC20(key.token1);
         pool = new DlmmPoolV2(key, address(this), 0);
+        pool.setReserveCaps(type(uint256).max, type(uint256).max);
         token0.mint(address(this), 1_000 ether);
         token1.mint(address(this), 1_000 ether);
         token0.approve(address(pool), type(uint256).max);
@@ -46,9 +47,7 @@ contract DlmmFeeEventTest {
         uint256 amountIn = 1 ether;
 
         vm.recordLogs();
-        (uint256 amountOut,) = pool.swapExactInput(
-            true, amountIn, 0, 1, address(this), block.timestamp + 1
-        );
+        (uint256 amountOut,) = pool.swapExactInput(true, amountIn, 0, 1, address(this), block.timestamp + 1);
         FeeEventVm.Log[] memory logs = vm.getRecordedLogs();
 
         uint256 matches;
@@ -63,5 +62,19 @@ contract DlmmFeeEventTest {
             require(totalShares == sharesBefore, "share denominator");
         }
         require(matches == 1, "one fee event per consumed bin");
+    }
+
+    function test_ReserveCapsRejectLiquidityAboveLimit() public {
+        pool.setReserveCaps(100 ether, 100 ether);
+        DlmmPoolV2.AddBin[] memory additions = new DlmmPoolV2.AddBin[](1);
+        additions[0] = DlmmPoolV2.AddBin(0, 1 ether, 1 ether, 0);
+        (bool success,) = address(pool)
+            .call(
+                abi.encodeCall(
+                    DlmmPoolV2.addLiquidityBatch,
+                    (bytes32("cap"), additions, int24(0), address(this), block.timestamp + 1)
+                )
+            );
+        require(!success, "reserve cap bypassed");
     }
 }

@@ -16,6 +16,14 @@ function raw(value: string): string {
   return Number.isSafeInteger(number) ? number.toLocaleString('en-US') : value;
 }
 
+function capUsage(stats: LivePoolStats): string {
+  if (stats.reserveUtilizationBps === null) return 'Pending snapshot';
+  const usage = `${(stats.reserveUtilizationBps / 100).toFixed(2)}%`;
+  if (stats.reserveCapStatus === 'critical') return `${usage} · critical`;
+  if (stats.reserveCapStatus === 'warning') return `${usage} · warning`;
+  return usage;
+}
+
 /** Canonical all-time pool counters. Windowed USD metrics stay absent until quote valuation exists. */
 export function MarketStrips({ stats }: { stats: LivePoolStats }) {
   return (
@@ -37,6 +45,7 @@ export function MarketStrips({ stats }: { stats: LivePoolStats }) {
         <Cell label="Positions">{stats.counts.positions}</Cell>
         <Cell label="Callouts">{stats.counts.callouts}</Cell>
         <Cell label="Indexed trades">{stats.counts.swaps}</Cell>
+        <Cell label="Reserve cap">{capUsage(stats)}</Cell>
       </section>
     </div>
   );

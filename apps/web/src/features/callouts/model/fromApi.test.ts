@@ -18,6 +18,8 @@ const pool: ApiPoolDetail = {
   quoteToken: '0x0000000000000000000000000000000000000002',
   binStep: 100,
   baseFeePips: 3_000,
+  reserveCapX: null,
+  reserveCapY: null,
   initialActiveBin: 0,
   activeBin: 0,
   baseIsTokenX: true,

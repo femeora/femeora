@@ -15,6 +15,7 @@ interface ToastState {
     tone?: 'success' | 'error' | 'info';
     transactionHash?: string;
     explorerUrl?: string;
+    userFacing?: boolean;
   }) => void;
   dismiss: () => void;
 }
@@ -31,7 +32,7 @@ export const useToast = create<ToastState>(set => ({
   show: (message, options = {}) => {
     const tone = options.tone ?? (looksLikeError(message) ? 'error' : 'success');
     set({
-      message: tone === 'error' ? friendlyErrorMessage(message) : message,
+      message: tone === 'error' && !options.userFacing ? friendlyErrorMessage(message) : message,
       title: options.title ?? (tone === 'error' ? 'We could not complete that' : tone === 'success' ? 'Activity successful' : 'Notification'),
       tone,
       transactionHash: options.transactionHash ?? null,

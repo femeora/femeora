@@ -5,7 +5,7 @@ import type { IndexerEnvironment } from '@fomeora/env';
 import { backfillPoolRegistry } from './backfill.js';
 import { createIndexerClient, type IndexerClient, verifyIndexerChain } from './chain-client.js';
 import { rollupUserStats } from './stats-rollup.js';
-import { refreshPositionValues } from './value-refresh.js';
+import { refreshPoolReserveSnapshots, refreshPositionValues } from './value-refresh.js';
 
 const MAX_RETRY_DELAY_MS = 60_000;
 
@@ -24,6 +24,9 @@ export interface IndexerCycleResult {
   readonly positionEvents: number;
   readonly valuePools: number;
   readonly valuePositions: number;
+  readonly reservePools: number;
+  readonly reserveWarnings: number;
+  readonly reserveCritical: number;
   readonly statsUsers: number;
   readonly statsRows: number;
 }
@@ -76,6 +79,14 @@ export async function runIndexerCycle(
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POSITION_VALUE_REFRESH_FAILED' : code);
   });
+  const reserveRefresh = await refreshPoolReserveSnapshots(
+    client,
+    chain.chainId,
+    chain.safeBlock,
+  ).catch(error => {
+    const code = safeIndexerErrorCode(error);
+    throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POOL_RESERVE_REFRESH_FAILED' : code);
+  });
   const cursor = await prisma.chainCursor
     .findUniqueOrThrow({ where: { chainId: chain.chainId } })
     .catch(() => {
@@ -126,6 +137,9 @@ export async function runIndexerCycle(
     positionEvents: backfill.positionEventsProjected,
     valuePools: valueRefresh.pools,
     valuePositions: valueRefresh.positions,
+    reservePools: reserveRefresh.pools,
+    reserveWarnings: reserveRefresh.warning,
+    reserveCritical: reserveRefresh.critical,
     statsUsers: statsRollup.users,
     statsRows: statsRollup.rows,
   };
@@ -174,7 +188,7 @@ export async function runIndexerWorker(
       // Contains public chain metrics only; no URLs, headers or credentials.
       // eslint-disable-next-line no-console
       console.info(
-        `Fomeora Indexer healthy chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} valuePools=${result.valuePools} valuePositions=${result.valuePositions} statsUsers=${result.statsUsers} statsRows=${result.statsRows}`,
+        `Fomeora Indexer healthy chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} valuePools=${result.valuePools} valuePositions=${result.valuePositions} reservePools=${result.reservePools} reserveWarnings=${result.reserveWarnings} reserveCritical=${result.reserveCritical} statsUsers=${result.statsUsers} statsRows=${result.statsRows}`,
       );
       await waitForNextCycle(environment.INDEXER_POLL_INTERVAL_MS, signal);
     } catch (error) {
