@@ -138,7 +138,9 @@ function findWorkspaceRoot(start: string): string {
 function loadNetworkFile(): z.infer<typeof networkSchema> {
   const network = networkSchema.parse(process.env.APP_NETWORK);
   const workspaceRoot = findWorkspaceRoot(process.cwd());
-  const loaded = loadDotenv({ path: resolve(workspaceRoot, `.env.${network}`), override: false });
+  const envPath = resolve(workspaceRoot, `.env.${network}`);
+  if (!existsSync(envPath)) return network;
+  const loaded = loadDotenv({ path: envPath, override: false });
   if (loaded.error) throw loaded.error;
   if (loaded.parsed?.APP_NETWORK && loaded.parsed.APP_NETWORK !== network) {
     throw new Error(`Selected APP_NETWORK does not match .env.${network}`);
