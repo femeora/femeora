@@ -1,32 +1,34 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { XLogo } from '@/components/ui/icons';
 import { useSession } from '@/features/session/store';
-
-/** Time the wallet confirmation takes in this client before the tx resolves. */
-const CONFIRM_MS = 900;
+import { useWallet } from '@/features/wallet/store';
 
 interface TxButtonProps {
-  /** Action label when the form is valid, e.g. "Create position". */
   label: string;
-  /** First blocking problem with the form; shown on the disabled button. */
   error: string | null;
-  onConfirmed: () => void;
+  onExecute?: () => Promise<void>;
+  pendingLabel?: string;
 }
 
-/**
- * Primary CTA for trade forms (brief 8.3 CTA states): sign in, action, pending,
- * done. `onConfirmed` is where the signed tx result is handled.
- */
-export function TxButton({ label, error, onConfirmed }: TxButtonProps) {
-  const { user, openSignIn } = useSession();
-  const [pending, setPending] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+const transactionError = (error: string | null) => {
+  if (error === 'INSUFFICIENT_GAS_BALANCE') return 'Insufficient ETH for value and estimated gas';
+  if (error === 'GAS_ESTIMATE_FAILED') return 'Gas estimate failed; transaction was not opened';
+  if (error === 'TRANSACTION_REJECTED') return 'Transaction rejected in wallet';
+  if (error === 'APPROVAL_REVERTED') return 'Approval reverted on-chain';
+  if (error === 'SWAP_REVERTED') return 'Swap reverted on-chain';
+  return error;
+};
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+/** Honest transaction gate. Execution is enabled only after an API-prepared transaction exists. */
+export function TxButton({ label, error, onExecute, pendingLabel = 'Checking balance and estimated gas…' }: TxButtonProps) {
+  const { user, openSignIn } = useSession();
+  const { account, chainId, config, status, connect, switchNetwork } = useWallet();
+  const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   if (!user) {
     return (
@@ -36,24 +38,42 @@ export function TxButton({ label, error, onConfirmed }: TxButtonProps) {
       </Button>
     );
   }
-
-  const confirm = () => {
+  if (!user.wallet) {
+    return <Button variant="primary" block onClick={openSignIn}>Link wallet</Button>;
+  }
+  if (status === 'unavailable') {
+    return <Button variant="primary" block disabled>Open in a wallet browser</Button>;
+  }
+  if (!account) {
+    return (
+      <Button variant="primary" block onClick={() => void connect()} disabled={status === 'connecting'}>
+        {status === 'connecting' ? 'Connecting…' : 'Connect wallet'}
+      </Button>
+    );
+  }
+  if (account.toLowerCase() !== user.wallet.toLowerCase()) {
+    return <Button variant="primary" block onClick={() => void connect()}>Select linked wallet</Button>;
+  }
+  if (config && chainId !== config.chainId) {
+    return <Button variant="primary" block onClick={() => void switchNetwork()}>Switch to {config.chainName}</Button>;
+  }
+  if (!onExecute) {
+    return <Button variant="primary" block disabled>{error ?? `${label} · transaction API pending`}</Button>;
+  }
+  const execute = async () => {
     setPending(true);
-    timer.current = setTimeout(() => {
+    setActionError(null);
+    try {
+      await onExecute();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'TRANSACTION_FAILED');
+    } finally {
       setPending(false);
-      onConfirmed();
-    }, CONFIRM_MS);
+    }
   };
-
   return (
-    <Button
-      variant="primary"
-      block
-      disabled={Boolean(error) || pending}
-      aria-busy={pending}
-      onClick={confirm}
-    >
-      {pending ? 'Confirm in your wallet…' : (error ?? label)}
+    <Button variant="primary" block disabled={Boolean(error) || pending} onClick={() => void execute()}>
+      {pending ? pendingLabel : (transactionError(actionError) ?? error ?? label)}
     </Button>
   );
 }

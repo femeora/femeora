@@ -1,3 +1,4 @@
+import { ChainBadge } from '@/components/ui/ChainBadge';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { cn } from '@/lib/cn';
 
@@ -11,19 +12,31 @@ interface Stat {
 }
 
 function poolStats(pool: Pool): Stat[] {
+  const available = (value: number | null, formatter: (number: number) => string) =>
+    value === null ? '—' : formatter(value);
   return [
-    { label: 'MCap', value: formatUnit(toUnit(pool.priceUsd, 'mcap', pool), 'mcap') },
+    {
+      label: 'MCap',
+      value: pool.marketCapAvailable ? formatUnit(toUnit(pool.priceUsd, 'mcap', pool), 'mcap') : '—',
+    },
     { label: 'Price', value: formatUnit(pool.priceUsd, 'price') },
     {
       label: '24h',
-      value: formatPct(pool.change24hPct),
-      tone: pool.change24hPct >= 0 ? 'up' : 'down',
+      value: available(pool.change24hPct, formatPct),
+      ...(pool.change24hPct === null
+        ? {}
+        : { tone: pool.change24hPct >= 0 ? 'up' as const : 'down' as const }),
     },
-    { label: 'TVL', value: formatCompactUsd(pool.tvlUsd) },
-    { label: '24h Vol', value: formatCompactUsd(pool.volume24hUsd) },
-    { label: '24h Fee', value: formatCompactUsd(pool.fee24hUsd) },
-    { label: 'Fees / TVL', value: formatPct((pool.fee24hUsd / pool.tvlUsd) * 100, 2) },
-    { label: 'Pool age', value: pool.age },
+    { label: 'TVL', value: available(pool.tvlUsd, formatCompactUsd) },
+    { label: '24h Vol', value: available(pool.volume24hUsd, formatCompactUsd) },
+    { label: '24h Fee', value: available(pool.fee24hUsd, formatCompactUsd) },
+    {
+      label: 'Fees / TVL',
+      value: pool.fee24hUsd === null || pool.tvlUsd === null || pool.tvlUsd === 0
+        ? '—'
+        : formatPct((pool.fee24hUsd / pool.tvlUsd) * 100, 2),
+    },
+    { label: 'Pool age', value: pool.age ?? '—' },
   ];
 }
 
@@ -34,7 +47,7 @@ export function PoolHeader({ pool }: { pool: Pool }) {
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="grid size-10 place-items-center rounded-full bg-signal font-mono text-xs text-on-signal"
+          className="grid size-10 place-items-center rounded-full metal font-mono text-xs"
         >
           {pool.base.slice(0, 2)}
         </span>
@@ -50,7 +63,7 @@ export function PoolHeader({ pool }: { pool: Pool }) {
             <span>Base fee {pool.baseFeeBps / 100}%</span>·
             <span className="inline-flex items-center gap-1.5">
               <StatusDot tone="up" />
-              {pool.chain}
+              <ChainBadge />
             </span>
           </p>
         </div>

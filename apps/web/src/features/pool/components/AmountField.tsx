@@ -21,7 +21,7 @@ export function AmountField({ token, value, usdPerToken, enabled, onChange }: Am
   const usd = Number.isFinite(amount) ? amount * usdPerToken : 0;
 
   return (
-    <div className="rounded-[2px] border border-line p-3 has-[:disabled]:opacity-50">
+    <div className="glass rounded-[2px] p-3 focus-within:border-fg/40 has-[:disabled]:opacity-50">
       <div className="flex items-baseline justify-between">
         <label htmlFor={id} className="t-label text-muted">
           {token}

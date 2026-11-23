@@ -1,10 +1,14 @@
 import { Avatar } from '@/components/ui/Avatar';
 import { BadgeCheck } from '@/components/ui/icons';
 import { SpanText } from '@/components/ui/SpanText';
-import { heldLabel, rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
+import {
+  formatCalloutValue,
+  heldLabel,
+  rangeLabel,
+  sideLabel,
+  type Callout,
+} from '@/features/callouts/model/callout';
 import { SHAPE_LABEL } from '@/lib/bins';
-
-import { formatCompactUsd } from '../model/format';
 
 interface CalloutPopoverProps {
   callout: Callout;
@@ -20,7 +24,7 @@ export function CalloutPopover({ callout, x, y }: CalloutPopoverProps) {
   return (
     <div
       role="tooltip"
-      className="pointer-events-none absolute z-20 rounded-[2px] border border-line-strong bg-panel-2 p-3 shadow-[0_20px_40px_-20px_rgb(0_0_0/0.8)]"
+      className="pointer-events-none absolute z-20 glass-raised rounded-[2px] p-3"
       style={{
         width: WIDTH,
         left: `min(${x + 16}px, calc(100% - ${WIDTH + 8}px))`,
@@ -28,7 +32,7 @@ export function CalloutPopover({ callout, x, y }: CalloutPopoverProps) {
       }}
     >
       <div className="flex items-center gap-2">
-        <Avatar initials={callout.caller.initials} size="sm" />
+        <Avatar seed={callout.caller.handle} size="sm" />
         <span className="text-[0.9375rem] font-medium">@{callout.caller.handle}</span>
         {callout.caller.verified ? (
           <BadgeCheck aria-label="X verified" className="size-3.5 text-signal" />
@@ -49,10 +53,10 @@ export function CalloutPopover({ callout, x, y }: CalloutPopoverProps) {
         </dd>
         <dt>Size</dt>
         <dd className="text-fg">
-          {callout.showSize ? formatCompactUsd(callout.sizeUsd) : 'Hidden'}
+          {callout.showSize ? formatCalloutValue(callout, callout.sizeUsd) : 'Hidden'}
         </dd>
         <dt>Earned</dt>
-        <dd className="text-up">+{formatCompactUsd(callout.earnedUsd)}</dd>
+        <dd className="text-up">+{formatCalloutValue(callout, callout.earnedUsd)}</dd>
         <dt>Tailers</dt>
         <dd className="text-fg">
           {callout.tailers} · in range {callout.inRangePct}% of {heldLabel(callout.heldHours)}

@@ -30,7 +30,7 @@ export function RangeField({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-[2px] border border-line p-3">
+    <div className="glass flex flex-col gap-2 rounded-[2px] p-3">
       <div className="flex items-baseline justify-between gap-2">
         <label htmlFor={id} className="t-label text-muted">
           {label} · % from price
@@ -45,7 +45,7 @@ export function RangeField({
           step={1}
           value={pct}
           onChange={event => update(event.target.value)}
-          className="w-20 rounded-[2px] border border-line-strong bg-transparent px-2 py-2 font-mono text-sm tabular-nums"
+          className="glass-control w-20 rounded-[2px] px-2 py-2 font-mono text-sm tabular-nums"
         />
         <input
           type="range"

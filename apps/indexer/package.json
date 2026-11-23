@@ -7,15 +7,24 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -b",
     "start": "node dist/index.js",
+    "sync:once": "node dist/sync-once.js",
     "clean": "rm -rf dist *.tsbuildinfo",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "tsx --test src/*.test.ts src/**/*.test.ts",
+    "verify:position-value": "tsx scripts/verify-position-value.ts",
+    "verify:callout-updates": "tsx scripts/verify-callout-updates.ts",
+    "verify:candles": "tsx scripts/verify-candles.ts",
+    "verify:stats-rollup": "tsx scripts/verify-stats-rollup.ts",
+    "verify:reorg-social": "tsx scripts/verify-reorg-social.ts",
+    "verify:intent-linking": "tsx scripts/verify-intent-linking.ts"
   },
   "dependencies": {
+    "@fomeora/contracts-sdk": "workspace:*",
     "@fomeora/database": "workspace:*",
+    "@fomeora/env": "workspace:*",
     "@fomeora/sdk": "workspace:*",
     "@fomeora/types": "workspace:*",
-    "dotenv": "^16.4.5",
     "viem": "^2.17.0"
   },
   "devDependencies": {

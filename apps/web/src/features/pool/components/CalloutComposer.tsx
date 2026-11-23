@@ -35,7 +35,7 @@ export function CalloutComposer({
   const errorId = useId();
 
   return (
-    <fieldset className="rounded-[2px] border border-line px-3">
+    <fieldset className="glass rounded-[2px] px-3">
       <legend className="sr-only">Callout</legend>
       <Switch
         label="Post as callout"
@@ -60,7 +60,7 @@ export function CalloutComposer({
             onChange={event => onCaptionChange(event.target.value)}
             className={cn(
               'resize-none rounded-[2px] border bg-transparent p-2 text-[0.9375rem] placeholder:text-faint',
-              error ? 'border-down' : 'border-line-strong'
+              error ? 'border-down' : 'glass-control'
             )}
           />
           <div className="t-label flex justify-between gap-3">
@@ -71,7 +71,7 @@ export function CalloutComposer({
               id={counterId}
               className={cn(
                 'shrink-0 tabular-nums',
-                caption.length >= CAPTION_WARN ? 'text-warn' : 'text-faint'
+                caption.length >= CAPTION_WARN ? 'text-down' : 'text-faint'
               )}
             >
               {caption.length} / {CAPTION_MAX}

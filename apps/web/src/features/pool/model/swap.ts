@@ -17,6 +17,9 @@ export const SLIPPAGE_PCT = 1;
  * the router; this only needs to react sensibly to input.
  */
 export function quoteSwap(pool: Pool, direction: SwapDirection, amountIn: number): SwapQuote {
+  if (pool.priceUsd <= 0 || pool.tvlUsd === null || pool.tvlUsd <= 0) {
+    return { amountOut: 0, feeUsd: 0, priceImpactPct: 0, minReceived: 0 };
+  }
   const feeRate = pool.baseFeeBps / 10_000;
   const inUsd = direction === 'buy' ? amountIn : amountIn * pool.priceUsd;
   const priceImpactPct = Math.min(99, (inUsd / pool.tvlUsd) * 100);

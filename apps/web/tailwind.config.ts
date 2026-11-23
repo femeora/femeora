@@ -21,7 +21,6 @@ const config: Config = {
         'on-signal': token('on-signal'),
         up: token('up'),
         down: token('down'),
-        warn: token('warn'),
       },
       borderColor: {
         line: 'rgb(var(--fg) / 0.12)',

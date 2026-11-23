@@ -1,14 +1,15 @@
 'use client';
 
+import { ApiLeaderboardSchema } from '@fomeora/types';
 import { useState } from 'react';
 
+import { Avatar } from '@/components/ui/Avatar';
 import { BadgeCheck } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { formatCompactUsd } from '@/features/pool/model/format';
+import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 
 import {
-  leaderboard,
   SORTS,
   WINDOWS,
   type LeaderboardSort,
@@ -16,12 +17,18 @@ import {
 } from '../model/leaderboard';
 
 const cell = 'border-t border-line py-3 pr-4 align-middle last:pr-0';
+const decimal = (value: string, digits = 2) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—';
+};
 
 /** Leaderboard (brief 7.3, Phase 4): windows, sort, and the anti-shill column. */
 export function LeaderboardScreen() {
   const [period, setPeriod] = useState<LeaderboardWindow>('24h');
   const [sort, setSort] = useState<LeaderboardSort>('score');
-  const rows = leaderboard(period, sort);
+  const path = `/v1/leaderboard?window=${period}&sort=${sort}&limit=100`;
+  const { data, error, isLoading, mutate } = useApiResource(path, ApiLeaderboardSchema);
+  const rows = data?.data ?? [];
 
   return (
     <div className="mx-auto max-w-[64rem] px-gutter py-8">
@@ -36,7 +43,11 @@ export function LeaderboardScreen() {
         </div>
       </header>
 
-      <div className="overflow-x-auto">
+      <div className="glass mt-6 overflow-x-auto rounded-[2px] px-4">
+        {isLoading ? <p className="py-14 text-center text-muted">Loading canonical rankings…</p> : null}
+        {error ? <div role="alert" className="py-14 text-center"><p className="text-down">Leaderboard unavailable.</p><button type="button" onClick={() => void mutate()} className="mt-3 min-h-11 text-signal underline underline-offset-4">Retry</button></div> : null}
+        {!isLoading && !error && rows.length === 0 ? <p className="py-14 text-center text-muted">No ranked callers yet. Rankings appear after canonical callouts are indexed.</p> : null}
+        {!isLoading && !error && rows.length > 0 ? (
         <table className="w-full min-w-[40rem] text-left">
           <caption className="sr-only">
             Callers ranked by {SORTS.find(option => option.value === sort)?.label}
@@ -60,40 +71,36 @@ export function LeaderboardScreen() {
             </tr>
           </thead>
           <tbody className="font-mono text-[0.8125rem] tabular-nums">
-            {rows.map((row, index) => (
-              <tr key={row.handle} className={cn(row.quickExits > 2 && 'text-muted')}>
-                <td className={cn(cell, 't-label', index < 3 ? 'text-signal' : 'text-faint')}>
-                  {index + 1}
+            {rows.map(row => (
+              <tr key={row.userId} className={cn(row.quickExits > 2 && 'text-muted')}>
+                <td className={cn(cell, 't-label', row.rank <= 3 ? 'text-signal' : 'text-faint')}>
+                  {row.rank}
                 </td>
                 <td className={cell}>
                   <span className="flex items-center gap-2 font-sans text-[0.9375rem]">
-                    <span
-                      aria-hidden="true"
-                      className="grid size-7 place-items-center rounded-full bg-fg/10 font-mono text-[0.625rem]"
-                    >
-                      {row.initials}
-                    </span>
-                    {row.handle}
-                    {row.verified ? (
+                    <Avatar seed={row.handle} size="sm" />
+                    @{row.handle.replace(/^@/, '')}
+                    {row.xVerified ? (
                       <BadgeCheck aria-label="X verified" className="size-4 text-signal" />
                     ) : null}
                   </span>
                 </td>
                 <td className={cell}>{row.callouts}</td>
-                <td className={cn(cell, 'text-up')}>+{formatCompactUsd(row.earnedUsd)}</td>
+                <td className={cn(cell, 'text-up')}>+{decimal(row.earnedQuote, 6)}</td>
                 <td className={cell}>{row.tailers}</td>
-                <td className={cell}>{row.inRangePct}%</td>
+                <td className={cell}>{decimal(row.avgInRange)}%</td>
                 <td className={cn(cell, row.quickExits > 0 && 'text-down')}>{row.quickExits}</td>
-                <td className={cell}>{row.score.toFixed(2)}</td>
+                <td className={cell}>{decimal(row.score, 4)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        ) : null}
       </div>
 
       <p className="t-label mt-6 max-w-[60em] text-muted">
-        Score combines fee yield, in-range ratio and social proof. Callouts with a quick exit (50%
-        or more removed within 30 min of posting) score zero.
+        Earned values use each pool&apos;s configured quote token. Score combines canonical fee yield,
+        in-range ratio and social proof. Quick exits are penalized by the server-side rollup.
       </p>
     </div>
   );

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { LiveClock } from '@/components/ui/LiveClock';
+import { ChainBadge } from '@/components/ui/ChainBadge';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { navLinks, site } from '@/content/landing';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
@@ -32,7 +32,7 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        'fixed inset-x-0 top-0 z-50 h-header border-b border-line bg-bg/80 backdrop-blur-md transition-transform duration-base ease-brand',
+        'fixed inset-x-0 top-0 z-50 h-header border-b border-line bg-bg transition-transform duration-base ease-brand',
         hidden && '-translate-y-full'
       )}
     >
@@ -43,12 +43,8 @@ export function SiteHeader() {
         </Link>
 
         <p className="t-label hidden items-center justify-self-center gap-2.5 whitespace-nowrap text-muted xl:inline-flex">
-          <StatusDot live />
-          <LiveClock />
-          <span className="text-faint">·</span>
-          <span>{site.chain}</span>
-          <span className="text-faint">·</span>
-          <span>Mainnet</span>
+          <StatusDot tone="up" />
+          <ChainBadge showNetwork />
         </p>
 
         <div className="flex items-center justify-self-end gap-6 md:gap-8">
@@ -99,8 +95,8 @@ export function SiteHeader() {
           ))}
         </ul>
         <p className="wrap t-label mt-8 flex items-center gap-2.5 text-muted">
-          <StatusDot live />
-          <LiveClock />
+          <StatusDot tone="up" />
+          <ChainBadge showNetwork />
         </p>
       </nav>
     </header>

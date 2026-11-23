@@ -46,7 +46,7 @@ export function AppBottomNav() {
   return (
     <nav
       aria-label="App"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      className="glass-raised fixed inset-x-0 bottom-0 z-40 border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="grid grid-cols-4">
         {appNav.map(item => {

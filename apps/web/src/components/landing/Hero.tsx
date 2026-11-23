@@ -3,16 +3,13 @@
 import type { ReactNode } from 'react';
 
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { LiveClock } from '@/components/ui/LiveClock';
-import { StatusDot } from '@/components/ui/StatusDot';
+import { RobinhoodLogo } from '@/components/ui/icons';
 import { hero } from '@/content/landing';
-import { useActiveBinWalk } from '@/hooks/useActiveBinWalk';
 
 import { BinRig } from './BinRig';
+import { HeroBackdrop } from './HeroBackdrop';
 
 const BIN_COUNT = 24;
-/** Arbitrary DLMM bin id the illustration is anchored to. */
-const BASE_BIN_ID = 8_388_608;
 
 function ReadoutCell({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
@@ -24,14 +21,14 @@ function ReadoutCell({ label, children }: { label: ReactNode; children: ReactNod
 }
 
 export function Hero() {
-  const { index, inRange } = useActiveBinWalk({ count: BIN_COUNT });
-  const binId = (BASE_BIN_ID + index).toLocaleString('en-US');
+  const index = 11;
 
   return (
     <section
       aria-labelledby="hero-title"
       className="relative grid min-h-[calc(100svh-56px)] items-end overflow-hidden border-b border-line"
     >
+      <HeroBackdrop />
       <BinRig
         shape="bid-ask"
         count={BIN_COUNT}
@@ -40,34 +37,17 @@ export function Hero() {
       />
 
       <div className="wrap grid-12 relative z-10 gap-y-6 pb-8 pt-16 md:pb-10">
-        <dl className="t-label col-span-12 flex animate-fade-up flex-wrap gap-x-9 gap-y-3 [animation-delay:200ms]">
-          <ReadoutCell label="Your clock">
-            <LiveClock />
-          </ReadoutCell>
+        <dl className="t-label col-span-12 mb-[clamp(4rem,22vh,14rem)] flex animate-fade-up flex-wrap gap-x-9 gap-y-3 [animation-delay:200ms]">
           {hero.readout.map(cell => (
             <ReadoutCell key={cell.key} label={cell.key}>
-              <span className="text-fg">{cell.value}</span>
+              <span className="inline-flex items-center gap-1.5 text-fg">
+                {cell.chainMark ? <RobinhoodLogo className="size-3.5" /> : null}
+                {cell.value}
+              </span>
               {cell.detail ? <span> · {cell.detail}</span> : null}
             </ReadoutCell>
           ))}
-          <ReadoutCell
-            label={
-              <>
-                <StatusDot live /> On air
-              </>
-            }
-          >
-            <span className="text-fg">HOODIE / USDG</span> · Bid-Ask · bin{' '}
-            <span className="tabular-nums">{binId}</span> ·{' '}
-            <span className={inRange ? 'text-up' : 'text-muted'}>
-              {inRange ? 'In range' : 'Out of range'}
-            </span>
-          </ReadoutCell>
         </dl>
-
-        <p className="col-span-12 mb-[clamp(3rem,16vh,11rem)] max-w-[34em] animate-fade-up font-mono text-label text-muted [animation-delay:260ms] md:col-span-6">
-          {hero.note}
-        </p>
 
         <h1 id="hero-title" className="col-span-12 text-hero font-medium md:col-span-9">
           {hero.titleLines.map((line, lineIndex) => (

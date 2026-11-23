@@ -1,0 +1,11 @@
+{
+  "baseToken": "0x8d949e9D5a2cD5D6DCfB27e461D3aC23aEE5708c",
+  "binStepBps": 100,
+  "chainId": 46630,
+  "feePips": 3000,
+  "governanceTimelock": "0x7B7d18e34012AF700C7F4e038649cC8c9282229F",
+  "initialActiveBin": -749,
+  "network": "testnet",
+  "pool": "0x62c67d20c6857992Ed4F0d8b224e8d73fcB4Cb4F",
+  "quoteToken": "0x7E955252E15c84f5768B83c41a71F9eba181802F"
+}

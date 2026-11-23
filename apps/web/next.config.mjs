@@ -1,3 +1,9 @@
+import { loadWebEnvironment } from '@fomeora/env';
+
+// Validate server-only configuration at build/startup. No value is copied into
+// Next.js `env`, so API and deployment configuration cannot enter the browser bundle.
+loadWebEnvironment();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -10,10 +16,10 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'pbs.twimg.com'
-      }
-    ]
-  }
+        hostname: 'pbs.twimg.com',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

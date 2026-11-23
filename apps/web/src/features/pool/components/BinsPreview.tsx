@@ -18,7 +18,7 @@ export function BinsPreview({ shape, bins, pricePosition, priceLabel }: BinsPrev
   const weights = binWeights(shape, bars);
 
   return (
-    <figure className="rounded-[2px] border border-line p-3">
+    <figure className="glass rounded-[2px] p-3">
       <div className="relative flex h-20 items-end gap-px" aria-hidden="true">
         {weights.map((weight, index) => (
           <span

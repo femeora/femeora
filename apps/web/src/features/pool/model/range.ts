@@ -17,7 +17,8 @@ export interface Preset extends RangeInput {
   hint: string;
 }
 
-export const RANGE_LIMITS = { minPct: -99, maxPct: 900, maxBins: 400 } as const;
+// PositionManagerV2 rejects batches larger than 61 bins.
+export const RANGE_LIMITS = { minPct: -99, maxPct: 900, maxBins: 61 } as const;
 
 /** Presets from brief 8.3. */
 export const PRESETS: readonly Preset[] = [
@@ -80,7 +81,7 @@ export function applyPct(value: number, pct: number): number {
   return value * (1 + pct / 100);
 }
 
-/** "Single-side USDG" / "Single-side HOODIE" / "Two-sided" (brief 8.3). */
+/** Human-readable single-side quote, single-side token, or two-sided label. */
 export function sideLabel(side: RangeSide, tokens: { base: string; quote: string }): string {
   if (side === 'quote') return `Single-side ${tokens.quote}`;
   if (side === 'base') return `Single-side ${tokens.base}`;

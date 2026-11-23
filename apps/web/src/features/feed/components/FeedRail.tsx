@@ -1,33 +1,45 @@
+'use client';
+
+import { ApiFeedRailSchema } from '@fomeora/types';
 import Link from 'next/link';
 
-import { ArrowRight } from '@/components/ui/icons';
+import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 
-import { topCallers, trendingPools } from '../model/feed';
+const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+const decimal = (value: string, digits = 2) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—';
+};
 
 /** Desktop right rail: pools by callout count and the day's top callers. */
 export function FeedRail() {
+  const { data, error, isLoading, mutate } = useApiResource('/v1/feed/rail', ApiFeedRailSchema);
+  const trendingPools = data?.trendingPools ?? [];
+  const topCallers = data?.topCallers ?? [];
   return (
     <aside aria-label="Trending" className="hidden flex-col gap-8 py-6 pr-gutter xl:flex">
       <section>
         <h2 className="t-label mb-3 text-muted">Trending by callouts</h2>
-        <ol className="border-t border-line">
+        <ol className="glass rounded-[2px] px-4">
+          {isLoading ? <li className="py-4 text-sm text-muted">Loading pools…</li> : null}
+          {!isLoading && !error && trendingPools.length === 0 ? <li className="py-4 text-sm text-muted">No callouts in the last 24h.</li> : null}
           {trendingPools.map((pool, index) => (
-            <li key={pool.pair}>
+            <li key={pool.address} className="border-b border-line last:border-b-0">
               <Link
-                href="/pools"
-                className="flex min-h-12 items-center gap-3 border-b border-line transition-colors hover:text-signal"
+                href={`/p/${pool.chainId}/${pool.address}`}
+                className="flex min-h-12 items-center gap-3 transition-colors hover:text-signal"
               >
                 <span className="t-label w-5 text-faint">{index + 1}</span>
-                <span className="flex-1">{pool.pair}</span>
+                <span className="flex-1">{short(pool.tokenX)} / {short(pool.quoteToken ?? pool.tokenY)}</span>
                 <span className="t-label text-muted">{pool.callouts24h}</span>
                 <span
                   className={cn(
                     't-label w-14 text-right',
-                    pool.change.startsWith('-') ? 'text-down' : 'text-up'
+                    (pool.change24h ?? 0) < 0 ? 'text-down' : 'text-up'
                   )}
                 >
-                  {pool.change}
+                  {pool.change24h === null ? '—' : `${pool.change24h >= 0 ? '+' : ''}${pool.change24h.toFixed(1)}%`}
                 </span>
               </Link>
             </li>
@@ -37,16 +49,18 @@ export function FeedRail() {
 
       <section>
         <h2 className="t-label mb-3 text-muted">Top callers 24h</h2>
-        <ol className="border-t border-line">
+        <ol className="glass rounded-[2px] px-4">
+          {isLoading ? <li className="py-4 text-sm text-muted">Loading callers…</li> : null}
+          {!isLoading && !error && topCallers.length === 0 ? <li className="py-4 text-sm text-muted">No ranked callers yet.</li> : null}
           {topCallers.map((caller, index) => (
             <li
               key={caller.handle}
-              className="flex min-h-12 items-center gap-3 border-b border-line"
+              className="flex min-h-12 items-center gap-3 border-b border-line last:border-b-0"
             >
               <span className="t-label w-5 text-faint">{index + 1}</span>
-              <span className="flex-1">{caller.handle}</span>
-              <span className="t-label text-up">+{caller.earned}</span>
-              <span className="t-label w-10 text-right text-muted">{caller.inRange}</span>
+              <span className="flex-1">@{caller.handle.replace(/^@/, '')}</span>
+              <span className="t-label text-up">+{decimal(caller.earnedQuote, 4)}</span>
+              <span className="t-label w-10 text-right text-muted">{decimal(caller.avgInRange, 0)}%</span>
             </li>
           ))}
         </ol>
@@ -54,9 +68,11 @@ export function FeedRail() {
           href="/leaderboard"
           className="t-label mt-3 inline-flex min-h-11 items-center gap-1.5 hover:text-signal"
         >
-          Full leaderboard <ArrowRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          Full leaderboard
         </Link>
       </section>
+
+      {error ? <div role="alert" className="t-label text-down">Rail unavailable. <button type="button" onClick={() => void mutate()} className="underline underline-offset-4">Retry</button></div> : null}
 
       <p className="t-label text-faint">
         Tailing copies a range, not a result. LP positions can lose value.

@@ -2,16 +2,17 @@
 
 import { MiniBins } from '@/components/callout/MiniBins';
 import { Chip } from '@/components/ui/Chip';
+import { GlowCard } from '@/components/ui/GlowCard';
 import { ArrowRight, TriangleAlert } from '@/components/ui/icons';
 import { SpanText } from '@/components/ui/SpanText';
 import { StatusDot } from '@/components/ui/StatusDot';
-import { formatCompactUsd } from '@/features/pool/model/format';
 import { SHAPE_LABEL } from '@/lib/bins';
 import { cn } from '@/lib/cn';
 
 import {
   calloutBins,
   calloutStatus,
+  formatCalloutValue,
   heldLabel,
   rangeLabel,
   sideLabel,
@@ -31,25 +32,38 @@ interface CalloutCardProps {
   preview?: boolean;
 }
 
+function IntegritySignals({ callout }: { callout: Callout }) {
+  return (
+    <>
+      {callout.isDevOrTopHolder ? <Chip tone="down">Dev / top holder</Chip> : null}
+      {callout.isFreshWallet ? <Chip tone="down">Fresh wallet</Chip> : null}
+      {callout.isDevOrTopHolder === null || callout.isFreshWallet === null ? (
+        <Chip>Integrity data incomplete</Chip>
+      ) : null}
+    </>
+  );
+}
+
 /**
  * The proof-backed position block of a callout (brief 5.2): token, shape, bins,
  * position and earned, attribute chips, anti-shill badges and the Tail action.
  */
 export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
   const openTail = useCallouts(state => state.openTail);
-  const tailers = useCallouts(state => callout.tailers + (state.extraTailers[callout.id] ?? 0));
   const statusKey = calloutStatus(callout);
   const status = STATUS[statusKey];
   const earned = callout.showSize
-    ? `+${formatCompactUsd(callout.earnedUsd)}`
-    : `+${((callout.earnedUsd / callout.sizeUsd) * 100).toFixed(2)}%`;
+    ? `+${formatCalloutValue(callout, callout.earnedUsd)}`
+    : callout.sizeUsd > 0
+      ? `+${((callout.earnedUsd / callout.sizeUsd) * 100).toFixed(2)}%`
+      : '—';
 
   return (
-    <div className="rounded-[2px] border border-line-strong bg-panel">
+    <GlowCard>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3 p-3.5">
         <span
           aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-signal font-mono text-xs text-on-signal"
+          className="grid size-9 shrink-0 place-items-center rounded-full metal font-mono text-xs"
         >
           {callout.pool.base.slice(0, 1)}
         </span>
@@ -66,7 +80,7 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
           <dt className="t-label text-muted">Position</dt>
           <dt className="t-label text-muted">Earned</dt>
           <dd className="font-mono text-sm tabular-nums">
-            {callout.showSize ? formatCompactUsd(callout.closed ? 0 : callout.sizeUsd) : 'Hidden'}
+            {callout.showSize ? formatCalloutValue(callout, callout.closed ? 0 : callout.sizeUsd) : 'Hidden'}
           </dd>
           <dd className="font-mono text-sm tabular-nums text-up">{earned}</dd>
         </dl>
@@ -91,24 +105,25 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
             Exited {callout.quickExitMinutes}m after call
           </Chip>
         ) : null}
-        {callout.oppositeSide ? <Chip tone="warn">Also selling above</Chip> : null}
+        {callout.oppositeSide ? <Chip tone="down">Also selling above</Chip> : null}
+        <IntegritySignals callout={callout} />
       </div>
 
       <div className="t-label flex items-center justify-between gap-3 border-t border-line px-3.5 py-2 text-muted">
         <span>
-          {tailers} tailers · in range {callout.inRangePct}% of {heldLabel(callout.heldHours)}
+          {callout.tailers} tailers · in range {callout.inRangePct}% of {heldLabel(callout.heldHours)}
         </span>
         {preview ? null : (
           <button
             type="button"
             onClick={() => openTail(callout)}
             aria-label={`Tail @${callout.caller.handle}'s range`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-[2px] bg-fg px-3 text-bg transition-colors hover:bg-signal hover:text-on-signal"
+            className="inline-flex min-h-9 items-center gap-1.5 metal rounded-[2px] px-3 transition-[filter] hover:brightness-110"
           >
             Tail <ArrowRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
           </button>
         )}
       </div>
-    </div>
+    </GlowCard>
   );
 }

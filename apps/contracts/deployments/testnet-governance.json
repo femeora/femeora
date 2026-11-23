@@ -1,0 +1,7 @@
+{
+  "chainId": 46630,
+  "governanceSafe": "0x55a91E02f93c56D5ed6E5Af8c7128d4533D9F784",
+  "minimumDelaySeconds": 300,
+  "network": "testnet",
+  "protocolTimelock": "0x7B7d18e34012AF700C7F4e038649cC8c9282229F"
+}

@@ -16,7 +16,8 @@
     "build": "tsc -b",
     "clean": "rm -rf dist *.tsbuildinfo",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@fomeora/types": "workspace:*"
@@ -25,6 +26,7 @@
     "@fomeora/eslint-config": "workspace:*",
     "@fomeora/config-typescript": "workspace:*",
     "eslint": "^8.57.0",
+    "tsx": "^4.16.2",
     "typescript": "^5.5.4"
   }
 }

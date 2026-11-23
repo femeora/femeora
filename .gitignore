@@ -13,7 +13,6 @@ out/
 # Environment files & Credentials (Strict - Never push secrets)
 .env
 .env.*
-!.env.example
 !.env.template
 
 # Secrets, Wallets, Keystores & Private Keys
@@ -30,8 +29,12 @@ credentials.*
 service-account*.json
 *credentials*.json
 
-# Documentation (Internal specs, briefs, roadmaps)
-docs/
+# Internal documentation and local tools live under docs/ but stay untracked.
+docs/*
+
+# Only user-facing guides are public and may be committed.
+!docs/guides/
+!docs/guides/**
 
 # Foundry & Smart contracts
 cache/

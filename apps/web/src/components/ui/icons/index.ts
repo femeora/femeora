@@ -23,3 +23,4 @@ export {
 } from 'lucide-react';
 export type { LucideIcon as Icon } from 'lucide-react';
 export { XLogo } from './XLogo';
+export { RobinhoodLogo } from './RobinhoodLogo';

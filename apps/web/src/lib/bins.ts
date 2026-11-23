@@ -23,15 +23,6 @@ export function binWeights(shape: BinShape, count: number): number[] {
   return Array.from({ length: count }, (_, index) => binWeight(shape, index, count));
 }
 
-/** Small deterministic PRNG so illustrative charts render the same on server and client. */
-export function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 2 ** 32;
-  };
-}
-
 export const SHAPE_LABEL: Record<BinShape, string> = {
   spot: 'Spot',
   curve: 'Curve',

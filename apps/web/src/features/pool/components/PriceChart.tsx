@@ -9,13 +9,13 @@ import {
 } from 'lightweight-charts';
 import { useEffect, useMemo, useState } from 'react';
 
-import { calloutStatus, sideLabel, type Callout } from '@/features/callouts/model/callout';
+import { calloutStatus, rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
 import { cn } from '@/lib/cn';
 import { tokenColor } from '@/lib/theme';
 
 import { useChartProjection } from '../hooks/useChartProjection';
 import { useLightweightChart } from '../hooks/useLightweightChart';
-import { formatRange, formatUnit, toUnit, type ValueUnit } from '../model/format';
+import { formatUnit, toUnit, type ValueUnit } from '../model/format';
 import type { Candle, LiquidityBin, Pool } from '../model/pool';
 import { applyPct, type RangeInput } from '../model/range';
 
@@ -69,7 +69,9 @@ export function PriceChart({
   const times = useMemo(() => {
     const anchor = Math.floor(Date.now() / 1000 / intervalSeconds) * intervalSeconds;
     return candles.map(
-      (_, index) => (anchor - (candles.length - 1 - index) * intervalSeconds) as UTCTimestamp
+      (candle, index) => (
+        candle.timestamp ?? anchor - (candles.length - 1 - index) * intervalSeconds
+      ) as UTCTimestamp
     );
   }, [candles, intervalSeconds]);
 
@@ -268,7 +270,7 @@ export function PriceChart({
         <ul className="sr-only">
           {callouts.map(callout => (
             <li key={callout.id}>
-              {`@${callout.caller.handle}: ${sideLabel(callout)}, ${formatRange(callout.minPct, callout.maxPct)}`}
+              {`@${callout.caller.handle}: ${sideLabel(callout)}, ${rangeLabel(callout)}`}
             </li>
           ))}
         </ul>

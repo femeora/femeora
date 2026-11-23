@@ -42,13 +42,20 @@ export interface Callout {
   likes: number;
   reposts: number;
   replies: number;
+  viewer: { liked: boolean; reposted: boolean; following: boolean };
   views: number;
   mcAtPostUsd: number;
   mcNowUsd: number;
   /** Minutes between posting and removing 50%+, when that happened within 30 min. */
   quickExitMinutes: number | null;
   /** Caller also holds liquidity on the other side of price (brief 13.1). */
-  oppositeSide: boolean;
+  oppositeSide: boolean | null;
+  /** Canonical callouts use quote-token amounts unless an audited USD oracle exists. */
+  valuation?: 'usd' | 'quote';
+  /** Exact on-chain DLMM range, when this is a canonical indexed callout. */
+  rangeBins?: { lower: number; upper: number; active: number };
+  isDevOrTopHolder?: boolean | null;
+  isFreshWallet?: boolean | null;
   updates: readonly CalloutUpdate[];
   /** Chart placement: candles back from the latest. */
   candlesAgo: number;
@@ -66,6 +73,12 @@ export function rangeMc(callout: Callout): [number, number] {
 export function calloutStatus(callout: Callout): RangeStatus {
   if (callout.closed) return 'closed';
   if (callout.pool.type === 'DAMM') return 'in-range';
+  if (callout.rangeBins) {
+    return callout.rangeBins.active >= callout.rangeBins.lower
+      && callout.rangeBins.active <= callout.rangeBins.upper
+      ? 'in-range'
+      : 'out-of-range';
+  }
   const [low, high] = rangeMc(callout);
   return callout.mcNowUsd >= low && callout.mcNowUsd <= high ? 'in-range' : 'out-of-range';
 }
@@ -84,12 +97,20 @@ export function sideLabel(callout: Callout): string {
 /** `$3.18M → $4.84M MC` for DLMM, `Full range` for DAMM. */
 export function rangeLabel(callout: Callout): Span {
   if (callout.pool.type === 'DAMM') return 'Full range';
+  if (callout.rangeBins) return [`Bin ${callout.rangeBins.lower}`, `Bin ${callout.rangeBins.upper}`];
   const [low, high] = rangeMc(callout);
   return [formatCompactUsd(low), `${formatCompactUsd(high)} MC`];
 }
 
 export function calloutBins(callout: Callout): number {
+  if (callout.rangeBins) return callout.rangeBins.upper - callout.rangeBins.lower + 1;
   return binCount(callout, callout.pool.binStepBps);
+}
+
+export function formatCalloutValue(callout: Callout, value: number): string {
+  if (callout.valuation !== 'quote') return formatCompactUsd(value);
+  const formatted = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  return `${formatted} ${callout.pool.quote}`;
 }
 
 export function heldLabel(hours: number): string {

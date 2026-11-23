@@ -16,7 +16,7 @@ export function Toaster() {
     >
       <div
         className={cn(
-          'pointer-events-auto flex items-center gap-4 rounded-[2px] border border-line-strong bg-panel-2 py-2 pl-4 pr-2 shadow-[0_20px_40px_-20px_rgb(0_0_0/0.8)] transition-[opacity,transform] duration-base ease-out-expo',
+          'pointer-events-auto flex items-center gap-4 glass-raised rounded-[2px] py-2 pl-4 pr-2 transition-[opacity,transform] duration-base ease-out-expo',
           message ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
         )}
       >

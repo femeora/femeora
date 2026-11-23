@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
+import { ChainBadge } from '@/components/ui/ChainBadge';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { footer, site } from '@/content/landing';
@@ -45,7 +46,7 @@ export function SiteFooter() {
         <p className="t-label mt-[clamp(3rem,6vw,5rem)] flex flex-wrap items-center gap-x-8 gap-y-2 text-muted">
           <span className="inline-flex items-center gap-2">
             <StatusDot live />
-            {site.chain} · Mainnet
+            <ChainBadge showNetwork />
           </span>
           <LiveClock />
         </p>

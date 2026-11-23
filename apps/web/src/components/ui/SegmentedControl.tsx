@@ -29,7 +29,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn('inline-flex rounded-[2px] border border-line', className)}
+      className={cn('glass inline-flex rounded-[2px] p-0.5', className)}
     >
       {options.map(option => {
         const selected = option.value === value;
@@ -42,7 +42,9 @@ export function SegmentedControl<T extends string>({
             className={cn(
               't-label flex-1 whitespace-nowrap transition-colors duration-fast',
               size === 'sm' ? 'min-h-8 px-2.5' : 'min-h-11 px-4',
-              selected ? 'bg-fg text-bg' : 'text-muted hover:text-fg'
+              selected
+                ? 'rounded-[1px] bg-fg text-bg'
+                : 'text-muted hover:bg-fg/[0.06] hover:text-fg'
             )}
           >
             {option.label}

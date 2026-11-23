@@ -1,10 +1,4 @@
-/**
- * Landing page copy, sourced from `docs/brief/femeora-dev-brie.md`.
- * Product rule (brief 13.4): no em dashes, no "guaranteed", "safe yield" or APR promises.
- * Copy describes the product as it runs in production.
- */
-
-import type { SampleCallout } from '@/types/callout';
+/** Public product copy. Do not use yield guarantees or present test fixtures as live data. */
 
 export interface NavLink {
   label: string;
@@ -15,6 +9,8 @@ export interface ReadoutCell {
   key: string;
   value: string;
   detail?: string;
+  /** Prefix the value with the Robinhood mark. */
+  chainMark?: boolean;
 }
 
 export interface SystemNode {
@@ -26,12 +22,7 @@ export interface SystemNode {
 export interface LoopStep {
   title: string;
   detail: string;
-  tone: 'fg' | 'signal' | 'up' | 'warn';
-}
-
-export interface Stat {
-  value: string;
-  label: string;
+  tone: 'fg' | 'signal' | 'up';
 }
 
 export type SignalId = 'quick-exit' | 'opposite-side' | 'dev' | 'fresh-wallet' | 'range-honesty';
@@ -41,21 +32,7 @@ export interface IntegritySignal {
   name: string;
   rule: string;
   badge: string;
-  tone: 'down' | 'warn' | 'faint' | 'up';
-}
-
-export type MarkerTone = 'up' | 'faint' | 'down' | 'warn';
-
-/** A callout avatar on the pool chart (brief 8.2). */
-export interface ChartMarker {
-  /** Position along the series, 0..1. */
-  at: number;
-  tone: MarkerTone;
-  /** Caller initials standing in for the avatar. */
-  label: string;
-  /** Callout range as price fractions 0..1 (0 = bottom of the chart). */
-  range: readonly [number, number];
-  signals: readonly SignalId[];
+  tone: 'down' | 'faint' | 'up';
 }
 
 export interface Safeguard {
@@ -80,19 +57,18 @@ export const site = {
 } as const;
 
 export const navLinks: readonly NavLink[] = [
-  { label: 'App', href: '#app' },
-  { label: 'Callouts', href: '#callouts' },
-  { label: 'Tail', href: '#tail' },
-  { label: 'Integrity', href: '#integrity' },
-  { label: 'Safety', href: '#safety' },
+  { label: 'App', href: '/#app' },
+  { label: 'Callouts', href: '/#callouts' },
+  { label: 'Tail', href: '/#tail' },
+  { label: 'Integrity', href: '/#integrity' },
+  { label: 'Safety', href: '/#safety' },
 ];
 
 export const hero = {
   readout: [
-    { key: 'Network', value: 'Robinhood Chain', detail: 'Mainnet' },
+    { key: 'Network', value: 'Robinhood Chain', detail: 'Testnet first', chainMark: true },
     { key: 'Pools', value: 'DLMM · DAMM', detail: 'Spot · Curve · Bid-Ask' },
   ] satisfies readonly ReadoutCell[],
-  note: 'The mark is a bin histogram. Twenty-four bins of a Bid-Ask range, replaying the active price as it walks.',
   titleLines: ['Every LP', 'is a callout.'],
   dek: 'DLMM and DAMM liquidity with a social feed. Open a position, post it as a callout, and let anyone tail the exact range in one tap.',
   primaryCta: { label: 'Launch app', href: '/pools' },
@@ -109,15 +85,14 @@ export const appPreview = {
   cue: 'Cue 01',
   label: 'The app',
   title: 'One terminal to open a range, post it and tail it.',
-  body: 'The pool page carries the chart, the liquidity bins, every callout in the pool and the Create Position panel in one place. Below is the terminal as you will use it.',
-  frameUrl: 'fomeora.app/pools',
+  body: 'The pool page carries indexed candles, liquidity bins, canonical callouts and the Create Position panel in one place. Empty testnet data stays empty instead of being replaced with a demo market.',
   cta: { label: 'Open the terminal', href: '/pools' },
   systemTitle: 'How a callout moves through the system',
   system: [
     {
       layer: 'Client',
       title: 'You',
-      detail: 'Sign in with X for identity, link a wallet with SIWE',
+      detail: 'Sign in with X for identity, link a wallet with one EIP-191 signature',
     },
     {
       layer: 'On-chain',
@@ -142,112 +117,28 @@ export const appPreview = {
   ] satisfies readonly SystemNode[],
 } as const;
 
-/** The callout used wherever a single example card is shown. */
-export const featuredCallout: SampleCallout = {
-  title: 'HOODIE · Bid-Ask below price',
-  token: 'HOODIE',
-  pool: 'DLMM',
-  shape: 'bid-ask',
-  side: 'Single-side USDG',
-  range: ['$3.51M', '$7.02M MC'],
-  bins: '36 bins',
-  status: 'in-range',
-  inRange: 'In range 82% of 3h',
-  position: '$2.50K',
-  earned: '+$41.20',
-  tailers: 23,
-  meta: ['DLMM', 'Single-side USDG', '36 bins'],
-};
-
 export const callouts = {
   cue: 'Cue 02',
   label: 'The callout',
   title: 'Every number is read from chain.',
-  note: 'On the feed now · HOODIE / USDG',
   more: { label: 'All callouts', href: '/feed' },
-  items: [
-    featuredCallout,
+  facts: [
     {
-      title: 'Sell into strength',
-      token: 'HOODIE',
-      pool: 'DLMM',
-      shape: 'bid-ask',
-      side: 'Single-side HOODIE',
-      range: ['+2%', '+80%'],
-      bins: '48 bins',
-      status: 'out-of-range',
-      inRange: 'In range 41% of 9h',
-      position: '$8.10K',
-      earned: '+$96.40',
-      tailers: 11,
-      meta: ['DLMM', 'Single-side token', ['+2%', '+80%']],
+      title: 'Bound to a position',
+      detail:
+        'A callout becomes canonical only after the indexer matches its one-time tag to an on-chain position owned by the linked wallet.',
     },
     {
-      title: 'Fee farm · two-sided Curve',
-      token: 'HOODIE',
-      pool: 'DLMM',
-      shape: 'curve',
-      side: 'Two-sided',
-      range: '±20% around price',
-      bins: '40 bins',
-      status: 'in-range',
-      inRange: 'In range 97% of 1d',
-      position: '$12.4K',
-      earned: '+$212.80',
-      tailers: 58,
-      meta: ['DLMM', 'Two-sided', '±20%'],
+      title: 'Measured continuously',
+      detail:
+        'Range state, earned quote value, position updates and anti-shill signals come from canonical indexed events.',
     },
     {
-      title: 'Spot across the range',
-      token: 'HOODIE',
-      pool: 'DLMM',
-      shape: 'spot',
-      side: 'Two-sided',
-      range: ['$4.10M', '$8.00M MC'],
-      bins: '30 bins',
-      status: 'closed',
-      inRange: 'Closed · held 3h 12m',
-      position: 'Closed',
-      earned: '+$412.00',
-      tailers: 7,
-      meta: ['DLMM', 'Rebalanced once', 'Closed'],
+      title: 'Copied with consent',
+      detail:
+        'Tail prepares the same range or shape, but the tailer reviews amounts and signs every approval and position transaction.',
     },
-    {
-      title: 'Full range · fee decays',
-      token: 'HOODIE',
-      pool: 'DAMM',
-      shape: 'spot',
-      side: 'Two-sided',
-      range: 'Full range',
-      bins: 'Fee 1.00%, decaying',
-      status: 'in-range',
-      inRange: 'In range 100% of 6h',
-      position: '$1.53K',
-      earned: '+$18.75',
-      tailers: 4,
-      meta: ['DAMM', 'Full range', 'Fee scheduler'],
-    },
-  ] satisfies readonly SampleCallout[],
-} as const;
-
-export const chartMarkers: readonly ChartMarker[] = [
-  { at: 0.1, tone: 'up', label: 'AK', range: [0.18, 0.42], signals: ['range-honesty'] },
-  { at: 0.26, tone: 'down', label: 'MX', range: [0.3, 0.56], signals: ['quick-exit'] },
-  { at: 0.42, tone: 'warn', label: 'RB', range: [0.22, 0.48], signals: ['opposite-side'] },
-  { at: 0.56, tone: 'faint', label: 'DV', range: [0.55, 0.85], signals: ['dev'] },
-  {
-    at: 0.7,
-    tone: 'up',
-    label: 'LN',
-    range: [0.36, 0.62],
-    signals: ['fresh-wallet', 'range-honesty'],
-  },
-  { at: 0.86, tone: 'up', label: 'SY', range: [0.44, 0.74], signals: ['range-honesty'] },
-];
-
-export const band = {
-  caption:
-    'Chart callout layer · avatar markers at time posted and MC at post · ring shows range status',
+  ],
 } as const;
 
 export const loop = {
@@ -256,19 +147,13 @@ export const loop = {
   title: 'From seeing a range to taking it, in one tap.',
   steps: [
     { title: 'Sign in with X', detail: 'Identity only', tone: 'fg' },
-    { title: 'Link wallet', detail: 'SIWE · up to 3', tone: 'fg' },
+    { title: 'Link wallet', detail: 'EIP-191 · up to 3', tone: 'fg' },
     { title: 'Open position', detail: 'DLMM v2 · one tx', tone: 'signal' },
-    { title: 'Post callout', detail: 'Your words · 280 chars', tone: 'warn' },
+    { title: 'Post callout', detail: 'Your words · 280 chars', tone: 'signal' },
     { title: 'Tail', detail: 'Same range or same shape now', tone: 'up' },
   ] satisfies readonly LoopStep[],
   body: 'X gives us identity: handle, avatar and verified badge. We never post to X. Open a position with Post as callout on, write your play, and it goes live when the tx confirms. Tailers copy the exact bins, or the same shape re-anchored to the active bin, and always sign their own tx.',
-  stats: [
-    { value: '1 tx', label: 'For a 36-bin single-sided position on DLMM v2' },
-    { value: '280', label: 'Caption characters, written by you, never generated' },
-    { value: '5 s', label: 'From tx confirmed to every open feed' },
-    { value: '0', label: 'X write scopes requested' },
-  ] satisfies readonly Stat[],
-  news: 'New · presets: Buy the dip, Sell into strength, Fee farm',
+  news: 'Position state and feed updates are delivered from the canonical indexer through the API.',
   disclaimer: 'Tailing copies a range, not a result. LP positions can lose value.',
   more: { label: 'Open the feed', href: '/feed' },
 } as const;
@@ -278,7 +163,7 @@ export const marquee: readonly { label: string; ours?: boolean }[] = [
   { label: 'Curve' },
   { label: 'Bid-Ask' },
   { label: 'Buy the dip', ours: true },
-  { label: 'Single-side USDG' },
+  { label: 'Single-side quote' },
   { label: 'Sell into strength', ours: true },
   { label: 'Two-sided' },
   { label: 'Fee farm', ours: true },
@@ -299,7 +184,6 @@ export const integrity = {
   label: 'Integrity',
   title: 'Anti-shill is a feature, not an afterthought.',
   body: 'Feed cards show when a caller exits soon after posting, when they hold opposite-side liquidity, and how long their range actually stayed in range. Deleting a callout cannot hide a bad call.',
-  hint: 'Hover or tap a signal to see it on the chart',
   footnote: 'All badges are computed server-side from chain data. Users cannot hide them.',
   signals: [
     quickExitSignal,
@@ -308,7 +192,7 @@ export const integrity = {
       name: 'Opposite side',
       rule: 'Caller holds single-side token liquidity above price while calling single-side quote, or the reverse.',
       badge: 'Also selling above',
-      tone: 'warn',
+      tone: 'down',
     },
     {
       id: 'dev',
@@ -383,15 +267,16 @@ const footerColumns: readonly FooterColumn[] = [
       { label: 'Pools', href: '/pools' },
       { label: 'Leaderboard', href: '/leaderboard' },
       { label: 'Portfolio', href: '/portfolio' },
+      { label: 'Testnet guide', href: '/testnet-guide' },
     ],
   },
   {
     title: 'On this page',
     items: [
-      { label: 'Callouts', href: '#callouts' },
-      { label: 'Tail', href: '#tail' },
-      { label: 'Integrity', href: '#integrity' },
-      { label: 'Safety', href: '#safety' },
+      { label: 'Callouts', href: '/#callouts' },
+      { label: 'Tail', href: '/#tail' },
+      { label: 'Integrity', href: '/#integrity' },
+      { label: 'Safety', href: '/#safety' },
     ],
   },
   {

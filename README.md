@@ -15,7 +15,7 @@ fomeora/
 ├── apps/
 │   ├── contracts/              # Foundry-based EVM Smart Contracts (DLMM v2, PositionManagerV2, Lens)
 │   ├── indexer/                # Event Ingestion: projections for swaps, fee attribution, positions
-│   ├── api/                    # Fastify REST & SSE Server (X OAuth 2.0 PKCE, SIWE, Feed, Ranking)
+│   ├── api/                    # Fastify REST & SSE Server (X OAuth 2.0 PKCE, EIP-191 wallet link, Feed, Ranking)
 │   └── web/                    # Next.js 14 App Router: Mobile-first Social Feed & Delta-grade Pool Terminal
 ├── packages/
 │   ├── sdk/                    # Core math: DLMM bin formulas, PnL, formatters, ranking algorithms
@@ -26,7 +26,7 @@ fomeora/
 │   ├── config-typescript/      # Strict tsconfig base (`strict: true`, `noUncheckedIndexedAccess`)
 │   └── config-prettier/        # Consistent opinionated code formatting
 └── tools/
-    └── docker/                 # Local development infrastructure (PostgreSQL 16, Redis 7, Anvil)
+    └── docker/                 # Local development infrastructure (PostgreSQL 16, Anvil)
 ```
 
 ---
@@ -66,11 +66,12 @@ pnpm install
 
 ### 2. Configure Environment Variables
 
-```bash
-cp .env.example .env
-```
+Fill `.env.testnet` for testnet or `.env.mainnet` for mainnet. These files are
+intentionally ignored and must be supplied through the deployment platform's
+secret manager outside local development. Select the active configuration with
+`APP_NETWORK=testnet` or `APP_NETWORK=mainnet`.
 
-### 3. Spin up Local Infrastructure (Postgres, Redis, Anvil)
+### 3. Spin up Local Infrastructure (Postgres and Anvil)
 
 ```bash
 pnpm docker:up

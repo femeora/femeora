@@ -1,9 +1,13 @@
 'use client';
 
+import { ApiFollowToggleSchema } from '@fomeora/types';
 import { useState } from 'react';
 
+import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
 import { BadgeCheck } from '@/components/ui/icons';
+import { useSession } from '@/features/session/store';
+import { browserApiRequest } from '@/lib/api/client';
 
 import type { Callout } from '../model/callout';
 
@@ -26,17 +30,42 @@ interface CalloutPostProps {
 export function CalloutPost({ callout, own = false }: CalloutPostProps) {
   const [captionOpen, setCaptionOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [following, setFollowing] = useState(callout.viewer.following);
+  const [followPending, setFollowPending] = useState(false);
+  const user = useSession(state => state.user);
+  const openSignIn = useSession(state => state.openSignIn);
+  const showToast = useToast(state => state.show);
   const { caller } = callout;
   const longCaption = (callout.caption?.length ?? 0) > CLAMP_FROM;
   const updates = updatesOpen ? callout.updates : callout.updates.slice(0, VISIBLE_UPDATES);
   const hiddenUpdates = callout.updates.length - updates.length;
+  const toggleFollow = async () => {
+    if (!user) { openSignIn(); return; }
+    if (followPending) return;
+    const previous = following;
+    setFollowing(!previous);
+    setFollowPending(true);
+    try {
+      const response = await browserApiRequest(
+        `/v1/users/${encodeURIComponent(caller.handle)}/follow`,
+        ApiFollowToggleSchema,
+        { method: previous ? 'DELETE' : 'POST' },
+      );
+      setFollowing(response.following);
+    } catch (error) {
+      setFollowing(previous);
+      showToast(error instanceof Error ? error.message : 'FOLLOW_FAILED');
+    } finally {
+      setFollowPending(false);
+    }
+  };
 
   return (
     <article
       id={`callout-${callout.id}`}
       className="grid scroll-mt-28 grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-line px-gutter py-5"
     >
-      <Avatar initials={caller.initials} size="lg" self={own} />
+      <Avatar seed={caller.handle} size="lg" self={own} />
       <div className="min-w-0">
         <header className="flex flex-wrap items-center gap-x-1.5 text-[0.9375rem]">
           <span className="font-medium">{caller.name}</span>
@@ -47,6 +76,7 @@ export function CalloutPost({ callout, own = false }: CalloutPostProps) {
             @{caller.handle} · {callout.postedAgo}
             {callout.edited ? ' · edited' : ''}
           </span>
+          {!own ? <button type="button" disabled={followPending} onClick={() => void toggleFollow()} aria-pressed={following} className="t-label ml-auto min-h-9 px-2 text-signal disabled:opacity-50">{following ? 'Following' : 'Follow'}</button> : null}
         </header>
 
         {callout.caption ? (

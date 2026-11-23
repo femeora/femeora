@@ -40,6 +40,7 @@ interface ChartToolbarProps {
   onIntervalChange: (interval: ChartInterval) => void;
   unit: ValueUnit;
   onUnitChange: (unit: ValueUnit) => void;
+  marketCapAvailable: boolean;
   showCallouts: boolean;
   onShowCalloutsChange: (show: boolean) => void;
   showBins: boolean;
@@ -52,6 +53,7 @@ export function ChartToolbar({
   onIntervalChange,
   unit,
   onUnitChange,
+  marketCapAvailable,
   showCallouts,
   onShowCalloutsChange,
   showBins,
@@ -65,12 +67,14 @@ export function ChartToolbar({
         value={interval}
         onChange={onIntervalChange}
       />
-      <SegmentedControl
-        label="Chart unit"
-        options={unitOptions}
-        value={unit}
-        onChange={onUnitChange}
-      />
+      {marketCapAvailable ? (
+        <SegmentedControl
+          label="Chart unit"
+          options={unitOptions}
+          value={unit}
+          onChange={onUnitChange}
+        />
+      ) : null}
       <SegmentedControl
         label="Callout markers"
         options={calloutOptions}

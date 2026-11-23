@@ -4,13 +4,17 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Toaster } from '@/components/feedback/Toaster';
+import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
+import { ChainBadge } from '@/components/ui/ChainBadge';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { site } from '@/content/landing';
 import { TailSheet } from '@/features/callouts/components/TailSheet';
 import { AccountButton } from '@/features/session/AccountButton';
 import { SignInSheet } from '@/features/session/SignInSheet';
 import { useRehydrateStores } from '@/features/session/useRehydrateStores';
+import { useWallet } from '@/features/wallet/store';
+import { cn } from '@/lib/cn';
 
 import { AppBottomNav, AppTopNav } from './AppNav';
 
@@ -20,11 +24,14 @@ import { AppBottomNav, AppTopNav } from './AppNav';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   useRehydrateStores();
+  const config = useWallet(state => state.config);
+  const testnet = config?.network === 'testnet';
 
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-50 h-14 border-b border-line bg-bg/90 backdrop-blur-md">
-        <div className="flex h-full items-center gap-8 px-gutter">
+    <div className={cn('min-h-dvh [--app-header-height:3.5rem]', testnet && '[--app-header-height:5.5rem]')}>
+      <Ambient />
+      <header className="sticky top-0 z-50 border-b border-line bg-bg">
+        <div className="flex h-14 items-center gap-8 px-gutter">
           <Link
             href="/"
             className="inline-flex shrink-0 items-center gap-3"
@@ -36,12 +43,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <AppTopNav />
           <p className="t-label ml-auto hidden items-center gap-2 text-muted lg:flex">
             <StatusDot tone="up" />
-            {site.chain}
+            <ChainBadge />
           </p>
           <div className="ml-auto lg:ml-0">
             <AccountButton />
           </div>
         </div>
+        {testnet ? (
+          <p className="t-label flex h-8 items-center justify-center border-t border-signal/30 bg-signal/10 px-gutter text-center text-signal" role="status">
+            Testnet · assets have no real-world value · {config.chainName}
+          </p>
+        ) : null}
       </header>
 
       <main id="main" className="pb-20 md:pb-0">

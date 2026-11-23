@@ -6,6 +6,8 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "turbo run dev --parallel",
+    "dev:testnet": "APP_NETWORK=testnet turbo run dev --parallel",
+    "dev:mainnet": "APP_NETWORK=mainnet turbo run dev --parallel",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

@@ -1,6 +1,5 @@
 import { AppSection } from '@/components/landing/AppSection';
 import { CalloutsSection } from '@/components/landing/CalloutsSection';
-import { ChartBand } from '@/components/landing/ChartBand';
 import { CtaSection } from '@/components/landing/CtaSection';
 import { Hero } from '@/components/landing/Hero';
 import { IntegritySection } from '@/components/landing/IntegritySection';
@@ -10,6 +9,7 @@ import { SafetySection } from '@/components/landing/SafetySection';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { Statement } from '@/components/landing/Statement';
+import { Ambient } from '@/components/ui/Ambient';
 import { Grain } from '@/components/ui/Grain';
 import { marquee } from '@/content/landing';
 
@@ -22,13 +22,13 @@ export default function LandingPage() {
       >
         Skip to content
       </a>
+      <Ambient />
       <SiteHeader />
       <main id="main" className="pt-header">
         <Hero />
         <Statement />
         <AppSection />
         <CalloutsSection />
-        <ChartBand />
         <LoopSection />
         <Marquee items={marquee} label="Shapes and presets" />
         <IntegritySection />

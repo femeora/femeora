@@ -1,12 +1,11 @@
 import { cn } from '@/lib/cn';
 
-type Tone = 'signal' | 'up' | 'down' | 'warn' | 'faint' | 'fg';
+type Tone = 'signal' | 'up' | 'down' | 'faint' | 'fg';
 
 const tones: Record<Tone, string> = {
   signal: 'bg-signal',
   up: 'bg-up',
   down: 'bg-down',
-  warn: 'bg-warn',
   faint: 'bg-faint',
   fg: 'bg-fg',
 };

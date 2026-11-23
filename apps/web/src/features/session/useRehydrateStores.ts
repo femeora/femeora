@@ -2,14 +2,23 @@
 
 import { useEffect } from 'react';
 
-import { usePortfolio } from '@/features/portfolio/store';
+import { useWallet } from '@/features/wallet/store';
 
 import { useSession } from './store';
 
-/** Loads persisted session and positions after mount, avoiding hydration mismatches. */
+/** Resolves the HttpOnly API session and initializes the injected wallet after mount. */
 export function useRehydrateStores() {
   useEffect(() => {
-    void useSession.persist.rehydrate();
-    void usePortfolio.persist.rehydrate();
+    let active = true;
+    let stopWallet: () => void = () => undefined;
+    void useSession.getState().refreshSession();
+    void useWallet.getState().initialize().then(stop => {
+      if (active) stopWallet = stop;
+      else stop();
+    });
+    return () => {
+      active = false;
+      stopWallet();
+    };
   }, []);
 }

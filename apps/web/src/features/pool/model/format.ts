@@ -11,13 +11,8 @@ export function toUnit(priceUsd: number, unit: ValueUnit, pool: Pool): number {
   return unit === 'mcap' ? priceUsd * pool.supply : priceUsd;
 }
 
-const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
-
-/** `$0.0{2}4893` from the SDK becomes `$0.0₂4893` for display. */
 export function formatPrice(value: number): string {
-  return formatSubscriptPrice(value).replace(/\{(\d+)\}/, (_, zeros: string) =>
-    [...zeros].map(digit => SUBSCRIPT_DIGITS[Number(digit)]).join('')
-  );
+  return formatSubscriptPrice(value);
 }
 
 export function formatUnit(value: number, unit: ValueUnit): string {

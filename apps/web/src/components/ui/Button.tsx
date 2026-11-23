@@ -10,9 +10,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary:
-    'border-fg bg-fg text-bg enabled:hover:border-signal enabled:hover:bg-signal enabled:hover:text-on-signal',
-  ghost: 'border-line-strong text-fg enabled:hover:border-fg',
+  primary: 'metal border-transparent enabled:hover:brightness-110',
+  ghost: 'glass-control text-fg',
 };
 
 /** Mono uppercase button. Pairs with `ButtonLink` for navigation. */

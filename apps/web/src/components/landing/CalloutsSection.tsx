@@ -1,10 +1,7 @@
 import Link from 'next/link';
 
-import { ArrowRight } from '@/components/ui/icons';
 import { SectionHead } from '@/components/ui/SectionHead';
 import { callouts } from '@/content/landing';
-
-import { CalloutList } from './CalloutList';
 
 export function CalloutsSection() {
   return (
@@ -16,14 +13,14 @@ export function CalloutsSection() {
           label={callouts.label}
           title={callouts.title}
         />
-        <p className="t-label mb-6 mt-10 text-faint md:mt-14">{callouts.note}</p>
-        <CalloutList items={callouts.items} href={callouts.more.href} />
+        <div className="mt-10 grid gap-px overflow-hidden rounded-[2px] bg-line md:mt-14 md:grid-cols-3">
+          {callouts.facts.map(fact => <article key={fact.title} className="bg-panel p-6"><h3 className="font-medium">{fact.title}</h3><p className="mt-3 text-muted">{fact.detail}</p></article>)}
+        </div>
         <Link
           href={callouts.more.href}
           className="t-label mt-10 inline-flex min-h-11 items-center gap-1.5 text-fg transition-colors hover:text-signal"
         >
-          {callouts.more.label}{' '}
-          <ArrowRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+          {callouts.more.label}
         </Link>
       </div>
     </section>

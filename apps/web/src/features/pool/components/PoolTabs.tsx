@@ -5,24 +5,28 @@ import { useState, type ReactNode } from 'react';
 
 import { Tabs } from '@/components/ui/Tabs';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
+import type { Callout } from '@/features/callouts/model/callout';
 import { useAllCallouts } from '@/features/callouts/useAllCallouts';
-import { usePortfolio } from '@/features/portfolio/store';
+import { usePositions } from '@/features/portfolio/usePositions';
 import { useSession } from '@/features/session/store';
 import { cn } from '@/lib/cn';
 
-import { recentTrades, topLps } from '../model/activity';
-import { formatCompactUsd, formatTokenAmount } from '../model/format';
+import { formatTokenAmount } from '../model/format';
+import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
 import type { Pool } from '../model/pool';
 
 type PoolTab = 'callouts' | 'positions' | 'top-lps' | 'trades';
 
 interface PoolTabsProps {
   pool: Pool;
+  trades: readonly LiveTrade[];
+  lps: readonly LiveLp[];
+  callouts: readonly Callout[];
 }
 
 function Table({ head, children }: { head: readonly string[]; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="glass mt-4 overflow-x-auto rounded-[2px] px-4">
       <table className="w-full min-w-[34rem] text-left">
         <thead>
           <tr className="t-label text-faint">
@@ -48,9 +52,10 @@ function PoolPositions({ pool }: { pool: Pool }) {
   const user = useSession(state => state.user);
   const openSignIn = useSession(state => state.openSignIn);
   const pair = `${pool.base} / ${pool.quote}`;
-  const count = usePortfolio(
-    state => state.positions.filter(position => position.pool === pair).length
-  );
+  const { data } = usePositions();
+  const count = data?.data.filter(position =>
+    position.pool.address.toLowerCase() === pool.address.toLowerCase() && position.status === 'open'
+  ).length ?? 0;
 
   if (!user) {
     return (
@@ -80,10 +85,10 @@ function PoolPositions({ pool }: { pool: Pool }) {
 const cellClass = 'border-t border-line py-3 pr-4 align-middle last:pr-0 last:text-right';
 
 /** Bottom tabs of the pool page (brief 8.1). */
-export function PoolTabs({ pool }: PoolTabsProps) {
+export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: PoolTabsProps) {
   const [tab, setTab] = useState<PoolTab>('callouts');
-  const { own, others } = useAllCallouts();
-  const callouts = [...own, ...others];
+  const { own } = useAllCallouts(false);
+  const callouts = [...own, ...canonicalCallouts];
   const ownIds = new Set(own.map(callout => callout.id));
   const tabItems: readonly { value: PoolTab; label: string }[] = [
     { value: 'callouts', label: `Callouts · ${callouts.length}` },
@@ -109,38 +114,41 @@ export function PoolTabs({ pool }: PoolTabsProps) {
       {tab === 'positions' ? <PoolPositions pool={pool} /> : null}
 
       {tab === 'top-lps' ? (
-        <Table head={['#', 'LP', 'Value', 'Earned', 'In range']}>
-          {topLps.map(lp => (
-            <tr key={lp.rank}>
-              <td className={cellClass}>{lp.rank}</td>
-              <td className={cn(cellClass, 'font-sans text-[0.9375rem]')}>{lp.handle}</td>
-              <td className={cellClass}>{formatCompactUsd(lp.valueUsd)}</td>
-              <td className={cn(cellClass, 'text-up')}>+{formatCompactUsd(lp.earnedUsd)}</td>
-              <td className={cellClass}>{lp.inRangePct}%</td>
+        <Table head={['#', 'LP', 'Value', 'Earned', 'Range']}>
+          {lps.map((lp, index) => (
+            <tr key={lp.id}>
+              <td className={cellClass}>{index + 1}</td>
+              <td className={cn(cellClass, 'font-sans text-[0.9375rem]')}>{shortAddress(lp.owner)}</td>
+              <td className={cellClass}>{lp.valueQuote ?? '—'}</td>
+              <td className={cn(cellClass, 'text-up')}>{lp.earnedQuote}</td>
+              <td className={cellClass}>{lp.lowerBin}–{lp.upperBin}</td>
             </tr>
           ))}
         </Table>
       ) : null}
 
       {tab === 'trades' ? (
-        <Table head={['Side', 'USD', pool.base, 'Trader', 'Age']}>
-          {recentTrades.map(trade => (
-            <tr key={trade.id}>
+        <Table head={['Side', 'Out (raw)', 'In (raw)', 'Trader', 'Time']}>
+          {trades.map(trade => {
+            const tokenXIn = trade.tokenIn.toLowerCase() === pool.tokenX.toLowerCase();
+            return (
+            <tr key={`${trade.transactionHash}:${trade.logIndex}`}>
               <td
                 className={cn(
                   cellClass,
-                  trade.side === 'buy' ? 'text-up' : 'text-down',
+                  tokenXIn ? 'text-down' : 'text-up',
                   'uppercase'
                 )}
               >
-                {trade.side}
+                {tokenXIn ? 'sell' : 'buy'}
               </td>
-              <td className={cellClass}>{formatCompactUsd(trade.amountUsd)}</td>
-              <td className={cellClass}>{formatTokenAmount(trade.amountBase)}</td>
-              <td className={cellClass}>{trade.trader}</td>
-              <td className={cellClass}>{trade.age}</td>
+              <td className={cellClass}>{formatTokenAmount(Number(trade.amountOut))}</td>
+              <td className={cellClass}>{formatTokenAmount(Number(trade.amountIn))}</td>
+              <td className={cellClass}>{shortAddress(trade.sender)}</td>
+              <td className={cellClass}>{new Date(trade.timestamp).toLocaleString()}</td>
             </tr>
-          ))}
+            );
+          })}
         </Table>
       ) : null}
     </Tabs>

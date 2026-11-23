@@ -18,10 +18,10 @@ export const CalloutCaptionSchema = z
 
 export const AntiShillBadgeSchema = z.object({
   quickExit: z.boolean().default(false), // Removed >= 50% within 30 min
-  quickExitMinutes: z.number().optional(),
-  hasOppositeSide: z.boolean().default(false), // Caller holds opposite-side liquidity >= 50%
-  isDevOrTopHolder: z.boolean().default(false),
-  isFreshWallet: z.boolean().default(false), // Linked wallet age < 7 days
+  quickExitMinutes: z.number().nullable().optional(),
+  hasOppositeSide: z.boolean().nullable(), // Caller holds opposite-side liquidity >= 50%
+  isDevOrTopHolder: z.boolean().nullable(),
+  isFreshWallet: z.boolean().nullable(), // Linked wallet age < 7 days
   inRangePercentage: z.number().min(0).max(100),
   heldDurationSeconds: z.number().nonnegative(),
 });

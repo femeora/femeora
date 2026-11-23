@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from 'react';
 
+import type { Callout } from '@/features/callouts/model/callout';
 import { useAllCallouts } from '@/features/callouts/useAllCallouts';
 
 import { usePositionDraft } from '../hooks/usePositionDraft';
 import type { ValueUnit } from '../model/format';
-import { buildCandles, buildLiquidity, featuredPool } from '../model/pool';
+import type { LiveLp, LivePoolStats, LiveTrade } from '../model/live';
+import type { Candle, LiquidityBin, Pool } from '../model/pool';
 
 import { ChartToolbar, INTERVAL_SECONDS, type ChartInterval } from './ChartToolbar';
 import { MarketStrips } from './MarketStrips';
@@ -15,34 +17,43 @@ import { PoolTabs } from './PoolTabs';
 import { PriceChart } from './PriceChart';
 import { TradePanel, type PanelTab } from './TradePanel';
 
-const CANDLE_COUNT: Record<ChartInterval, number> = { '5m': 96, '15m': 80, '1h': 64, '4h': 48 };
-const CANDLE_SEED: Record<ChartInterval, number> = { '5m': 11, '15m': 23, '1h': 37, '4h': 41 };
-const liquidity = buildLiquidity(40);
+interface PoolTerminalProps {
+  pool: Pool;
+  stats: LivePoolStats;
+  candlesByInterval: Readonly<Record<ChartInterval, readonly Candle[]>>;
+  liquidity: readonly LiquidityBin[];
+  trades: readonly LiveTrade[];
+  lps: readonly LiveLp[];
+  callouts: readonly Callout[];
+}
 
 /**
  * The pool page (brief 8): header, strips, chart, Create Position / Swap and the
  * pool tabs. Owns the shared state: chart unit and the position draft, which the
  * chart draws as a band.
  */
-export function PoolTerminal() {
-  const pool = featuredPool;
+export function PoolTerminal({
+  pool,
+  stats,
+  candlesByInterval,
+  liquidity,
+  trades,
+  lps,
+  callouts,
+}: PoolTerminalProps) {
   const [interval, setChartInterval] = useState<ChartInterval>('15m');
-  const [unit, setUnit] = useState<ValueUnit>('mcap');
+  const [unit, setUnit] = useState<ValueUnit>(pool.marketCapAvailable ? 'mcap' : 'price');
   const [showCallouts, setShowCallouts] = useState(true);
   const [showBins, setShowBins] = useState(true);
   const [panelTab, setPanelTab] = useState<PanelTab>('create');
   const position = usePositionDraft(pool);
-  const { own, others } = useAllCallouts();
-
-  const candles = useMemo(
-    () => buildCandles(CANDLE_COUNT[interval], pool.priceUsd, CANDLE_SEED[interval]),
-    [interval, pool.priceUsd]
-  );
+  const { own } = useAllCallouts(false);
+  const candles = useMemo(() => candlesByInterval[interval], [candlesByInterval, interval]);
 
   return (
     <div className="flex flex-col gap-4 px-gutter py-5">
       <PoolHeader pool={pool} />
-      <MarketStrips />
+      <MarketStrips stats={stats} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
         <section aria-label="Chart" className="min-w-0">
@@ -51,12 +62,13 @@ export function PoolTerminal() {
             onIntervalChange={setChartInterval}
             unit={unit}
             onUnitChange={setUnit}
+            marketCapAvailable={pool.marketCapAvailable}
             showCallouts={showCallouts}
             onShowCalloutsChange={setShowCallouts}
             showBins={showBins}
             onShowBinsChange={setShowBins}
           />
-          <div className="h-[320px] border border-line bg-panel sm:h-[440px]">
+          <div className="glass h-[320px] rounded-[2px] sm:h-[440px]">
             <PriceChart
               pool={pool}
               candles={candles}
@@ -64,7 +76,7 @@ export function PoolTerminal() {
               liquidity={showBins ? liquidity : []}
               unit={unit}
               range={panelTab === 'create' ? position.draft : null}
-              callouts={own.concat(others)}
+              callouts={own.concat(callouts)}
               showCallouts={showCallouts}
             />
           </div>
@@ -72,7 +84,7 @@ export function PoolTerminal() {
 
         <aside
           aria-label="Trade panel"
-          className="scroll-mt-20 self-start border border-line bg-panel xl:sticky xl:top-20 xl:row-span-2"
+          className="glass scroll-mt-20 self-start rounded-[2px] xl:sticky xl:top-20 xl:row-span-2"
         >
           <TradePanel
             pool={pool}
@@ -83,7 +95,7 @@ export function PoolTerminal() {
           />
         </aside>
 
-        <PoolTabs pool={pool} />
+        <PoolTabs pool={pool} trades={trades} lps={lps} callouts={callouts} />
       </div>
     </div>
   );

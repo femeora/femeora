@@ -3,10 +3,9 @@ import { Reveal } from '@/components/ui/Reveal';
 import { SectionHead } from '@/components/ui/SectionHead';
 import { appPreview } from '@/content/landing';
 
-import { AppPreview } from './AppPreview';
 import { SystemDiagram } from './SystemDiagram';
 
-/** Shows the product itself: the live terminal in a frame, then how the system fits together. */
+/** Explains the real application flow without a fabricated market preview. */
 export function AppSection() {
   return (
     <section id="app" aria-labelledby="app-title" className="section-tight">
@@ -29,11 +28,7 @@ export function AppSection() {
           </Reveal>
         </div>
 
-        <Reveal className="mt-8 md:mt-10">
-          <AppPreview frameUrl={appPreview.frameUrl} />
-        </Reveal>
-
-        <Reveal className="mt-14 md:mt-20">
+        <Reveal className="mt-12 md:mt-16">
           <SystemDiagram title={appPreview.systemTitle} nodes={appPreview.system} />
         </Reveal>
       </div>

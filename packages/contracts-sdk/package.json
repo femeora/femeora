@@ -1,0 +1,28 @@
+{
+  "name": "@fomeora/contracts-sdk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "node ./scripts/generate.mjs",
+    "build": "pnpm run generate && tsc -b",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "pnpm run generate && tsc --noEmit",
+    "lint": "pnpm run generate && eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@fomeora/eslint-config": "workspace:*",
+    "@fomeora/config-typescript": "workspace:*",
+    "eslint": "^8.57.0",
+    "typescript": "^5.5.4"
+  }
+}

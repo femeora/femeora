@@ -1,3 +1,4 @@
+import { GlowCard } from '@/components/ui/GlowCard';
 import { ArrowDown, ArrowRight } from '@/components/ui/icons';
 import type { SystemNode } from '@/content/landing';
 import { cn } from '@/lib/cn';
@@ -19,13 +20,15 @@ export function SystemDiagram({ title, nodes }: { title: string; nodes: readonly
       <ol className="grid gap-3 md:grid-cols-5 md:gap-0">
         {nodes.map((node, index) => (
           <li key={node.title} className="relative flex md:pr-6">
-            <div className="flex w-full flex-col gap-2 rounded-[2px] border border-line bg-panel p-4">
-              <span className={cn('t-label', LAYER_TONE[node.layer])}>
-                {String(index + 1).padStart(2, '0')} · {node.layer}
-              </span>
-              <span className="text-lg font-medium">{node.title}</span>
-              <span className="text-[0.9375rem] text-muted">{node.detail}</span>
-            </div>
+            <GlowCard className="w-full">
+              <div className="flex flex-col gap-2 p-4">
+                <span className={cn('t-label', LAYER_TONE[node.layer])}>
+                  {String(index + 1).padStart(2, '0')} · {node.layer}
+                </span>
+                <span className="text-lg font-medium">{node.title}</span>
+                <span className="text-[0.9375rem] text-muted">{node.detail}</span>
+              </div>
+            </GlowCard>
             {index < nodes.length - 1 ? (
               <span
                 aria-hidden="true"

@@ -1,0 +1,3 @@
+# Vendored React Bits source and generated output, kept byte-for-byte with upstream.
+vendor/react-bits/
+src/components/react-bits/
