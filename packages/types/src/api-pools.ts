@@ -71,6 +71,7 @@ export const ApiPoolSchema = z.object({
   baseFeePips: z.number().int().min(0),
   initialActiveBin: z.number().int().nullable(),
   activeBin: z.number().int().nullable(),
+  baseIsTokenX: z.boolean().nullable(),
   createdBlock: IntegerStringSchema,
 });
 export type ApiPool = z.infer<typeof ApiPoolSchema>;
@@ -102,7 +103,9 @@ export const ApiCandleSchema = z.object({
   close: DecimalStringSchema,
   volumeX: DecimalStringSchema,
   volumeY: DecimalStringSchema,
+  volumeQuote: DecimalStringSchema.nullable().optional(),
   swapCount: z.number().int().nonnegative(),
+  synthetic: z.boolean().optional(),
 });
 export type ApiCandle = z.infer<typeof ApiCandleSchema>;
 
@@ -112,6 +115,9 @@ export const ApiBinSchema = z.object({
   reserveY: DecimalStringSchema,
   totalShares: DecimalStringSchema,
   updatedBlock: IntegerStringSchema,
+  priceQuote: DecimalStringSchema.nullable(),
+  depthQuote: DecimalStringSchema.nullable(),
+  side: z.enum(['base', 'quote', 'active']),
 });
 export type ApiBin = z.infer<typeof ApiBinSchema>;
 

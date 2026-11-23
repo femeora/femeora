@@ -13,6 +13,7 @@ import {
   priceFromBinX18,
   quoteAtPrice,
   rawUnitsToDecimal,
+  shapeWeights,
   token0Value,
   token1Value,
 } from './math.js';
@@ -24,6 +25,19 @@ test('matches Solidity BinPriceMath golden vectors exactly', () => {
   assert.equal(priceFromBinX18(2, 25), 1_005_006_250_000_000_000n);
   assert.equal(priceFromBinX18(-2, 25), 995_018_687_694_728_266n);
   assert.equal(priceFromBinX18(20, 100), 1_220_190_039_947_966_823n);
+});
+
+test('liquidity shape weights are relative to active price', () => {
+  const curve = shapeWeights({ lowerBin: -4, upperBin: 4, activeBin: 0, shape: 'curve' });
+  const bidAsk = shapeWeights({ lowerBin: -4, upperBin: 4, activeBin: 0, shape: 'bid-ask' });
+  assert.ok(curve[4]!.weight > curve[0]!.weight);
+  assert.ok(curve[4]!.weight > curve[8]!.weight);
+  assert.ok(bidAsk[0]!.weight > bidAsk[4]!.weight);
+  assert.ok(bidAsk[8]!.weight > bidAsk[4]!.weight);
+  assert.deepEqual(
+    shapeWeights({ lowerBin: -2, upperBin: 2, activeBin: 0, shape: 'spot' }).map(item => item.weight),
+    [1_000_000_000n, 1_000_000_000n, 1_000_000_000n, 1_000_000_000n, 1_000_000_000n],
+  );
 });
 
 test('selects the closest valid bin for an initial price', () => {

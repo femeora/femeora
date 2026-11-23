@@ -37,5 +37,7 @@ export interface Candle {
 /** Liquidity in one bin, as distance from the active bin and USD depth. */
 export interface LiquidityBin {
   offset: number;
+  priceQuote: number | null;
   depthUsd: number;
+  side: 'base' | 'quote' | 'active';
 }

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { shapeWeights } from '@fomeora/sdk';
+
 import {
   allocateRangeAmounts,
   distributeAmount,
@@ -36,6 +38,26 @@ test('range allocation obeys DLMM token sides and conserves both totals', () => 
   assert.deepEqual(result.amounts1.slice(2), [0n, 0n, 0n]);
   assert.equal(result.amounts0.reduce((sum, amount) => sum + amount, 0n), 90n);
   assert.equal(result.amounts1.reduce((sum, amount) => sum + amount, 0n), 40n);
+});
+
+test('preview weights and server allocation agree across 20 ranges', () => {
+  for (let sample = 0; sample < 20; sample += 1) {
+    const lower = -(2 + sample % 9);
+    const upper = 2 + (sample * 3) % 9;
+    const bins = Array.from({ length: upper - lower + 1 }, (_, index) => lower + index);
+    const shape = (['spot', 'curve', 'bid-ask'] as const)[sample % 3]!;
+    const result = allocateRangeAmounts({ bins, activeBin: 0, amount0: 1_000_000_000_000n, amount1: 1_000_000_000_000n, shape });
+    const expected = new Map(shapeWeights({ lowerBin: lower, upperBin: upper, activeBin: 0, shape }).map(item => [item.bin, Number(item.weight)]));
+    for (const side of [bins.filter(bin => bin < 0), bins.filter(bin => bin >= 0)]) {
+      const amounts = side.map(bin => Number(bin < 0 ? result.amounts1[bins.indexOf(bin)] : result.amounts0[bins.indexOf(bin)]));
+      const expectedTotal = side.reduce((sum, bin) => sum + (expected.get(bin) ?? 0), 0);
+      side.forEach((bin, index) => {
+        const actualRatio = amounts[index]! / amounts.reduce((sum, amount) => sum + amount, 0);
+        const expectedRatio = (expected.get(bin) ?? 0) / expectedTotal;
+        assert.ok(Math.abs(actualRatio - expectedRatio) < 0.001);
+      });
+    }
+  }
 });
 
 test('minimumShares mirrors new and initialized bin math with slippage', () => {

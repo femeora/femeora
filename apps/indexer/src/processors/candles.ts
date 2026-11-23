@@ -1,5 +1,5 @@
 import type { Prisma } from '@fomeora/database';
-import { rawUnitsToDecimal } from '@fomeora/sdk';
+import { priceFromBinX18, rawUnitsToDecimal } from '@fomeora/sdk';
 
 export const CANDLE_INTERVAL_SECONDS = {
   '1m': 60,
@@ -20,6 +20,9 @@ export interface CandleSwap {
   readonly tokenIn: string;
   readonly amountIn: string;
   readonly amountOut: string;
+  readonly activeBinAfter?: number | null;
+  readonly reserveXAfter?: string | null;
+  readonly reserveYAfter?: string | null;
 }
 
 export interface CandlePool {
@@ -27,6 +30,8 @@ export interface CandlePool {
   readonly tokenY: string;
   readonly tokenXDecimals: number | null;
   readonly tokenYDecimals: number | null;
+  readonly type?: string;
+  readonly binStep?: number;
 }
 
 export interface ProjectedCandle {
@@ -65,9 +70,16 @@ function execution(swap: CandleSwap, pool: CandlePool) {
   const amountX = tokenIn === tokenX ? amountIn : tokenIn === tokenY ? amountOut : null;
   const amountY = tokenIn === tokenY ? amountIn : tokenIn === tokenX ? amountOut : null;
   if (amountX === null || amountY === null) return null;
-  const numerator = amountY * 10n ** BigInt(pool.tokenXDecimals) * 10n ** 18n;
-  const denominator = amountX * 10n ** BigInt(pool.tokenYDecimals);
-  const priceX18 = numerator / denominator;
+  const executionNumerator = amountY * 10n ** BigInt(pool.tokenXDecimals) * 10n ** 18n;
+  const executionDenominator = amountX * 10n ** BigInt(pool.tokenYDecimals);
+  const executionPriceX18 = executionNumerator / executionDenominator;
+  const dammPriceX18 = pool.type === 'DAMM' && swap.reserveXAfter && swap.reserveYAfter && BigInt(swap.reserveXAfter) > 0n
+    ? BigInt(swap.reserveYAfter) * 10n ** BigInt(pool.tokenXDecimals) * 10n ** 18n
+      / (BigInt(swap.reserveXAfter) * 10n ** BigInt(pool.tokenYDecimals))
+    : null;
+  const priceX18 = pool.type === 'DLMM' && swap.activeBinAfter !== null && swap.activeBinAfter !== undefined && pool.binStep
+    ? priceFromBinX18(swap.activeBinAfter, pool.binStep) * 10n ** BigInt(pool.tokenXDecimals) / 10n ** BigInt(pool.tokenYDecimals)
+    : dammPriceX18 ?? executionPriceX18;
   if (priceX18 === 0n) return null;
   return {
     price: rawUnitsToDecimal(priceX18, 18, 18),
@@ -165,6 +177,8 @@ export async function rebuildTouchedCandles(
       tokenY: true,
       tokenXDecimals: true,
       tokenYDecimals: true,
+      type: true,
+      binStep: true,
     },
   });
   const swaps = pool
@@ -178,6 +192,9 @@ export async function rebuildTouchedCandles(
           tokenIn: true,
           amountIn: true,
           amountOut: true,
+          activeBinAfter: true,
+          reserveXAfter: true,
+          reserveYAfter: true,
         },
       })
     : [];
@@ -186,6 +203,8 @@ export async function rebuildTouchedCandles(
         ...swap,
         amountIn: swap.amountIn.toString(),
         amountOut: swap.amountOut.toString(),
+        reserveXAfter: swap.reserveXAfter?.toString() ?? null,
+        reserveYAfter: swap.reserveYAfter?.toString() ?? null,
       })), pool).filter(candle => targets.has(`${candle.interval}:${candle.bucketStart.toISOString()}`))
     : [];
   await transaction.candle.deleteMany({

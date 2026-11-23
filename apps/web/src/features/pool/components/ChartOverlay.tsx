@@ -10,8 +10,6 @@ interface ChartOverlayProps {
   liquidity: readonly LiquidityBin[];
   /** Converts a USD price to the chart unit. */
   priceToValue: (priceUsd: number) => number;
-  priceUsd: number;
-  binStepBps: number;
 }
 
 const BINS_WIDTH = 64;
@@ -26,11 +24,8 @@ export function ChartOverlay({
   calloutBand,
   liquidity,
   priceToValue,
-  priceUsd,
-  binStepBps,
 }: ChartOverlayProps) {
   const { toY, plotWidth } = projection;
-  const ratio = 1 + binStepBps / 10_000;
   const maxDepth = Math.max(1, ...liquidity.map(bin => bin.depthUsd));
   const bandTop = band ? toY(band[1]) : null;
   const bandBottom = band ? toY(band[0]) : null;
@@ -64,10 +59,16 @@ export function ChartOverlay({
         />
       ) : null}
 
-      {liquidity.map(bin => {
-        const lower = priceUsd * ratio ** bin.offset;
-        const yLow = toY(priceToValue(lower));
-        const yHigh = toY(priceToValue(lower * ratio));
+      {liquidity.map((bin, index) => {
+        if (bin.priceQuote === null) return null;
+        const adjacent = liquidity[index + 1]?.priceQuote ?? liquidity[index - 1]?.priceQuote;
+        const otherEdge = adjacent === null || adjacent === undefined
+          ? bin.priceQuote
+          : bin.priceQuote + Math.abs(adjacent - bin.priceQuote);
+        const yFirst = toY(priceToValue(bin.priceQuote));
+        const ySecond = toY(priceToValue(otherEdge));
+        const yLow = yFirst === null || ySecond === null ? null : Math.max(yFirst, ySecond);
+        const yHigh = yFirst === null || ySecond === null ? null : Math.min(yFirst, ySecond);
         if (yLow === null || yHigh === null) return null;
         const width = (bin.depthUsd / maxDepth) * BINS_WIDTH;
         return (
@@ -77,7 +78,7 @@ export function ChartOverlay({
             y={yHigh}
             width={width}
             height={Math.max(1, yLow - yHigh - 1)}
-            className={bin.offset < 0 ? 'fill-signal/35' : 'fill-fg/20'}
+            className={bin.side === 'active' ? 'fill-signal/70' : bin.side === 'quote' ? 'fill-signal/35' : 'fill-fg/20'}
           />
         );
       })}

@@ -382,12 +382,16 @@ export async function backfillPoolRegistry(
               activeBinBefore: swap.activeBinBefore,
               activeBinAfter: swap.activeBinAfter,
               binCrossings: swap.binCrossings,
+              reserveXAfter: swap.reserveXAfter,
+              reserveYAfter: swap.reserveYAfter,
             },
             update: {
               blockHash: swap.blockHash,
               timestamp: swap.timestamp,
               transactionIndex: swap.transactionIndex,
               canonical: true,
+              reserveXAfter: swap.reserveXAfter,
+              reserveYAfter: swap.reserveYAfter,
             },
           });
           if (swap.activeBinAfter !== null) {

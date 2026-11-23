@@ -15,18 +15,29 @@ import {
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase() as Address);
 const paramsSchema = z.object({ pool: addressSchema });
-const requestSchema = z.object({
+const requestBaseSchema = z.object({
   shape: z.enum(['spot', 'curve', 'bid-ask']),
-  minPct: z.number().finite().gt(-100).lt(1_000),
-  maxPct: z.number().finite().gt(-100).lt(1_000),
+  minPct: z.number().finite().gt(-100).lt(1_000).optional(),
+  maxPct: z.number().finite().gt(-100).lt(1_000).optional(),
+  lowerBin: z.number().int().min(-10_000).max(10_000).optional(),
+  upperBin: z.number().int().min(-10_000).max(10_000).optional(),
   amountX: z.string().regex(/^\d+(?:\.\d+)?$/).max(80),
   amountY: z.string().regex(/^\d+(?:\.\d+)?$/).max(80),
   slippageBps: z.number().int().min(1).max(1_000).default(50),
 });
-const prepareSchema = requestSchema.extend({
+function validateRangeRepresentation(value: z.infer<typeof requestBaseSchema>, context: z.RefinementCtx) {
+  const percentages = value.minPct !== undefined && value.maxPct !== undefined;
+  const exactBins = value.lowerBin !== undefined && value.upperBin !== undefined;
+  if (percentages === exactBins) context.addIssue({
+    code: z.ZodIssueCode.custom,
+    message: 'Provide exactly one range representation',
+  });
+}
+const requestSchema = requestBaseSchema.superRefine(validateRangeRepresentation);
+const prepareSchema = requestBaseSchema.extend({
   walletAddress: addressSchema,
   intentId: z.string().uuid().nullable().default(null),
-});
+}).superRefine(validateRangeRepresentation);
 const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
@@ -94,7 +105,14 @@ async function buildQuote(
   const activeBin = await client.readContract({
     address: poolAddress, abi: dlmmPoolV2Abi, functionName: 'activeBin', blockNumber,
   });
-  const requestedBins = rangeBins(activeBin, input.minPct, input.maxPct, pool.binStep);
+  const requestedBins = input.lowerBin !== undefined && input.upperBin !== undefined
+    ? (() => {
+        if (input.lowerBin > input.upperBin) throw new RangeError('INVALID_RANGE');
+        const length = input.upperBin - input.lowerBin + 1;
+        if (length > 61) throw new RangeError('TOO_MANY_BINS');
+        return Array.from({ length }, (_, index) => input.lowerBin! + index);
+      })()
+    : rangeBins(activeBin, input.minPct!, input.maxPct!, pool.binStep);
   const requestedAllocation = allocateRangeAmounts({ bins: requestedBins, activeBin, amount0, amount1, shape: input.shape });
   // Very small raw amounts can produce zero allocations. Omit those bins because the contract rejects zero-value additions.
   const selected = requestedBins.map((binId, index) => ({

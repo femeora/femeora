@@ -3,18 +3,13 @@ import {
   getFomeoraDeploymentStartBlock,
 } from '@fomeora/contracts-sdk';
 import type { IndexerEnvironment } from '@fomeora/env';
-import { createPublicClient, fallback, http } from 'viem';
+import { createPublicClient, http } from 'viem';
 import type { PublicClient } from 'viem';
 
 export type IndexerClient = PublicClient;
 
 export function createIndexerClient(environment: IndexerEnvironment): IndexerClient {
-  const transports = [http(environment.RPC_URL, { retryCount: 2 })];
-  if (environment.RPC_BACKUP_URL) {
-    transports.push(http(environment.RPC_BACKUP_URL, { retryCount: 2 }));
-  }
-
-  return createPublicClient({ transport: fallback(transports) });
+  return createPublicClient({ transport: http(environment.RPC_INDEXER, { retryCount: 2 }) });
 }
 
 export interface IndexerChainState {

@@ -34,7 +34,6 @@ const commonSchema = z.object({
   CHAIN_ID: z.coerce.number().int().positive(),
   CHAIN_NAME: configuredString,
   RPC_URL: configuredUrl,
-  RPC_BACKUP_URL: optionalUrl,
   EXPLORER_URL: configuredUrl,
   QUOTE_TOKEN_ADDRESS: optionalAddress,
   DATABASE_URL: optionalUrl,
@@ -46,13 +45,6 @@ function validateCommon(value: z.infer<typeof commonSchema>, context: z.Refineme
       code: z.ZodIssueCode.custom,
       path: ['CHAIN_ID'],
       message: 'chain ID does not match APP_NETWORK',
-    });
-  }
-  if (value.RPC_BACKUP_URL === value.RPC_URL) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['RPC_BACKUP_URL'],
-      message: 'backup RPC must differ from primary RPC',
     });
   }
 }
@@ -117,6 +109,7 @@ const webSchema = z
 const indexerSchema = commonSchema
   .extend({
     DATABASE_URL: databaseUrl,
+    RPC_INDEXER: configuredUrl,
     INDEXER_CONFIRMATIONS: z.coerce.number().int().min(1).max(1_024),
     INDEXER_POLL_INTERVAL_MS: z.coerce.number().int().min(250).max(60_000),
     INDEXER_BATCH_SIZE: z.coerce.number().int().min(1).max(10_000),

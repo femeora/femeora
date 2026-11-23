@@ -70,7 +70,7 @@ test('projects DLMM bins and distinguishes DLMM/DAMM swap fields', async () => {
           },
         ];
       }
-      return [
+      if (eventCall === 4) return [
         {
           address: damm,
           blockNumber: 100n,
@@ -81,9 +81,15 @@ test('projects DLMM bins and distinguishes DLMM/DAMM swap fields', async () => {
           args: { sender, recipient, tokenIn: tokenY, amountIn: 200n, amountOut: 180n, protocolFee: 1n },
         },
       ];
+      return [];
     },
-    async readContract() {
+    async readContract(request: { functionName: string }) {
+      if (request.functionName === 'reserve0') return 820n;
+      if (request.functionName === 'reserve1') return 2_199n;
       return [10n, 20n, 30n, 1n] as const;
+    },
+    async getBlockNumber() {
+      return 100n;
     },
     async getBlock() {
       return { timestamp: 1_000n };
@@ -121,4 +127,6 @@ test('projects DLMM bins and distinguishes DLMM/DAMM swap fields', async () => {
   assert.equal(result.swaps[1]?.tokenIn, tokenY);
   assert.equal(result.swaps[1]?.totalFee, null);
   assert.equal(result.swaps[1]?.activeBinAfter, null);
+  assert.equal(result.swaps[1]?.reserveXAfter, '820');
+  assert.equal(result.swaps[1]?.reserveYAfter, '2199');
 });

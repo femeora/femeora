@@ -15,7 +15,8 @@ interface BinsPreviewProps {
 /** Shape preview with the pool price marker and total bin count (brief 8.3). */
 export function BinsPreview({ shape, bins, pricePosition, priceLabel }: BinsPreviewProps) {
   const bars = Math.max(1, Math.min(bins, MAX_BARS));
-  const weights = binWeights(shape, bars);
+  const activeIndex = Math.max(0, Math.min(bars - 1, Math.round(pricePosition * (bars - 1))));
+  const weights = binWeights(shape, bars, activeIndex);
 
   return (
     <figure className="glass rounded-[2px] p-3">

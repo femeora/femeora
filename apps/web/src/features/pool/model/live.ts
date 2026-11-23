@@ -55,7 +55,7 @@ export function apiCandlesToChart(candles: readonly ApiCandle[]) {
     const high = finiteNumber(candle.high, Number.NaN);
     const low = finiteNumber(candle.low, Number.NaN);
     const close = finiteNumber(candle.close, Number.NaN);
-    const volume = finiteNumber(candle.volumeY);
+    const volume = finiteNumber(candle.volumeQuote ?? candle.volumeY);
     const timestamp = Math.floor(new Date(candle.timestamp).getTime() / 1_000);
     return [open, high, low, close, timestamp].every(Number.isFinite)
       ? [{ open, high, low, close, volume, timestamp }]
@@ -66,7 +66,9 @@ export function apiCandlesToChart(candles: readonly ApiCandle[]) {
 export function apiBinsToLiquidity(bins: readonly ApiBin[], activeBin: number) {
   return bins.map(bin => ({
     offset: bin.binId - activeBin,
-    depthUsd: Math.max(0, finiteNumber(bin.reserveY)),
+    priceQuote: bin.priceQuote === null ? null : finiteNumber(bin.priceQuote),
+    depthUsd: bin.depthQuote === null ? 0 : Math.max(0, finiteNumber(bin.depthQuote)),
+    side: bin.side,
   }));
 }
 

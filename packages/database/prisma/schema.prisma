@@ -143,6 +143,8 @@ model Swap {
   activeBinBefore  Int?     @map("active_bin_before")
   activeBinAfter   Int?     @map("active_bin_after")
   binCrossings     Int?     @map("bin_crossings")
+  reserveXAfter    Decimal? @map("reserve_x_after") @db.Decimal(78, 0)
+  reserveYAfter    Decimal? @map("reserve_y_after") @db.Decimal(78, 0)
   canonical        Boolean  @default(true)
 
   pool Pool @relation(fields: [poolId], references: [id], onDelete: Cascade)

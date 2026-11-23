@@ -14,8 +14,8 @@ import { OutboxWakeup, pruneOutboxEvents } from './core/realtime/outbox.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCalloutRoutes } from './routes/callouts.js';
 import { registerFeedRoutes } from './routes/feed.js';
-import { registerPoolRoutes } from './routes/pools.js';
 import { registerPoolCreationRoutes } from './routes/pool-creation.js';
+import { registerPoolRoutes } from './routes/pools.js';
 import { registerPositionActionRoutes } from './routes/position-actions.js';
 import { registerPositionCreateRoutes } from './routes/position-create.js';
 import { registerPositionRoutes } from './routes/positions.js';
@@ -39,7 +39,7 @@ export async function createServer(environment = loadApiEnvironment()) {
           'res.headers.set-cookie',
           '*.DATABASE_URL',
           '*.RPC_URL',
-          '*.RPC_BACKUP_URL',
+          '*.RPC_INDEXER',
           '*.X_CLIENT_SECRET',
         ],
         censor: '[REDACTED]',
@@ -71,10 +71,7 @@ export async function createServer(environment = loadApiEnvironment()) {
   });
 
   const outboxWakeup = new OutboxWakeup(environment.DATABASE_URL);
-  const chainClient = createApiChainClient({
-    RPC_URL: environment.RPC_URL,
-    ...(environment.RPC_BACKUP_URL ? { RPC_BACKUP_URL: environment.RPC_BACKUP_URL } : {}),
-  });
+  const chainClient = createApiChainClient({ RPC_URL: environment.RPC_URL });
   await outboxWakeup.start();
   const retentionTimer = setInterval(
     () => {

@@ -37,6 +37,8 @@ export interface SwapProjection {
   readonly activeBinBefore: number | null;
   readonly activeBinAfter: number | null;
   readonly binCrossings: number | null;
+  readonly reserveXAfter: string | null;
+  readonly reserveYAfter: string | null;
 }
 
 export interface BinFeeProjection {
@@ -75,8 +77,9 @@ export async function collectPoolEvents(
   const dlmmAddresses = pools.filter(pool => pool.type === 'DLMM').map(pool => pool.address);
   const dammAddresses = pools.filter(pool => pool.type === 'DAMM').map(pool => pool.address);
   const descriptorByAddress = new Map(pools.map(pool => [pool.address.toLowerCase(), pool]));
+  const latestBlock = dammAddresses.length === 0 ? toBlock : await client.getBlockNumber();
 
-  const [binLogs, binFeeLogs, dlmmSwapLogs, dammSwapLogs] = await Promise.all([
+  const [binLogs, binFeeLogs, dlmmSwapLogs, dammSwapLogs, dammAddedLogs, dammRemovedLogs] = await Promise.all([
     dlmmAddresses.length === 0
       ? []
       : client.getContractEvents({
@@ -114,8 +117,18 @@ export async function collectPoolEvents(
           abi: dammPoolAbi,
           eventName: 'Swap',
           fromBlock,
-          toBlock,
+          toBlock: latestBlock,
           strict: true,
+        }),
+    dammAddresses.length === 0
+      ? []
+      : client.getContractEvents({
+          address: dammAddresses, abi: dammPoolAbi, eventName: 'LiquidityAdded', fromBlock, toBlock: latestBlock, strict: true,
+        }),
+    dammAddresses.length === 0
+      ? []
+      : client.getContractEvents({
+          address: dammAddresses, abi: dammPoolAbi, eventName: 'LiquidityRemoved', fromBlock, toBlock: latestBlock, strict: true,
         }),
   ]);
 
@@ -225,32 +238,92 @@ export async function collectPoolEvents(
       activeBinBefore: log.args.activeBinBefore,
       activeBinAfter: log.args.activeBinAfter,
       binCrossings: log.args.binsCrossed,
+      reserveXAfter: null,
+      reserveYAfter: null,
     });
   }
-  for (const log of dammSwapLogs) {
-    const blockNumber = mined(log.blockNumber, 'BLOCK_NUMBER');
+  const dammReserves = new Map<string, { x: bigint; y: bigint }>();
+  await Promise.all(dammAddresses.map(async address => {
+    const [x, y] = await Promise.all([
+      client.readContract({ address, abi: dammPoolAbi, functionName: 'reserve0' }),
+      client.readContract({ address, abi: dammPoolAbi, functionName: 'reserve1' }),
+    ]);
+    dammReserves.set(address.toLowerCase(), { x, y });
+  }));
+  const dammEvents = [
+    ...dammAddedLogs.map(log => ({
+      kind: 'add' as const, address: log.address, blockNumber: mined(log.blockNumber, 'BLOCK_NUMBER'),
+      transactionIndex: mined(log.transactionIndex, 'TRANSACTION_INDEX'), logIndex: mined(log.logIndex, 'LOG_INDEX'),
+      amount0: log.args.amount0, amount1: log.args.amount1,
+    })),
+    ...dammRemovedLogs.map(log => ({
+      kind: 'remove' as const, address: log.address, blockNumber: mined(log.blockNumber, 'BLOCK_NUMBER'),
+      transactionIndex: mined(log.transactionIndex, 'TRANSACTION_INDEX'), logIndex: mined(log.logIndex, 'LOG_INDEX'),
+      amount0: log.args.amount0, amount1: log.args.amount1,
+    })),
+    ...dammSwapLogs.map(log => ({
+      kind: 'swap' as const, address: log.address, blockNumber: mined(log.blockNumber, 'BLOCK_NUMBER'),
+      blockHash: mined(log.blockHash, 'BLOCK_HASH'), transactionHash: mined(log.transactionHash, 'TRANSACTION_HASH'),
+      transactionIndex: mined(log.transactionIndex, 'TRANSACTION_INDEX'), logIndex: mined(log.logIndex, 'LOG_INDEX'),
+      sender: log.args.sender, recipient: log.args.recipient, tokenIn: log.args.tokenIn,
+      amountIn: log.args.amountIn, amountOut: log.args.amountOut, protocolFee: log.args.protocolFee,
+    })),
+  ].sort((left, right) => {
+    const block = Number(left.blockNumber - right.blockNumber);
+    if (block !== 0) return block;
+    const transaction = left.transactionIndex - right.transactionIndex;
+    return transaction !== 0 ? transaction : left.logIndex - right.logIndex;
+  });
+  const dammSwaps: SwapProjection[] = [];
+  for (const event of [...dammEvents].reverse()) {
+    const blockNumber = event.blockNumber;
     const timestamp = timestampByBlock.get(blockNumber);
     if (!timestamp) throw new Error('BLOCK_TIMESTAMP_MISSING');
-    swaps.push({
-      poolAddress: log.address,
-      transactionHash: mined(log.transactionHash, 'TRANSACTION_HASH'),
-      logIndex: mined(log.logIndex, 'LOG_INDEX'),
-      transactionIndex: mined(log.transactionIndex, 'TRANSACTION_INDEX'),
-      blockNumber,
-      blockHash: mined(log.blockHash, 'BLOCK_HASH'),
-      timestamp,
-      sender: log.args.sender,
-      recipient: log.args.recipient,
-      tokenIn: log.args.tokenIn,
-      amountIn: log.args.amountIn.toString(),
-      amountOut: log.args.amountOut.toString(),
-      totalFee: null,
-      protocolFee: log.args.protocolFee.toString(),
-      activeBinBefore: null,
-      activeBinAfter: null,
-      binCrossings: null,
-    });
+    const descriptor = descriptorByAddress.get(event.address.toLowerCase());
+    const reserves = dammReserves.get(event.address.toLowerCase());
+    if (!descriptor || !reserves) throw new Error('POOL_DESCRIPTOR_MISSING');
+    if (event.kind === 'add') {
+      reserves.x -= event.amount0;
+      reserves.y -= event.amount1;
+      continue;
+    }
+    if (event.kind === 'remove') {
+      reserves.x += event.amount0;
+      reserves.y += event.amount1;
+      continue;
+    }
+    if (event.blockNumber <= toBlock) {
+      dammSwaps.push({
+        poolAddress: event.address,
+        transactionHash: event.transactionHash,
+        logIndex: event.logIndex,
+        transactionIndex: event.transactionIndex,
+        blockNumber,
+        blockHash: event.blockHash,
+        timestamp,
+        sender: event.sender,
+        recipient: event.recipient,
+        tokenIn: event.tokenIn,
+        amountIn: event.amountIn.toString(),
+        amountOut: event.amountOut.toString(),
+        totalFee: null,
+        protocolFee: event.protocolFee.toString(),
+        activeBinBefore: null,
+        activeBinAfter: null,
+        binCrossings: null,
+        reserveXAfter: reserves.x.toString(),
+        reserveYAfter: reserves.y.toString(),
+      });
+    }
+    if (event.tokenIn.toLowerCase() === descriptor.tokenX.toLowerCase()) {
+      reserves.x -= event.amountIn - event.protocolFee;
+      reserves.y += event.amountOut;
+    } else {
+      reserves.y -= event.amountIn - event.protocolFee;
+      reserves.x += event.amountOut;
+    }
   }
+  swaps.push(...dammSwaps.reverse());
 
   return { bins, binFees, swaps };
 }

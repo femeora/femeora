@@ -1,4 +1,4 @@
-import { priceFromBinX18, token1Value } from '@fomeora/sdk';
+import { priceFromBinX18, shapeWeights, token1Value } from '@fomeora/sdk';
 
 export const MAX_POSITION_BINS = 61;
 export const MINIMUM_BIN_LIQUIDITY = 1_000n;
@@ -16,11 +16,8 @@ function weights(length: number, shape: PositionShape): bigint[] {
   if (!Number.isInteger(length) || length < 1 || length > MAX_POSITION_BINS) {
     throw new RangeError('INVALID_BIN_COUNT');
   }
-  return Array.from({ length }, (_, index) => {
-    if (shape === 'spot') return 1n;
-    const edgeDistance = Math.min(index + 1, length - index);
-    return shape === 'curve' ? BigInt(edgeDistance) : BigInt(Math.max(1, length + 1 - 2 * edgeDistance));
-  });
+  const activeBin = Math.floor((length - 1) / 2);
+  return shapeWeights({ lowerBin: 0, upperBin: length - 1, activeBin, shape }).map(item => item.weight);
 }
 
 /** Allocates every raw unit deterministically; remainder goes from the first bin onward. */
@@ -28,7 +25,9 @@ export function distributeAmount(total: bigint, length: number, shape: PositionS
   if (total < 0n) throw new RangeError('INVALID_AMOUNT');
   const binWeights = weights(length, shape);
   const totalWeight = binWeights.reduce((sum, weight) => sum + weight, 0n);
-  const result = binWeights.map(weight => total * weight / totalWeight);
+  const minimum = total >= BigInt(length) ? 1n : 0n;
+  const distributable = total - minimum * BigInt(length);
+  const result = binWeights.map(weight => minimum + distributable * weight / totalWeight);
   let remainder = total - result.reduce((sum, amount) => sum + amount, 0n);
   for (let index = 0; remainder > 0n; index = (index + 1) % result.length) {
     result[index] = (result[index] ?? 0n) + 1n;
@@ -67,8 +66,28 @@ export function allocateRangeAmounts(input: {
   const atOrAbove = input.bins.filter(bin => bin >= input.activeBin);
   if (below.length === 0 && input.amount1 !== 0n) throw new RangeError('TOKEN1_OUTSIDE_RANGE');
   if (atOrAbove.length === 0 && input.amount0 !== 0n) throw new RangeError('TOKEN0_OUTSIDE_RANGE');
-  const belowAmounts = distributeAmount(input.amount1, below.length || 1, input.shape);
-  const aboveAmounts = distributeAmount(input.amount0, atOrAbove.length || 1, input.shape);
+  const allWeights = new Map(shapeWeights({
+    lowerBin: input.bins[0]!, upperBin: input.bins.at(-1)!, activeBin: input.activeBin, shape: input.shape,
+  }).map(item => [item.bin, item.weight]));
+  const distribute = (total: bigint, bins: number[]) => {
+    if (bins.length === 0) return [0n];
+    const selected = bins.map(bin => allWeights.get(bin) ?? 1n);
+    const totalWeight = selected.reduce((sum, weight) => sum + weight, 0n);
+    const minimum = total >= BigInt(bins.length) ? 1n : 0n;
+    const distributable = total - minimum * BigInt(bins.length);
+    const amounts = selected.map(weight => minimum + distributable * weight / totalWeight);
+    let remainder = total - amounts.reduce((sum, amount) => sum + amount, 0n);
+    const order = bins.map((bin, index) => ({ index, distance: Math.abs(bin - input.activeBin) }))
+      .sort((left, right) => right.distance - left.distance || left.index - right.index);
+    for (let cursor = 0; remainder > 0n; cursor = (cursor + 1) % order.length) {
+      const index = order[cursor]!.index;
+      amounts[index] = (amounts[index] ?? 0n) + 1n;
+      remainder -= 1n;
+    }
+    return amounts;
+  };
+  const belowAmounts = distribute(input.amount1, below);
+  const aboveAmounts = distribute(input.amount0, atOrAbove);
   let belowIndex = 0;
   let aboveIndex = 0;
   return {

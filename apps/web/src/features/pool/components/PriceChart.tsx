@@ -288,8 +288,6 @@ export function PriceChart({
           calloutBand={calloutBand}
           liquidity={liquidity}
           priceToValue={convert}
-          priceUsd={pool.priceUsd}
-          binStepBps={pool.binStepBps}
         />
       ) : null}
 

@@ -5,6 +5,34 @@ export const MIN_BIN_ID = -10_000;
 export const MAX_BIN_ID = 10_000;
 export const MAX_BIN_STEP_BPS = 1_000;
 export type RangeSide = 'below' | 'above' | 'around';
+export type LiquidityShape = 'spot' | 'curve' | 'bid-ask';
+
+const SHAPE_WEIGHT_SCALE = 1_000_000_000;
+
+/** Deterministic active-price-relative weights shared by previews and API allocation. */
+export function shapeWeights(input: {
+  lowerBin: number;
+  upperBin: number;
+  activeBin: number;
+  shape: LiquidityShape;
+}): readonly { bin: number; weight: bigint }[] {
+  const { lowerBin, upperBin, activeBin, shape } = input;
+  if (!Number.isInteger(lowerBin) || !Number.isInteger(upperBin) || lowerBin > upperBin) {
+    throw new RangeError('invalid bin range');
+  }
+  if (lowerBin < MIN_BIN_ID || upperBin > MAX_BIN_ID) throw new RangeError('bin range out of bounds');
+  const farthest = Math.max(1, Math.abs(activeBin - lowerBin), Math.abs(upperBin - activeBin));
+  return Array.from({ length: upperBin - lowerBin + 1 }, (_, index) => {
+    const bin = lowerBin + index;
+    const distance = Math.min(1, Math.abs(bin - activeBin) / farthest);
+    const numeric = shape === 'spot'
+      ? 1
+      : shape === 'curve'
+        ? Math.exp(-(distance ** 2) / (2 * 0.35 ** 2))
+        : 0.1 + distance ** 1.5;
+    return { bin, weight: BigInt(Math.max(1, Math.round(numeric * SHAPE_WEIGHT_SCALE))) };
+  });
+}
 
 export function classifyRangeSide(lowerBin: number, upperBin: number, activeBin: number): RangeSide {
   if (lowerBin > upperBin) throw new RangeError('lowerBin must not exceed upperBin');

@@ -108,7 +108,7 @@ export async function registerAuthRoutes(
       authorize.searchParams.set('response_type', 'code');
       authorize.searchParams.set('client_id', environment.xClientId);
       authorize.searchParams.set('redirect_uri', `${environment.webBaseUrl}/api/v1/auth/x/callback`);
-      authorize.searchParams.set('scope', 'users.read');
+      authorize.searchParams.set('scope', 'tweet.read users.read');
       authorize.searchParams.set('state', state);
       authorize.searchParams.set('code_challenge', base64UrlSha256(verifier));
       authorize.searchParams.set('code_challenge_method', 'S256');
@@ -157,7 +157,7 @@ export async function registerAuthRoutes(
       if (!tokenResponse.ok || !token.success) throw new Error('X_TOKEN_FAILED');
 
       const userResponse = await fetch(
-        'https://api.x.com/2/users/me?user.fields=profile_image_url,verified',
+        'https://api.x.com/2/users/me?user.fields=profile_image_url,public_metrics,verified',
         {
           headers: { authorization: `Bearer ${token.data.access_token}` },
           signal: AbortSignal.timeout(10_000),

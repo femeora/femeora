@@ -20,6 +20,7 @@ const pool: ApiPoolDetail = {
   baseFeePips: 3_000,
   initialActiveBin: 0,
   activeBin: 0,
+  baseIsTokenX: true,
   createdBlock: '1',
   counts: { positions: 1, swaps: 1, callouts: 1 },
 };
