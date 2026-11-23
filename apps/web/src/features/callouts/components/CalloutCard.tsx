@@ -6,6 +6,7 @@ import { GlowCard } from '@/components/ui/GlowCard';
 import { ArrowRight, TriangleAlert } from '@/components/ui/icons';
 import { SpanText } from '@/components/ui/SpanText';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { TokenPair } from '@/components/ui/TokenPair';
 import { SHAPE_LABEL } from '@/lib/bins';
 import { cn } from '@/lib/cn';
 
@@ -61,14 +62,8 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
   return (
     <GlowCard>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3 p-3.5">
-        <span
-          aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center rounded-full metal font-mono text-xs"
-        >
-          {callout.pool.base.slice(0, 1)}
-        </span>
         <div className="min-w-0">
-          <p className="font-medium">{callout.pool.base}</p>
+          <TokenPair tokenX={callout.pool.base} tokenY={callout.pool.quote} compact />
           <p className="t-label whitespace-nowrap text-muted">
             {SHAPE_LABEL[callout.shape]} · {callout.pool.type}
           </p>

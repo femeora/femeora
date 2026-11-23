@@ -6,6 +6,7 @@ import type {
   ApiPoolStats,
   ApiTrade,
 } from '@/lib/api/types';
+import { tokenSymbol } from '@/lib/tokens';
 
 import type { Pool } from './pool';
 
@@ -30,8 +31,8 @@ export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined
     address: pool.address,
     tokenX: pool.tokenX,
     tokenY: pool.tokenY,
-    base: shortAddress(pool.tokenX),
-    quote: shortAddress(pool.tokenY),
+    base: tokenSymbol(pool.tokenX),
+    quote: tokenSymbol(pool.tokenY),
     chain: String(pool.chainId),
     type: pool.type,
     binStepBps: pool.binStep,

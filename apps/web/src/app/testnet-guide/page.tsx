@@ -5,6 +5,7 @@ import { SiteFooter } from '@/components/landing/SiteFooter';
 import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { Grain } from '@/components/ui/Grain';
+import { TokenIcon } from '@/components/ui/TokenPair';
 
 export const metadata: Metadata = {
   title: 'Testnet guide · Fomeora',
@@ -128,7 +129,10 @@ export default function TestnetGuidePage() {
               {network.map(([label, value]) => (
                 <div key={label} className="grid gap-2 p-4 sm:grid-cols-[11rem_1fr]">
                   <dt className="t-label text-muted">{label}</dt>
-                  <dd className="break-all font-mono text-sm">{value}</dd>
+                  <dd className="flex min-w-0 items-center gap-2 break-all font-mono text-sm">
+                    {label === 'Currency' ? <TokenIcon token="ETH" className="size-6" /> : null}
+                    {value}
+                  </dd>
                 </div>
               ))}
             </dl>

@@ -1,6 +1,8 @@
 import { ChainBadge } from '@/components/ui/ChainBadge';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { TokenIcon } from '@/components/ui/TokenPair';
 import { cn } from '@/lib/cn';
+import { tokenMeta } from '@/lib/tokens';
 
 import { formatCompactUsd, formatPct, formatUnit, toUnit } from '../model/format';
 import type { Pool } from '../model/pool';
@@ -42,19 +44,20 @@ function poolStats(pool: Pool): Stat[] {
 
 /** Pool identity and headline stats (brief 8.1 header). */
 export function PoolHeader({ pool }: { pool: Pool }) {
+  const base = tokenMeta(pool.tokenX);
+  const quote = tokenMeta(pool.tokenY);
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="grid size-10 place-items-center rounded-full metal font-mono text-xs"
-        >
-          {pool.base.slice(0, 2)}
+        <span className="flex shrink-0 items-center pl-1">
+          <TokenIcon token={pool.tokenX} className="size-11" />
+          <TokenIcon token={pool.tokenY} className="-ml-3 size-11" />
         </span>
         <div>
           <h1 className="text-2xl font-medium tracking-tight">
             {pool.base} <span className="text-muted">/ {pool.quote}</span>
           </h1>
+          <p className="mt-0.5 text-sm text-muted">{base.name} · {quote.name}</p>
           <p className="t-label mt-0.5 flex flex-wrap items-center gap-x-2 text-muted">
             <span className="rounded-[2px] border border-line-strong px-1.5 text-fg">
               {pool.type}

@@ -2,10 +2,13 @@
 
 import { useId } from 'react';
 
+import { TokenIcon } from '@/components/ui/TokenPair';
+
 import { formatCompactUsd } from '../model/format';
 
 interface AmountFieldProps {
   token: string;
+  tokenAddress: string;
   value: string;
   usdPerToken: number;
   enabled: boolean;
@@ -15,7 +18,7 @@ interface AmountFieldProps {
 const DECIMAL = /^\d*\.?\d*$/;
 
 /** Deposit amount for one token. Disabled, with a reason, when the range does not use it. */
-export function AmountField({ token, value, usdPerToken, enabled, onChange }: AmountFieldProps) {
+export function AmountField({ token, tokenAddress, value, usdPerToken, enabled, onChange }: AmountFieldProps) {
   const id = useId();
   const amount = Number.parseFloat(value);
   const usd = Number.isFinite(amount) ? amount * usdPerToken : 0;
@@ -23,7 +26,8 @@ export function AmountField({ token, value, usdPerToken, enabled, onChange }: Am
   return (
     <div className="glass rounded-[2px] p-3 focus-within:border-fg/40 has-[:disabled]:opacity-50">
       <div className="flex items-baseline justify-between">
-        <label htmlFor={id} className="t-label text-muted">
+        <label htmlFor={id} className="t-label inline-flex items-center gap-2 text-muted">
+          <TokenIcon token={tokenAddress} className="size-5" />
           {token}
         </label>
         <span className="t-label text-faint">

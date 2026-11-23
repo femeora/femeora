@@ -106,6 +106,7 @@ export function SwapForm({ pool }: { pool: Pool }) {
     <form className="flex flex-col gap-3" onSubmit={event => event.preventDefault()} noValidate>
       <AmountField
         token={`You pay · ${tokenIn}`}
+        tokenAddress={tokenInAddress}
         value={amount}
         usdPerToken={direction === 'buy' ? 1 : pool.priceUsd}
         enabled

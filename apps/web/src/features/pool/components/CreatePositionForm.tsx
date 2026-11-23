@@ -184,6 +184,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       <div className="grid gap-2">
         <AmountField
           token={pool.quote}
+          tokenAddress={pool.tokenY}
           value={draft.quoteAmount}
           usdPerToken={1}
           enabled={needs.quote}
@@ -191,6 +192,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         />
         <AmountField
           token={pool.base}
+          tokenAddress={pool.tokenX}
           value={draft.baseAmount}
           usdPerToken={pool.priceUsd}
           enabled={needs.base}
