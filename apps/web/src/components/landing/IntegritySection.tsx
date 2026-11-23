@@ -2,8 +2,8 @@ import { Reveal } from '@/components/ui/Reveal';
 import { SectionHead } from '@/components/ui/SectionHead';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { integrity } from '@/content/landing';
-import { cn } from '@/lib/cn';
 import type { IntegritySignal } from '@/content/landing';
+import { cn } from '@/lib/cn';
 
 const BADGE_TONE: Record<IntegritySignal['tone'], string> = {
   down: 'border-down/50 text-down',
