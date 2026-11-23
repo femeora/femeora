@@ -3,7 +3,6 @@
 import { ApiPositionActionPreparationSchema, type ApiIndexedPosition, type ApiPositionActionPreparation } from '@fomeora/types';
 import { useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
 import { TxButton } from '@/features/pool/components/TxButton';
 import { useWallet } from '@/features/wallet/store';
@@ -24,7 +23,6 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
   const [stage, setStage] = useState('Preparing transaction…');
   const [hash, setHash] = useState<string | null>(null);
   const { account, config } = useWallet();
-  const showToast = useToast(state => state.show);
 
   const path = `/v1/positions/${position.id}/${kind}-prepare`;
   const body = () => ({
@@ -45,7 +43,7 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
   const execute = async () => {
     if (!account || !preparation) throw new Error('POSITION_PREPARATION_REQUIRED');
     const transactionHash = await executePositionAction({ account, preparation, refreshPreparation: prepare, onStage: setStage });
-    setHash(transactionHash); setPreparation(null); await onConfirmed(); showToast('Position transaction confirmed');
+    setHash(transactionHash); setPreparation(null); await onConfirmed(); return transactionHash;
   };
   const choose = (next: ActionKind) => { setKind(next); setPreparation(null); setReviewError(null); setHash(null); };
 

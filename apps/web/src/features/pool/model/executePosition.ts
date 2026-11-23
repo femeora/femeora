@@ -2,6 +2,7 @@ import type { ApiPositionPreparation, ApiPreparedTransaction } from '@fomeora/ty
 import type { Hex, TransactionReceipt } from 'viem';
 
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
+import { TransactionExecutionError } from '@/features/wallet/transactionError';
 
 type Send = (transaction: ApiPreparedTransaction, account: `0x${string}`) => Promise<Hex>;
 type Wait = (hash: Hex) => Promise<Pick<TransactionReceipt, 'status'>>;
@@ -24,7 +25,7 @@ export async function executePreparedPosition(input: {
     input.onStage?.(`Approve token ${totalApprovals - approvalCount + 1} of ${totalApprovals}`);
     const hash = await send(approval, input.account);
     input.onStage?.('Approval pending…');
-    if ((await wait(hash)).status !== 'success') throw new Error('APPROVAL_REVERTED');
+    if ((await wait(hash)).status !== 'success') throw new TransactionExecutionError('APPROVAL_REVERTED', hash);
     preparation = await input.refreshPreparation();
     if (preparation.approvals.length >= approvalCount) throw new Error('APPROVAL_NOT_EFFECTIVE');
     approvalCount = preparation.approvals.length;
@@ -32,6 +33,6 @@ export async function executePreparedPosition(input: {
   input.onStage?.('Create position');
   const hash = await send(preparation.create, input.account);
   input.onStage?.('Position pending…');
-  if ((await wait(hash)).status !== 'success') throw new Error('POSITION_CREATE_REVERTED');
+  if ((await wait(hash)).status !== 'success') throw new TransactionExecutionError('POSITION_CREATE_REVERTED', hash);
   return hash;
 }

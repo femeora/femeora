@@ -2,6 +2,7 @@ import type { ApiPositionActionPreparation, ApiPreparedTransaction } from '@fome
 import type { Hex, TransactionReceipt } from 'viem';
 
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
+import { TransactionExecutionError } from '@/features/wallet/transactionError';
 
 type Send = (transaction: ApiPreparedTransaction, account: `0x${string}`) => Promise<Hex>;
 type Wait = (hash: Hex) => Promise<Pick<TransactionReceipt, 'status'>>;
@@ -23,7 +24,7 @@ export async function executePositionAction(input: {
     input.onStage?.(`Approve token ${total - remaining + 1} of ${total}`);
     const hash = await send(preparation.approvals[0]!, input.account);
     input.onStage?.('Approval pending…');
-    if ((await wait(hash)).status !== 'success') throw new Error('APPROVAL_REVERTED');
+    if ((await wait(hash)).status !== 'success') throw new TransactionExecutionError('APPROVAL_REVERTED', hash);
     preparation = await input.refreshPreparation();
     if (preparation.approvals.length >= remaining) throw new Error('APPROVAL_NOT_EFFECTIVE');
     remaining = preparation.approvals.length;
@@ -31,6 +32,6 @@ export async function executePositionAction(input: {
   input.onStage?.(`${preparation.quote.action === 'close' ? 'Close' : preparation.quote.action === 'decrease' ? 'Decrease' : 'Increase'} position`);
   const hash = await send(preparation.action, input.account);
   input.onStage?.('Transaction pending…');
-  if ((await wait(hash)).status !== 'success') throw new Error('POSITION_ACTION_REVERTED');
+  if ((await wait(hash)).status !== 'success') throw new TransactionExecutionError('POSITION_ACTION_REVERTED', hash);
   return hash;
 }

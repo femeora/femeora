@@ -52,6 +52,7 @@ export function CalloutPost({ callout, own = false }: CalloutPostProps) {
         { method: previous ? 'DELETE' : 'POST' },
       );
       setFollowing(response.following);
+      showToast(response.following ? `You are now following @${caller.handle}.` : `You unfollowed @${caller.handle}.`);
     } catch (error) {
       setFollowing(previous);
       showToast(error instanceof Error ? error.message : 'FOLLOW_FAILED');

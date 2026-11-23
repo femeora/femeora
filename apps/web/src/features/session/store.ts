@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import { create } from 'zustand';
 
+import { useToast } from '@/components/feedback/toast';
 import { connectInjectedWallet, signWalletMessage } from '@/features/wallet/adapter';
 import { BrowserApiError, browserApiRequest } from '@/lib/api/client';
 
@@ -74,6 +75,10 @@ export const useSession = create<SessionState>((set, get) => ({
         error: null,
         signInOpen: user.wallets.length === 0,
       });
+      if (window.sessionStorage.getItem('fomeora:x-auth-pending') === '1') {
+        window.sessionStorage.removeItem('fomeora:x-auth-pending');
+        useToast.getState().show(`Signed in as @${user.handle}.`, { title: 'X connected' });
+      }
     } catch (error) {
       if (error instanceof BrowserApiError && error.status === 401) {
         const authError = new URLSearchParams(window.location.search).get('auth_error');
@@ -89,6 +94,7 @@ export const useSession = create<SessionState>((set, get) => ({
     }
   },
   startXSignIn: () => {
+    window.sessionStorage.setItem('fomeora:x-auth-pending', '1');
     window.location.assign('/api/v1/auth/x/start?redirect=/portfolio');
   },
   linkWallet: async () => {
@@ -108,8 +114,11 @@ export const useSession = create<SessionState>((set, get) => ({
       });
       await get().refreshSession();
       set({ signInOpen: false });
+      useToast.getState().show('Your wallet was verified and linked to your X identity.', { title: 'Wallet linked' });
     } catch (error) {
-      set({ error: errorCode(error) });
+      const nextError = errorCode(error);
+      set({ error: nextError });
+      useToast.getState().show(nextError, { title: 'Wallet link failed', tone: 'error' });
     }
   },
   signOut: async () => {
@@ -117,6 +126,7 @@ export const useSession = create<SessionState>((set, get) => ({
       await browserApiRequest('/v1/auth/logout', z.undefined(), { method: 'POST' });
     } finally {
       set({ user: null, status: 'anonymous', signInOpen: false, error: null });
+      useToast.getState().show('You have signed out of Fomeora.', { title: 'Signed out' });
     }
   },
 }));

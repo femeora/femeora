@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { ChainBadge } from '@/components/ui/ChainBadge';
+import { XLogo } from '@/components/ui/icons';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { footer, site } from '@/content/landing';
@@ -17,6 +18,16 @@ export function SiteFooter() {
               <Wordmark className="text-lg" />
             </p>
             <p className="mt-6 max-w-[18em]">{site.tagline}</p>
+            <a
+              href={site.x.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Follow @${site.x.handle} on X`}
+              className="t-label mt-5 inline-flex items-center gap-2 text-muted transition-colors duration-fast hover:text-fg"
+            >
+              <XLogo className="size-3.5" />
+              <span>@{site.x.handle}</span>
+            </a>
           </div>
 
           {footer.columns.map(column => (

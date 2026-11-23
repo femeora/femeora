@@ -3,7 +3,6 @@
 import { ApiSwapPreparationSchema, ApiSwapQuoteSchema, type ApiSwapQuote } from '@fomeora/types';
 import { useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
 import { ArrowUpDown } from '@/components/ui/icons';
 import { useWallet } from '@/features/wallet/store';
@@ -30,7 +29,6 @@ export function SwapForm({ pool }: { pool: Pool }) {
   const [quoting, setQuoting] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const { account, config } = useWallet();
-  const showToast = useToast(state => state.show);
 
   const tokenIn = direction === 'buy' ? pool.quote : pool.base;
   const tokenOut = direction === 'buy' ? pool.base : pool.quote;
@@ -80,7 +78,7 @@ export function SwapForm({ pool }: { pool: Pool }) {
     setTransactionHash(hash);
     setQuote(null);
     setAmount('');
-    showToast('Swap confirmed on-chain');
+    return hash;
   };
 
   const updateAmount = (value: string) => {

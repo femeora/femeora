@@ -7,6 +7,7 @@ import { Toaster } from '@/components/feedback/Toaster';
 import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { ChainBadge } from '@/components/ui/ChainBadge';
+import { XLogo } from '@/components/ui/icons';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { site } from '@/content/landing';
 import { TailSheet } from '@/features/callouts/components/TailSheet';
@@ -45,6 +46,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             <StatusDot tone="up" />
             <ChainBadge />
           </p>
+          <a
+            href={site.x.href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Follow @${site.x.handle} on X`}
+            className="t-label hidden shrink-0 items-center gap-2 text-muted transition-colors duration-fast hover:text-fg md:inline-flex"
+          >
+            <XLogo className="size-3.5" />
+            <span>@{site.x.handle}</span>
+          </a>
           <div className="ml-auto lg:ml-0">
             <AccountButton />
           </div>

@@ -54,6 +54,7 @@ export const site = {
   /** Entry point into the app from the landing page (hero, header, CTA). */
   appCta: { label: 'Launch app', href: '/pools' },
   chain: 'Robinhood Chain',
+  x: { handle: 'femeoraApp', href: 'https://x.com/femeoraApp' },
 } as const;
 
 export const navLinks: readonly NavLink[] = [

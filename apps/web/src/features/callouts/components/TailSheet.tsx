@@ -3,7 +3,6 @@
 import { ApiTailIntentSchema, ApiTailPreparationSchema, ApiTailQuoteSchema, type ApiTailQuote } from '@fomeora/types';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
 import { Close, TriangleAlert } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -52,7 +51,6 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
   const [hash, setHash] = useState<string | null>(null);
   const titleId = useId();
   const { account, config } = useWallet();
-  const showToast = useToast(state => state.show);
   const invalidate = () => { setQuote(null); setQuoteError(null); setHash(null); };
   const requestQuote = async () => {
     setQuoting(true); setQuoteError(null); setHash(null);
@@ -77,7 +75,7 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
     const prepare = () => browserApiRequest(`/v1/callouts/${callout.id}/tail-prepare`, ApiTailPreparationSchema, { method: 'POST', body: requestBody() });
     setStage('Preparing exact approvals…');
     const transactionHash = await executePreparedTail({ account, preparation: await prepare(), refreshPreparation: prepare, onStage: setStage });
-    setHash(transactionHash); setQuote(null); showToast('Tailed position confirmed; indexer will attach it to the source callout');
+    setHash(transactionHash); setQuote(null); return transactionHash;
   };
 
   return (

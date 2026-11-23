@@ -8,9 +8,9 @@ import {
 } from '@fomeora/types';
 import { useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
 import { SHAPE_LABEL } from '@/lib/bins';
@@ -51,7 +51,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [transactionStage, setTransactionStage] = useState('Preparing transaction…');
   const { account, config } = useWallet();
-  const showToast = useToast(state => state.show);
+  const { user, openSignIn } = useSession();
 
   const at = (pct: number) => formatUnit(toUnit(applyPct(pool.priceUsd, pct), unit, pool), unit);
   const invalidateQuote = () => {
@@ -67,6 +67,13 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     amountY: needs.quote ? draft.quoteAmount : '0',
     slippageBps: 50,
   });
+  const setPostAsCallout = (value: boolean) => {
+    if (value && (!user || !user.wallet)) {
+      openSignIn();
+      return;
+    }
+    dispatch({ type: 'postAsCallout', value });
+  };
   const requestQuote = async () => {
     if (error) return;
     setQuoting(true);
@@ -105,7 +112,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     setTransactionHash(hash);
     setQuote(null);
     dispatch({ type: 'submitted' });
-    showToast(draft.postAsCallout ? 'Position confirmed; callout will appear after indexing' : 'Position confirmed on-chain');
+    return hash;
   };
 
   return (
@@ -209,7 +216,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         caption={draft.caption}
         showSize={draft.showSize}
         error={captionError}
-        onEnabledChange={value => dispatch({ type: 'postAsCallout', value })}
+        onEnabledChange={setPostAsCallout}
         onCaptionChange={value => dispatch({ type: 'caption', value })}
         onShowSizeChange={value => dispatch({ type: 'showSize', value })}
       />

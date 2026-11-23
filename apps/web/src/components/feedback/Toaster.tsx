@@ -1,34 +1,41 @@
 'use client';
 
 import { Close } from '@/components/ui/icons';
-import { cn } from '@/lib/cn';
 
 import { useToast } from './toast';
 
-/** Polite live region for confirmations. Never takes focus. */
+const shortHash = (hash: string) => `${hash.slice(0, 10)}…${hash.slice(-8)}`;
+
+/** Blocking result modal used for both ordinary activities and transactions. */
 export function Toaster() {
-  const { message, dismiss } = useToast();
+  const { message, title, tone, transactionHash, explorerUrl, dismiss } = useToast();
+
+  if (!message) return null;
 
   return (
-    <div
-      aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center px-gutter lg:bottom-6"
-    >
-      <div
-        className={cn(
-          'pointer-events-auto flex items-center gap-4 glass-raised rounded-[2px] py-2 pl-4 pr-2 transition-[opacity,transform] duration-base ease-out-expo',
-          message ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
-        )}
-      >
-        <span className="text-[0.9375rem]">{message}</span>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss"
-          className="grid size-9 place-items-center text-muted hover:text-fg"
-        >
-          <Close aria-hidden="true" className="size-4" strokeWidth={1.75} />
-        </button>
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 px-gutter backdrop-blur-sm" role="presentation" onMouseDown={event => event.target === event.currentTarget && dismiss()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="activity-result-title" className="glass-raised w-full max-w-md rounded-[2px] p-5 shadow-2xl">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className={`t-label ${tone === 'error' ? 'text-down' : tone === 'success' ? 'text-up' : 'text-signal'}`}>{tone}</p>
+            <h2 id="activity-result-title" className="mt-1 text-2xl font-medium">{title}</h2>
+          </div>
+          <button type="button" onClick={dismiss} aria-label="Close notification" className="grid size-11 place-items-center text-muted hover:text-fg">
+            <Close aria-hidden="true" className="size-5" strokeWidth={1.75} />
+          </button>
+        </header>
+        <p className="mt-4 text-muted">{message}</p>
+        {transactionHash ? (
+          <div className="glass mt-5 rounded-[2px] p-3">
+            <p className="t-label text-faint">Transaction</p>
+            {explorerUrl ? (
+              <a href={`${explorerUrl.replace(/\/$/, '')}/tx/${transactionHash}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-11 items-center font-mono text-sm text-signal underline underline-offset-4">
+                {shortHash(transactionHash)} ↗
+              </a>
+            ) : <p className="mt-2 break-all font-mono text-sm">{transactionHash}</p>}
+          </div>
+        ) : null}
+        <button type="button" onClick={dismiss} className="metal t-label mt-6 min-h-11 w-full rounded-[2px] px-4">Done</button>
       </div>
     </div>
   );

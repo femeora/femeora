@@ -55,6 +55,7 @@ export function CalloutActions({ callout }: { callout: Callout }) {
         { method: current ? 'DELETE' : 'POST' },
       );
       setActive(response.active);
+      showToast(response.active ? `${action === 'like' ? 'Callout liked' : 'Callout reposted'}.` : `${action === 'like' ? 'Like' : 'Repost'} removed.`);
     } catch (error) {
       setActive(current);
       showToast(error instanceof Error ? error.message : `${action.toUpperCase()}_FAILED`);

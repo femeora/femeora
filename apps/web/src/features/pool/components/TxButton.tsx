@@ -2,15 +2,15 @@
 
 import { useState } from 'react';
 
+import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
-import { XLogo } from '@/components/ui/icons';
-import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
+import { TransactionExecutionError } from '@/features/wallet/transactionError';
 
 interface TxButtonProps {
   label: string;
   error: string | null;
-  onExecute?: () => Promise<void>;
+  onExecute?: () => Promise<string | void>;
   pendingLabel?: string;
 }
 
@@ -20,27 +20,19 @@ const transactionError = (error: string | null) => {
   if (error === 'TRANSACTION_REJECTED') return 'Transaction rejected in wallet';
   if (error === 'APPROVAL_REVERTED') return 'Approval reverted on-chain';
   if (error === 'SWAP_REVERTED') return 'Swap reverted on-chain';
+  if (error === 'POSITION_CREATE_REVERTED') return 'Position creation reverted on-chain';
+  if (error === 'TAIL_CREATE_REVERTED') return 'Tail position reverted on-chain';
+  if (error === 'POSITION_ACTION_REVERTED') return 'Position transaction reverted on-chain';
   return error;
 };
 
 /** Honest transaction gate. Execution is enabled only after an API-prepared transaction exists. */
 export function TxButton({ label, error, onExecute, pendingLabel = 'Checking balance and estimated gas…' }: TxButtonProps) {
-  const { user, openSignIn } = useSession();
   const { account, chainId, config, status, connect, switchNetwork } = useWallet();
+  const showResult = useToast(state => state.show);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (!user) {
-    return (
-      <Button variant="primary" block onClick={openSignIn}>
-        Sign in with <XLogo className="size-3.5" />
-        <span className="sr-only">X</span> to continue
-      </Button>
-    );
-  }
-  if (!user.wallet) {
-    return <Button variant="primary" block onClick={openSignIn}>Link wallet</Button>;
-  }
   if (status === 'unavailable') {
     return <Button variant="primary" block disabled>Open in a wallet browser</Button>;
   }
@@ -50,9 +42,6 @@ export function TxButton({ label, error, onExecute, pendingLabel = 'Checking bal
         {status === 'connecting' ? 'Connecting…' : 'Connect wallet'}
       </Button>
     );
-  }
-  if (account.toLowerCase() !== user.wallet.toLowerCase()) {
-    return <Button variant="primary" block onClick={() => void connect()}>Select linked wallet</Button>;
   }
   if (config && chainId !== config.chainId) {
     return <Button variant="primary" block onClick={() => void switchNetwork()}>Switch to {config.chainName}</Button>;
@@ -64,9 +53,22 @@ export function TxButton({ label, error, onExecute, pendingLabel = 'Checking bal
     setPending(true);
     setActionError(null);
     try {
-      await onExecute();
+      const transactionHash = await onExecute();
+      showResult(`${label} confirmed on-chain.`, {
+        title: 'Transaction successful',
+        tone: 'success',
+        ...(transactionHash ? { transactionHash } : {}),
+        ...(config ? { explorerUrl: config.explorerUrl } : {}),
+      });
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : 'TRANSACTION_FAILED');
+      const nextError = cause instanceof Error ? cause.message : 'TRANSACTION_FAILED';
+      setActionError(nextError);
+      showResult(transactionError(nextError) ?? 'Transaction failed.', {
+        title: 'Transaction failed',
+        tone: 'error',
+        ...(cause instanceof TransactionExecutionError ? { transactionHash: cause.transactionHash } : {}),
+        ...(config ? { explorerUrl: config.explorerUrl } : {}),
+      });
     } finally {
       setPending(false);
     }
