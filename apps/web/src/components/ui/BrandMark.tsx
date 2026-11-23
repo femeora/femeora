@@ -1,28 +1,18 @@
+import Image from 'next/image';
+
 import { cn } from '@/lib/cn';
 
-/** Fomeora mark: a Bid-Ask bin histogram with the active bin lit. */
-const BARS = [
-  { x: 0, h: 20 },
-  { x: 5, h: 13 },
-  { x: 10, h: 8 },
-  { x: 15, h: 13 },
-  { x: 20, h: 20 },
-];
-
+/** Fomeora's chrome infinity mark, shared by every product surface. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 23 20" aria-hidden="true" className={cn('h-5 w-[23px]', className)}>
-      {BARS.map((bar, index) => (
-        <rect
-          key={bar.x}
-          x={bar.x}
-          y={20 - bar.h}
-          width="3"
-          height={bar.h}
-          className={index === 2 ? 'fill-signal' : 'fill-fg'}
-        />
-      ))}
-    </svg>
+    <Image
+      src="/fomeora-logo.png"
+      alt=""
+      aria-hidden="true"
+      width={512}
+      height={512}
+      className={cn('size-7 shrink-0 rounded-full object-contain', className)}
+    />
   );
 }
 
