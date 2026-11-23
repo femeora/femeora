@@ -1,6 +1,7 @@
 'use client';
 
 import { ApiFeedSchema } from '@fomeora/types';
+import Link from 'next/link';
 import { useCallback, useId, useMemo, useState } from 'react';
 
 import { Tabs } from '@/components/ui/Tabs';
@@ -20,6 +21,39 @@ const tabItems: readonly { value: FeedTab; label: string }[] = [
   { value: 'following', label: 'Following' },
   { value: 'best', label: 'Best' },
 ];
+
+function EmptyFeed({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  return (
+    <div className="px-gutter py-8 sm:py-12">
+      <div className="glass relative overflow-hidden rounded-[2px] border border-line p-6 sm:p-8">
+        <div aria-hidden="true" className="absolute -right-12 -top-16 size-48 rounded-full border border-fg/[0.06] shadow-[0_0_60px_rgb(var(--fg)/0.04)]" />
+        <p className="t-label text-signal">The feed starts onchain</p>
+        <h2 className="mt-3 max-w-md text-2xl font-medium tracking-tight">
+          {filtered ? 'No callouts match this side yet.' : 'Be the first caller in this pool.'}
+        </h2>
+        <p className="mt-3 max-w-lg text-muted">
+          Create a liquidity position, publish it as a callout, and it will appear here after the transaction reaches the safe block.
+        </p>
+
+        <ol className="mt-7 grid gap-px overflow-hidden rounded-[2px] bg-line sm:grid-cols-3">
+          {['Choose a canonical pool', 'Create an LP range', 'Post it as a callout'].map((step, index) => (
+            <li key={step} className="bg-panel/95 p-4">
+              <span className="t-label text-faint">0{index + 1}</span>
+              <span className="mt-2 block text-sm">{step}</span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <Link href="/pools" className="glass-control t-label inline-flex min-h-11 items-center rounded-[2px] px-4 hover:border-line-strong">
+            Browse pools →
+          </Link>
+          {filtered ? <button type="button" onClick={onClear} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-fg">Clear side filter</button> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** API-backed feed. SSE only buffers notification IDs; REST remains the source of truth. */
 export function FeedScreen() {
@@ -57,7 +91,7 @@ export function FeedScreen() {
           {tab === 'following' && !user ? <div className="px-gutter py-16 text-center"><p className="text-lg">Sign in to view followed callers.</p><button type="button" onClick={openSignIn} className="mt-3 min-h-11 text-signal underline underline-offset-4">Sign in with X</button></div> : null}
           {path && isLoading ? <p className="px-gutter py-16 text-center text-muted">Loading canonical callouts…</p> : null}
           {path && error ? <div role="alert" className="px-gutter py-16 text-center"><p className="text-down">Feed unavailable.</p><button type="button" onClick={() => void refresh()} className="mt-3 min-h-11 text-signal underline underline-offset-4">Retry</button></div> : null}
-          {path && !isLoading && !error && visible.length === 0 ? <p className="px-gutter py-16 text-center text-muted">No canonical callouts match this tab and side.</p> : null}
+          {path && !isLoading && !error && visible.length === 0 ? <EmptyFeed filtered={side !== 'all'} onClear={() => setSide('all')} /> : null}
           {path && !isLoading && !error ? visible.map(callout => <CalloutPost key={callout.id} callout={callout} own={ownIds.has(callout.id)} />) : null}
           {streamError ? <p className="t-label px-gutter py-3 text-center text-muted">Realtime reconnecting; REST data remains available.</p> : null}
         </Tabs>

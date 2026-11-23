@@ -3,10 +3,10 @@
 import { ApiFeedRailSchema } from '@fomeora/types';
 import Link from 'next/link';
 
+import { TokenPair } from '@/components/ui/TokenPair';
 import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 
-const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 const decimal = (value: string, digits = 2) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—';
@@ -23,7 +23,7 @@ export function FeedRail() {
         <h2 className="t-label mb-3 text-muted">Trending by callouts</h2>
         <ol className="glass rounded-[2px] px-4">
           {isLoading ? <li className="py-4 text-sm text-muted">Loading pools…</li> : null}
-          {!isLoading && !error && trendingPools.length === 0 ? <li className="py-4 text-sm text-muted">No callouts in the last 24h.</li> : null}
+          {!isLoading && !error && trendingPools.length === 0 ? <li className="py-5"><p className="text-sm">No trending pools yet</p><p className="mt-1 text-xs leading-relaxed text-muted">The first confirmed callout starts this 24h ranking.</p></li> : null}
           {trendingPools.map((pool, index) => (
             <li key={pool.address} className="border-b border-line last:border-b-0">
               <Link
@@ -31,7 +31,7 @@ export function FeedRail() {
                 className="flex min-h-12 items-center gap-3 transition-colors hover:text-signal"
               >
                 <span className="t-label w-5 text-faint">{index + 1}</span>
-                <span className="flex-1">{short(pool.tokenX)} / {short(pool.quoteToken ?? pool.tokenY)}</span>
+                <span className="min-w-0 flex-1"><TokenPair tokenX={pool.tokenX} tokenY={pool.quoteToken ?? pool.tokenY} compact /></span>
                 <span className="t-label text-muted">{pool.callouts24h}</span>
                 <span
                   className={cn(
@@ -51,7 +51,7 @@ export function FeedRail() {
         <h2 className="t-label mb-3 text-muted">Top callers 24h</h2>
         <ol className="glass rounded-[2px] px-4">
           {isLoading ? <li className="py-4 text-sm text-muted">Loading callers…</li> : null}
-          {!isLoading && !error && topCallers.length === 0 ? <li className="py-4 text-sm text-muted">No ranked callers yet.</li> : null}
+          {!isLoading && !error && topCallers.length === 0 ? <li className="py-5"><p className="text-sm">No ranked callers yet</p><p className="mt-1 text-xs leading-relaxed text-muted">Scores appear after canonical callout activity is indexed.</p></li> : null}
           {topCallers.map((caller, index) => (
             <li
               key={caller.handle}

@@ -58,7 +58,7 @@ export function BinRig({ shape, count, activeIndex, className }: BinRigProps) {
               <span
                 key={index}
                 className={cn(
-                  'block border border-fg/10 transition-[background-color,box-shadow] duration-base ease-brand',
+                  'block border border-fg/10 transition-[height,background-color,box-shadow] duration-[900ms] ease-brand',
                   distance === 0 &&
                     'border-fg/60 bg-fg/80 shadow-[0_0_48px_6px_rgb(var(--fg)/0.25)]',
                   distance === 1 && 'bg-fg/20',

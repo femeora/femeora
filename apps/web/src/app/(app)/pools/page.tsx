@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { TokenPair } from '@/components/ui/TokenPair';
 import { getPools } from '@/lib/api/server';
 
 export const dynamic = 'force-dynamic';
@@ -9,10 +10,6 @@ export const metadata: Metadata = {
   title: 'Pools · Fomeora',
   description: 'Browse canonical liquidity pools indexed by Fomeora.',
 };
-
-function short(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 export default async function PoolsPage() {
   let result;
@@ -50,15 +47,15 @@ export default async function PoolsPage() {
       ) : (
         <ul className="mt-6 grid gap-3 lg:grid-cols-2">
           {result.data.map(pool => (
-            <li key={pool.id}>
+            <li key={pool.id} className="lg:only:col-span-2">
               <Link
                 href={`/p/${pool.chainId}/${pool.address}`}
-                className="glass group flex min-h-28 items-center justify-between gap-5 rounded-[2px] p-5 transition-colors hover:border-line-strong"
+                className="glass group flex min-h-32 items-center justify-between gap-5 rounded-[2px] p-5 transition-colors hover:border-line-strong sm:p-6"
               >
                 <div className="min-w-0">
-                  <p className="font-medium">{short(pool.tokenX)} / {short(pool.tokenY)}</p>
-                  <p className="mt-1 truncate font-mono text-xs text-faint">{pool.address}</p>
-                  <p className="t-label mt-3 text-muted">Chain {pool.chainId} · {pool.type}</p>
+                  <TokenPair tokenX={pool.tokenX} tokenY={pool.tokenY} />
+                  <p className="mt-3 truncate font-mono text-xs text-faint">Pool {pool.address}</p>
+                  <p className="t-label mt-2 text-muted">Robinhood Chain · {pool.type}</p>
                 </div>
                 <dl className="shrink-0 text-right font-mono text-xs tabular-nums">
                   <dt className="text-faint">Bin step</dt>
