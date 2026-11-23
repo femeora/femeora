@@ -14,7 +14,7 @@
   },
   "scripts": {
     "generate": "node ./scripts/generate.mjs",
-    "build": "pnpm run generate && tsc -b",
+    "build": "tsc -b",
     "clean": "rm -rf dist *.tsbuildinfo",
     "typecheck": "pnpm run generate && tsc --noEmit",
     "lint": "pnpm run generate && eslint src --ext .ts"
