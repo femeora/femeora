@@ -4,6 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["APP_NETWORK", "NODE_ENV", "API_BASE_URL", "WEB_BASE_URL"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "out/**"]
     },
     "typecheck": {
