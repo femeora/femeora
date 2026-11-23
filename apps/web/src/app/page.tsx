@@ -1,3 +1,5 @@
+import { loadWebEnvironment } from '@fomeora/env';
+
 import { AppSection } from '@/components/landing/AppSection';
 import { CalloutsSection } from '@/components/landing/CalloutsSection';
 import { CtaSection } from '@/components/landing/CtaSection';
@@ -13,6 +15,8 @@ import { Grain } from '@/components/ui/Grain';
 import { marquee } from '@/content/landing';
 
 export default function LandingPage() {
+  const { APP_NETWORK: network } = loadWebEnvironment();
+
   return (
     <>
       <a
@@ -22,9 +26,9 @@ export default function LandingPage() {
         Skip to content
       </a>
       <Ambient />
-      <SiteHeader />
+      <SiteHeader network={network} />
       <main id="main" className="pt-header">
-        <Hero />
+        <Hero network={network} />
         <Statement />
         <AppSection />
         <CalloutsSection />

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+
 import { Toaster } from '@/components/feedback/Toaster';
 import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
@@ -28,9 +29,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useRehydrateStores();
   const config = useWallet(state => state.config);
   const testnet = config?.network === 'testnet';
+  const prelaunch = config?.network === 'mainnet' && !config.protocolDeployed;
 
   return (
-    <div className={cn('min-h-dvh [--app-header-height:3.5rem]', testnet && '[--app-header-height:5.5rem]')}>
+    <div className={cn('min-h-dvh [--app-header-height:3.5rem]', (testnet || prelaunch) && '[--app-header-height:5.5rem]')}>
       <Ambient />
       <header className="sticky top-0 z-50 border-b border-line bg-bg">
         <div className="flex h-14 items-center gap-8 px-gutter">
@@ -45,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <AppTopNav />
           <p className="t-label ml-auto hidden items-center gap-2 text-muted lg:flex">
             <StatusDot tone="up" />
-            <ChainBadge />
+            {config ? <ChainBadge network={config.network} /> : <ChainBadge />}
           </p>
           <a
             href={site.x.href}
@@ -64,6 +66,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {testnet ? (
           <p className="t-label flex h-8 items-center justify-center border-t border-signal/30 bg-signal/10 px-gutter text-center text-signal" role="status">
             Testnet · assets have no real-world value · {config.chainName}
+          </p>
+        ) : null}
+        {prelaunch ? (
+          <p className="t-label flex h-8 items-center justify-center border-t border-up/30 bg-up/10 px-gutter text-center text-up" role="status">
+            Mainnet · protocol deployment pending · read-only preview
           </p>
         ) : null}
       </header>

@@ -69,4 +69,9 @@ const deploymentSource = `${generatedHeader}export const fomeoraDeployments = {\
   2,
 ).replaceAll('\n', '\n  ')},\n} as const;\n\nexport const fomeoraDeploymentStartBlocks = {\n  [${manifest.chainId}]: ${BigInt(manifest.deploymentStartBlock)}n,\n} as const;\n\nexport type FomeoraChainId = keyof typeof fomeoraDeployments;\nexport type FomeoraDeployment = (typeof fomeoraDeployments)[FomeoraChainId];\n\nconst deploymentsByChainId: Readonly<Partial<Record<number, FomeoraDeployment>>> = fomeoraDeployments;\nconst startBlocksByChainId: Readonly<Partial<Record<number, bigint>>> = fomeoraDeploymentStartBlocks;\n\nexport function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = deploymentsByChainId[chainId];\n  if (!deployment) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return deployment;\n}\n\nexport function getFomeoraDeploymentStartBlock(chainId: number): bigint {\n  const startBlock = startBlocksByChainId[chainId];\n  if (startBlock === undefined) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return startBlock;\n}\n`;
 
-await writeFile(resolve(outputRoot, 'deployments.ts'), deploymentSource, 'utf8');
+const deploymentSourceWithOptionalLookup = deploymentSource.replace(
+  'export function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = deploymentsByChainId[chainId];',
+  'export function tryGetFomeoraDeployment(chainId: number): FomeoraDeployment | null {\n  return deploymentsByChainId[chainId] ?? null;\n}\n\nexport function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = tryGetFomeoraDeployment(chainId);',
+);
+
+await writeFile(resolve(outputRoot, 'deployments.ts'), deploymentSourceWithOptionalLookup, 'utf8');

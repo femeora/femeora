@@ -33,6 +33,9 @@ export function TxButton({ label, error, onExecute, pendingLabel = 'Checking bal
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  if (config && !config.protocolDeployed) {
+    return <Button variant="primary" block disabled>Protocol deployment pending</Button>;
+  }
   if (status === 'unavailable') {
     return <Button variant="primary" block disabled>Open in a wallet browser</Button>;
   }

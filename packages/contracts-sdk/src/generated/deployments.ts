@@ -5,7 +5,7 @@ export const fomeoraDeployments = {
     "poolRegistry": "0xD7DF769438915BA0444f0604F227F713e286c15C",
     "poolFactory": "0x89A7736F4Ea900c66274CC67431F6010bf0c1b60",
     "dammPoolDeployer": "0xCAfa757A8f50688237CC7EaFA9D860a4624ACBF4",
-    "dlmmPoolV2Deployer": "0x1e3CA75F54C324B2be3440FBFb5177a847C3c0ec",
+    "dlmmPoolV2Deployer": "0xf70D8DFBd84FB0ebBE18dE03BaD68Da344D0979c",
     "positionManagerV2": "0x5176a2C68Aa991C7ea535B05E5C71Ec0d4c028c9",
     "swapRouter": "0x4D0bCc23FDf7E180b0e49Ce538b866E821EB015B",
     "feeSplitter": "0x641Da4A49715534400081A884F6ccc83c4692636",
@@ -23,8 +23,12 @@ export type FomeoraDeployment = (typeof fomeoraDeployments)[FomeoraChainId];
 const deploymentsByChainId: Readonly<Partial<Record<number, FomeoraDeployment>>> = fomeoraDeployments;
 const startBlocksByChainId: Readonly<Partial<Record<number, bigint>>> = fomeoraDeploymentStartBlocks;
 
+export function tryGetFomeoraDeployment(chainId: number): FomeoraDeployment | null {
+  return deploymentsByChainId[chainId] ?? null;
+}
+
 export function getFomeoraDeployment(chainId: number): FomeoraDeployment {
-  const deployment = deploymentsByChainId[chainId];
+  const deployment = tryGetFomeoraDeployment(chainId);
   if (!deployment) throw new Error(`Fomeora is not deployed on chain ${chainId}`);
   return deployment;
 }

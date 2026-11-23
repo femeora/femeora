@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
+
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { RobinhoodLogo } from '@/components/ui/icons';
 import { hero } from '@/content/landing';
@@ -27,7 +28,7 @@ function ReadoutCell({ label, children }: { label: ReactNode; children: ReactNod
   );
 }
 
-export function Hero() {
+export function Hero({ network }: { network: 'testnet' | 'mainnet' }) {
   const { index } = useActiveBinWalk({ count: BIN_COUNT, intervalMs: 920 });
   const reducedMotion = usePrefersReducedMotion();
   const [shapeIndex, setShapeIndex] = useState(0);
@@ -70,7 +71,9 @@ export function Hero() {
                 {cell.chainMark ? <RobinhoodLogo className="size-3.5" /> : null}
                 {cell.value}
               </span>
-              {cell.detail ? <span> · {cell.detail}</span> : null}
+              {cell.detail ? (
+                <span> · {cell.key === 'Network' ? (network === 'testnet' ? 'Testnet' : 'Mainnet') : cell.detail}</span>
+              ) : null}
             </ReadoutCell>
           ))}
         </dl>

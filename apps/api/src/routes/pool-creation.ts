@@ -1,12 +1,12 @@
-import { getFomeoraDeployment, poolFactoryAbi, poolRegistryAbi } from '@fomeora/contracts-sdk';
+import { poolFactoryAbi, poolRegistryAbi, tryGetFomeoraDeployment } from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import { binForPriceX18, PRICE_SCALE, priceFromBinX18, rawUnitsToDecimal } from '@fomeora/sdk';
 import type { FastifyInstance } from 'fastify';
 import { encodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, parseUnits, toHex, zeroAddress, type Address } from 'viem';
 import { z } from 'zod';
 
-import type { ApiChainClient } from '../core/chain-client.js';
 import { robinhoodAssets, robinhoodReferencePrice } from '../core/assets/robinhood.js';
+import type { ApiChainClient } from '../core/chain-client.js';
 
 const erc20Abi = parseAbi(['function symbol() view returns (string)', 'function name() view returns (string)', 'function decimals() view returns (uint8)']);
 const address = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => getAddress(value));
@@ -54,7 +54,7 @@ async function persistRobinhoodAssets(stocks: Awaited<ReturnType<typeof robinhoo
 }
 
 export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: number, client: ApiChainClient) {
-  const deployment = getFomeoraDeployment(chainId);
+  const deployment = tryGetFomeoraDeployment(chainId);
 
   app.get('/v1/pool-assets', async () => {
     const pools = await prisma.pool.findMany({ where: { chainId, canonical: true }, select: { tokenX: true, tokenY: true } });
@@ -99,6 +99,7 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
   });
 
   app.post('/v1/pools/create-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {
+    if (!deployment) return reply.status(503).send({ error: 'PROTOCOL_NOT_DEPLOYED' });
     const parsed = requestSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'INVALID_POOL_PARAMETERS' });
     const input = parsed.data;

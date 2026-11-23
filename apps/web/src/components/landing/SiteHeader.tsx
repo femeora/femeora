@@ -11,7 +11,7 @@ import { navLinks, site } from '@/content/landing';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { cn } from '@/lib/cn';
 
-export function SiteHeader() {
+export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const scrolledAway = useHideOnScroll();
   const hidden = scrolledAway && !menuOpen;
@@ -44,7 +44,7 @@ export function SiteHeader() {
 
         <p className="t-label hidden items-center justify-self-center gap-2.5 whitespace-nowrap text-muted xl:inline-flex">
           <StatusDot tone="up" />
-          <ChainBadge showNetwork />
+          <ChainBadge network={network} />
         </p>
 
         <div className="flex items-center justify-self-end gap-6 md:gap-8">
@@ -96,7 +96,7 @@ export function SiteHeader() {
         </ul>
         <p className="wrap t-label mt-8 flex items-center gap-2.5 text-muted">
           <StatusDot tone="up" />
-          <ChainBadge showNetwork />
+          <ChainBadge network={network} />
         </p>
       </nav>
     </header>

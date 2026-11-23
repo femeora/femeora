@@ -1,3 +1,4 @@
+import { loadWebEnvironment } from '@fomeora/env';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
@@ -23,6 +24,8 @@ export const viewport: Viewport = {
 const JS_FLAG = "document.documentElement.classList.add('js')";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const { APP_NETWORK: network } = loadWebEnvironment();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -30,7 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
-        <SiteFooter />
+        <SiteFooter network={network} />
       </body>
     </html>
   );

@@ -12,6 +12,7 @@ test('serves public chain metadata without an RPC URL', async () => {
     chainId: 46_630,
     chainName: 'Robinhood Chain Testnet',
     explorerUrl: 'https://testnet.robinhood.com',
+    protocolDeployed: true,
   });
   const response = await app.inject({ method: 'GET', url: '/v1/config' });
   assert.equal(response.statusCode, 200);
@@ -21,6 +22,7 @@ test('serves public chain metadata without an RPC URL', async () => {
     chainIdHex: '0xb626',
     chainName: 'Robinhood Chain Testnet',
     explorerUrl: 'https://testnet.robinhood.com',
+    protocolDeployed: true,
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   });
   assert.equal(JSON.stringify(response.json()).includes('rpc'), false);

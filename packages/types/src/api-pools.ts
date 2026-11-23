@@ -322,6 +322,7 @@ export const ApiChainConfigSchema = z.object({
   chainIdHex: z.string().regex(/^0x[0-9a-f]+$/),
   chainName: z.string().min(1),
   explorerUrl: z.string().url(),
+  protocolDeployed: z.boolean(),
   nativeCurrency: z.object({
     name: z.literal('Ether'),
     symbol: z.literal('ETH'),

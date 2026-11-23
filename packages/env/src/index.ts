@@ -34,17 +34,31 @@ const commonSchema = z.object({
   CHAIN_ID: z.coerce.number().int().positive(),
   CHAIN_NAME: configuredString,
   RPC_URL: configuredUrl,
+  RPC_FALLBACK_URL: optionalUrl,
   EXPLORER_URL: configuredUrl,
   QUOTE_TOKEN_ADDRESS: optionalAddress,
   DATABASE_URL: optionalUrl,
 });
 
-function validateCommon(value: z.infer<typeof commonSchema>, context: z.RefinementCtx) {
+function validateCommon(
+  value: Pick<z.infer<typeof commonSchema>, 'APP_NETWORK' | 'CHAIN_ID'> & {
+    RPC_URL?: string | undefined;
+    RPC_FALLBACK_URL?: string | undefined;
+  },
+  context: z.RefinementCtx
+) {
   if (value.CHAIN_ID !== EXPECTED_CHAIN_IDS[value.APP_NETWORK]) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['CHAIN_ID'],
       message: 'chain ID does not match APP_NETWORK',
+    });
+  }
+  if (value.RPC_FALLBACK_URL && value.RPC_FALLBACK_URL === value.RPC_URL) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['RPC_FALLBACK_URL'],
+      message: 'fallback RPC must differ from primary RPC',
     });
   }
 }
@@ -107,6 +121,7 @@ const webSchema = z
   });
 
 const indexerSchema = commonSchema
+  .omit({ RPC_URL: true, RPC_FALLBACK_URL: true })
   .extend({
     DATABASE_URL: databaseUrl,
     RPC_INDEXER: configuredUrl,

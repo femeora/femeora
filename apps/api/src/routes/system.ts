@@ -7,6 +7,7 @@ export async function registerSystemRoutes(
     chainId: number;
     chainName: string;
     explorerUrl: string;
+    protocolDeployed: boolean;
   },
 ) {
   app.get('/v1/config', async () => ({
@@ -15,6 +16,7 @@ export async function registerSystemRoutes(
     chainIdHex: `0x${environment.chainId.toString(16)}`,
     chainName: environment.chainName,
     explorerUrl: environment.explorerUrl,
+    protocolDeployed: environment.protocolDeployed,
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   }));
 }

@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import { tryGetFomeoraDeployment } from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import { loadApiEnvironment } from '@fomeora/env';
 import Fastify from 'fastify';
@@ -39,6 +40,7 @@ export async function createServer(environment = loadApiEnvironment()) {
           'res.headers.set-cookie',
           '*.DATABASE_URL',
           '*.RPC_URL',
+          '*.RPC_FALLBACK_URL',
           '*.RPC_INDEXER',
           '*.X_CLIENT_SECRET',
         ],
@@ -71,7 +73,12 @@ export async function createServer(environment = loadApiEnvironment()) {
   });
 
   const outboxWakeup = new OutboxWakeup(environment.DATABASE_URL);
-  const chainClient = createApiChainClient({ RPC_URL: environment.RPC_URL });
+  const chainClient = createApiChainClient({
+    RPC_URL: environment.RPC_URL,
+    ...(environment.RPC_FALLBACK_URL
+      ? { RPC_FALLBACK_URL: environment.RPC_FALLBACK_URL }
+      : {}),
+  });
   await outboxWakeup.start();
   const retentionTimer = setInterval(
     () => {
@@ -145,6 +152,7 @@ export async function createServer(environment = loadApiEnvironment()) {
     chainId: environment.CHAIN_ID,
     chainName: environment.CHAIN_NAME,
     explorerUrl: environment.EXPLORER_URL,
+    protocolDeployed: Boolean(tryGetFomeoraDeployment(environment.CHAIN_ID)),
   });
   await registerSwapRoutes(app, environment.CHAIN_ID, chainClient);
 

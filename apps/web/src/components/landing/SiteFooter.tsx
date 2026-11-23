@@ -7,7 +7,7 @@ import { LiveClock } from '@/components/ui/LiveClock';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { footer, site } from '@/content/landing';
 
-export function SiteFooter() {
+export function SiteFooter({ network }: { network: 'testnet' | 'mainnet' }) {
   return (
     <footer className="relative z-10 border-t border-line bg-bg pb-6 pt-[clamp(3rem,6vw,5rem)]">
       <div className="wrap">
@@ -57,7 +57,7 @@ export function SiteFooter() {
         <p className="t-label mt-[clamp(3rem,6vw,5rem)] flex flex-wrap items-center gap-x-8 gap-y-2 text-muted">
           <span className="inline-flex items-center gap-2">
             <StatusDot live />
-            <ChainBadge showNetwork />
+            <ChainBadge network={network} />
           </span>
           <LiveClock />
         </p>

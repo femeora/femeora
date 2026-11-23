@@ -67,7 +67,7 @@ export const navLinks: readonly NavLink[] = [
 
 export const hero = {
   readout: [
-    { key: 'Network', value: 'Robinhood Chain', detail: 'Testnet first', chainMark: true },
+    { key: 'Network', value: 'Robinhood Chain', detail: 'Active network', chainMark: true },
     { key: 'Pools', value: 'DLMM · DAMM', detail: 'Spot · Curve · Bid-Ask' },
   ] satisfies readonly ReadoutCell[],
   titleLines: ['Every LP', 'is a callout.'],
@@ -103,12 +103,12 @@ export const appPreview = {
     {
       layer: 'Off-chain',
       title: 'Indexer',
-      detail: 'Binds the tag, tracks earned and the in-range clock',
+      detail: 'Binds the tag to its on-chain position, tracks earned fees and time in range',
     },
     {
       layer: 'Off-chain',
       title: 'API',
-      detail: 'Feed, callouts and tail quotes, streamed over SSE',
+      detail: 'Serves the feed, callouts and tail quotes with realtime updates over SSE',
     },
     {
       layer: 'Client',
