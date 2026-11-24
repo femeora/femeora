@@ -28,6 +28,17 @@ export type EventFilter = {
   owner?: string;
 };
 
+function eventWhere(afterId: bigint | null, filter: EventFilter): Prisma.OutboxEventWhereInput {
+  return {
+    ...(afterId === null ? {} : { id: { gt: afterId } }),
+    chainId: filter.chainId,
+    canonical: true,
+    topic: { in: filter.topics },
+    ...(filter.aggregateId ? { aggregateId: filter.aggregateId } : {}),
+    ...(filter.owner ? { payload: { path: ['owner'], equals: filter.owner } } : {}),
+  };
+}
+
 export function parseLastEventId(value: string | undefined): bigint | null {
   if (value === undefined || !/^[0-9]+$/.test(value)) return null;
   const parsed = BigInt(value);
@@ -136,18 +147,28 @@ export class OutboxWakeup {
 
 export async function readOutboxEvents(afterId: bigint, filter: EventFilter): Promise<RealtimeEvent[]> {
   return prisma.outboxEvent.findMany({
-    where: {
-      id: { gt: afterId },
-      chainId: filter.chainId,
-      canonical: true,
-      topic: { in: filter.topics },
-      ...(filter.aggregateId ? { aggregateId: filter.aggregateId } : {}),
-      ...(filter.owner ? { payload: { path: ['owner'], equals: filter.owner } } : {}),
-    },
+    where: eventWhere(afterId, filter),
     select: { id: true, topic: true, aggregateId: true, payload: true, createdAt: true },
     orderBy: { id: 'asc' },
     take: SSE_BATCH_SIZE,
   });
+}
+
+/** Fresh streams start after the latest matching row; reconnects still replay from Last-Event-ID. */
+export async function latestOutboxEventId(filter: EventFilter): Promise<bigint> {
+  const latest = await prisma.outboxEvent.findFirst({
+    where: eventWhere(null, filter),
+    select: { id: true },
+    orderBy: { id: 'desc' },
+  });
+  return latest?.id ?? 0n;
+}
+
+export async function resolveInitialEventId(
+  cursor: bigint | null,
+  latest: () => Promise<bigint>,
+): Promise<bigint> {
+  return cursor ?? latest();
 }
 
 export async function pruneOutboxEvents(now = new Date()): Promise<number> {

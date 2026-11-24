@@ -9,9 +9,11 @@ import {
   ConnectionLimiter,
   formatSseEvent,
   type EventFilter,
+  latestOutboxEventId,
   OutboxWakeup,
   parseLastEventId,
   readOutboxEvents,
+  resolveInitialEventId,
   SSE_HEARTBEAT_MS,
 } from '../core/realtime/outbox.js';
 
@@ -45,6 +47,15 @@ async function streamEvents(
     return;
   }
 
+  let initialId: bigint;
+  try {
+    initialId = await resolveInitialEventId(cursor, () => latestOutboxEventId(filter));
+  } catch {
+    limiter.release(limiterKey);
+    await reply.status(503).send({ error: 'STREAM_UNAVAILABLE' });
+    return;
+  }
+
   reply.hijack();
   reply.raw.writeHead(200, {
     'cache-control': 'no-cache, no-transform',
@@ -55,7 +66,7 @@ async function streamEvents(
   reply.raw.flushHeaders();
 
   const abort = new AbortController();
-  let lastId = cursor ?? 0n;
+  let lastId = initialId;
   let lastWrite = Date.now();
   const close = () => abort.abort();
   request.raw.once('close', close);

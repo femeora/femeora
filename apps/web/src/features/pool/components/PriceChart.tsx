@@ -14,6 +14,7 @@ import { TokenPair } from '@/components/ui/TokenPair';
 import { calloutStatus, rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
 import { cn } from '@/lib/cn';
 import { tokenColor } from '@/lib/theme';
+import type { BinShape } from '@/types/callout';
 
 import { useChartProjection } from '../hooks/useChartProjection';
 import { useLightweightChart } from '../hooks/useLightweightChart';
@@ -32,7 +33,8 @@ interface PriceChartProps {
   liquidity: readonly LiquidityBin[];
   unit: ValueUnit;
   /** The draft range from Create Position, drawn as a band. */
-  range: RangeInput | null;
+  range: (RangeInput & { shape: BinShape; presetId?: string | null }) | null;
+  onRangeChange?: (bound: 'minPct' | 'maxPct', value: number) => void;
   callouts: readonly Callout[];
   showCallouts: boolean;
   className?: string;
@@ -57,6 +59,7 @@ export function PriceChart({
   liquidity,
   unit,
   range,
+  onRangeChange,
   callouts,
   showCallouts,
   className,
@@ -224,6 +227,25 @@ export function PriceChart({
       ) as [number, number])
     : null;
   const projection = useChartProjection(handles, band ?? [current * 0.9, current * 1.1]);
+  const dragRange = (bound: 'minPct' | 'maxPct', y: number, phase: 'start' | 'move' | 'end') => {
+    if (!handles || !range || !onRangeChange) return;
+    if (phase === 'start') {
+      handles.chart.applyOptions({ handleScroll: false, handleScale: false });
+      handles.chart.priceScale('right').applyOptions({ autoScale: false });
+    }
+    const chartValue = handles.candles.coordinateToPrice(y);
+    if (chartValue !== null) {
+      const price = unit === 'mcap' ? chartValue / pool.supply : chartValue;
+      onRangeChange(bound, ((price / pool.priceUsd) - 1) * 100);
+    }
+    if (phase === 'end') {
+      handles.chart.applyOptions({
+        handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+        handleScale: true,
+      });
+      handles.chart.priceScale('right').applyOptions({ autoScale: true });
+    }
+  };
   const last = candles[candles.length - 1];
   const legend: Ohlc | null =
     hovered ??
@@ -288,6 +310,9 @@ export function PriceChart({
           calloutBand={calloutBand}
           liquidity={liquidity}
           priceToValue={convert}
+          range={range}
+          binStepBps={pool.binStepBps}
+          {...(onRangeChange ? { onRangeDrag: dragRange } : {})}
         />
       ) : null}
 

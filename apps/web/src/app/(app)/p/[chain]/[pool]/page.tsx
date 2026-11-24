@@ -32,6 +32,14 @@ const candleLimits = { '5m': 96, '15m': 80, '1h': 64, '4h': 48 } as const;
 
 interface PageProps { params: { chain: string; pool: string } }
 
+async function optional<T>(request: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request;
+  } catch {
+    return fallback;
+  }
+}
+
 function Unavailable() {
   return (
     <section className="mx-auto flex min-h-[55vh] max-w-3xl flex-col justify-center px-gutter py-16">
@@ -58,46 +66,57 @@ export default async function PoolPage({ params }: PageProps) {
   const activeBin = detail.activeBin ?? 0;
   const from = Math.max(-10_000, activeBin - 40);
   const to = Math.min(10_000, activeBin + 40);
-  try {
-    const [stats, pool5m, pool15m, pool1h, pool4h, reference5m, reference15m, reference1h, reference4h, bins, trades, lps, callouts] = await Promise.all([
-      getPoolStats(detail.address),
-      getPoolCandles(detail.address, '5m', candleLimits['5m'], 'pool'),
-      getPoolCandles(detail.address, '15m', candleLimits['15m'], 'pool'),
-      getPoolCandles(detail.address, '1h', candleLimits['1h'], 'pool'),
-      getPoolCandles(detail.address, '4h', candleLimits['4h'], 'pool'),
-      getPoolCandles(detail.address, '5m', candleLimits['5m'], 'reference'),
-      getPoolCandles(detail.address, '15m', candleLimits['15m'], 'reference'),
-      getPoolCandles(detail.address, '1h', candleLimits['1h'], 'reference'),
-      getPoolCandles(detail.address, '4h', candleLimits['4h'], 'reference'),
-      detail.type === 'DLMM' ? getPoolBins(detail.address, from, to) : Promise.resolve({ data: [] }),
-      getPoolTrades(detail.address),
-      getPoolLps(detail.address),
-      getPoolCallouts(detail.address),
-    ]);
-    const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
-    const pool = apiPoolToPool(detail, latest);
-    const liveStats: LivePoolStats = { ...stats, counts: detail.counts };
-    return (
-      <PoolTerminal
-        pool={pool}
-        stats={liveStats}
-        candlesBySource={{
-          pool: {
-            '5m': apiCandlesToChart(pool5m.data), '15m': apiCandlesToChart(pool15m.data),
-            '1h': apiCandlesToChart(pool1h.data), '4h': apiCandlesToChart(pool4h.data),
-          },
-          reference: {
-            '5m': apiCandlesToChart(reference5m.data), '15m': apiCandlesToChart(reference15m.data),
-            '1h': apiCandlesToChart(reference1h.data), '4h': apiCandlesToChart(reference4h.data),
-          },
-        }}
-        liquidity={apiBinsToLiquidity(bins.data, activeBin)}
-        trades={trades.data}
-        lps={lps.data}
-        callouts={callouts.data.map(callout => apiCalloutToCallout(callout, detail, reference15m.data.length > 0 ? reference15m.data : pool15m.data))}
-      />
-    );
-  } catch {
-    return <Unavailable />;
-  }
+  const emptyList: { data: never[] } = { data: [] };
+  const fallbackStats: LivePoolStats = {
+    swapCount: detail.counts.swaps,
+    openPositions: 0,
+    amountIn: '0',
+    amountOut: '0',
+    totalFee: '0',
+    protocolFee: '0',
+    reserveX: detail.reserveX,
+    reserveY: detail.reserveY,
+    reserveUpdatedBlock: detail.reserveUpdatedBlock,
+    reserveUtilizationBps: null,
+    reserveCapStatus: 'unavailable',
+    counts: detail.counts,
+  };
+  const [stats, pool5m, pool15m, pool1h, pool4h, reference5m, reference15m, reference1h, reference4h, bins, trades, lps, callouts] = await Promise.all([
+    optional(getPoolStats(detail.address), fallbackStats),
+    optional(getPoolCandles(detail.address, '5m', candleLimits['5m'], 'pool'), emptyList),
+    optional(getPoolCandles(detail.address, '15m', candleLimits['15m'], 'pool'), emptyList),
+    optional(getPoolCandles(detail.address, '1h', candleLimits['1h'], 'pool'), emptyList),
+    optional(getPoolCandles(detail.address, '4h', candleLimits['4h'], 'pool'), emptyList),
+    optional(getPoolCandles(detail.address, '5m', candleLimits['5m'], 'reference'), emptyList),
+    optional(getPoolCandles(detail.address, '15m', candleLimits['15m'], 'reference'), emptyList),
+    optional(getPoolCandles(detail.address, '1h', candleLimits['1h'], 'reference'), emptyList),
+    optional(getPoolCandles(detail.address, '4h', candleLimits['4h'], 'reference'), emptyList),
+    detail.type === 'DLMM' ? optional(getPoolBins(detail.address, from, to), emptyList) : emptyList,
+    optional(getPoolTrades(detail.address), emptyList),
+    optional(getPoolLps(detail.address), emptyList),
+    optional(getPoolCallouts(detail.address), emptyList),
+  ]);
+  const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
+  const pool = apiPoolToPool(detail, latest);
+  const liveStats: LivePoolStats = { ...stats, counts: detail.counts };
+  return (
+    <PoolTerminal
+      pool={pool}
+      stats={liveStats}
+      candlesBySource={{
+        pool: {
+          '5m': apiCandlesToChart(pool5m.data), '15m': apiCandlesToChart(pool15m.data),
+          '1h': apiCandlesToChart(pool1h.data), '4h': apiCandlesToChart(pool4h.data),
+        },
+        reference: {
+          '5m': apiCandlesToChart(reference5m.data), '15m': apiCandlesToChart(reference15m.data),
+          '1h': apiCandlesToChart(reference1h.data), '4h': apiCandlesToChart(reference4h.data),
+        },
+      }}
+      liquidity={apiBinsToLiquidity(bins.data, activeBin)}
+      trades={trades.data}
+      lps={lps.data}
+      callouts={callouts.data.map(callout => apiCalloutToCallout(callout, detail, reference15m.data.length > 0 ? reference15m.data : pool15m.data))}
+    />
+  );
 }

@@ -81,6 +81,38 @@ export function applyPct(value: number, pct: number): number {
   return value * (1 + pct / 100);
 }
 
+function pctToBinOffset(pct: number, binStepBps: number): number {
+  return Math.round(Math.log1p(pct / 100) / Math.log1p(binStepBps / 10_000));
+}
+
+function binOffsetToPct(offset: number, binStepBps: number): number {
+  return (Math.pow(1 + binStepBps / 10_000, offset) - 1) * 100;
+}
+
+/**
+ * Snaps a manually entered or chart-dragged bound to the pool's bin grid.
+ * The opposite handle remains fixed and the resulting inclusive range never
+ * exceeds PositionManagerV2's 61-bin batch limit.
+ */
+export function snapRangeBound(
+  range: RangeInput,
+  bound: 'minPct' | 'maxPct',
+  requestedPct: number,
+  binStepBps: number,
+): number {
+  if (!Number.isFinite(requestedPct) || binStepBps <= 0) return range[bound];
+  const lower = pctToBinOffset(range.minPct, binStepBps);
+  const upper = pctToBinOffset(range.maxPct, binStepBps);
+  const requested = pctToBinOffset(
+    Math.min(RANGE_LIMITS.maxPct, Math.max(RANGE_LIMITS.minPct, requestedPct)),
+    binStepBps,
+  );
+  const offset = bound === 'minPct'
+    ? Math.min(upper - 1, Math.max(upper - (RANGE_LIMITS.maxBins - 1), requested))
+    : Math.max(lower + 1, Math.min(lower + (RANGE_LIMITS.maxBins - 1), requested));
+  return Number(binOffsetToPct(offset, binStepBps).toFixed(6));
+}
+
 /** Human-readable single-side quote, single-side token, or two-sided label. */
 export function sideLabel(side: RangeSide, tokens: { base: string; quote: string }): string {
   if (side === 'quote') return `Single-side ${tokens.quote}`;

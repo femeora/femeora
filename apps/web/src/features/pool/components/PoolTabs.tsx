@@ -109,14 +109,15 @@ export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: Poo
     `/v1/positions?pool=${encodeURIComponent(pool.address)}&limit=200`,
     ApiIndexedPositionListSchema,
   );
+  const refreshPositions = positionsResource.mutate;
   useEffect(() => {
     const refresh = (event: Event) => {
       const detail = (event as CustomEvent<{ pool?: string }>).detail;
-      if (detail?.pool?.toLowerCase() === pool.address.toLowerCase()) void positionsResource.mutate();
+      if (detail?.pool?.toLowerCase() === pool.address.toLowerCase()) void refreshPositions();
     };
     window.addEventListener('fomeora:pool-update', refresh);
     return () => window.removeEventListener('fomeora:pool-update', refresh);
-  }, [pool.address, positionsResource]);
+  }, [pool.address, refreshPositions]);
   const positions = positionsResource.data?.data ?? [];
   const callouts = [...own, ...canonicalCallouts];
   const ownIds = new Set(own.map(callout => callout.id));
@@ -145,8 +146,8 @@ export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: Poo
         pool={pool}
         positions={positions}
         error={positionsResource.error}
-        isLoading={positionsResource.isLoading}
-        refresh={() => positionsResource.mutate()}
+        isLoading={positionsResource.isLoading && !positionsResource.data}
+        refresh={() => refreshPositions()}
       /> : null}
 
       {tab === 'top-lps' ? (

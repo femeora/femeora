@@ -12,6 +12,7 @@ import { usePositionDraft } from '../hooks/usePositionDraft';
 import type { ValueUnit } from '../model/format';
 import type { LiveLp, LivePoolStats, LiveTrade } from '../model/live';
 import type { Candle, LiquidityBin, Pool } from '../model/pool';
+import { snapRangeBound } from '../model/range';
 
 import { ChartToolbar, INTERVAL_SECONDS, type ChartInterval } from './ChartToolbar';
 import { MarketStrips } from './MarketStrips';
@@ -64,10 +65,17 @@ export function PoolTerminal({
   }, [candlesBySource, chartSource, interval]);
 
   useEffect(() => {
-    const refreshPool = () => {
-      router.refresh();
-      window.dispatchEvent(new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } }));
+    let refreshTimer: number | null = null;
+    const queuePoolRefresh = () => {
+      if (refreshTimer !== null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        router.refresh();
+      }, 500);
     };
+    const positionTopics = new Set([
+      'position.created', 'position.increased', 'position.decreased', 'position.closed', 'position.transferred',
+    ]);
     const stop = openApiEventStream(`/v1/pools/${pool.address}/stream`, {
       onMessage: message => {
         if (message.topic === 'pool.cap') {
@@ -92,18 +100,22 @@ export function PoolTerminal({
             });
           }
         }
-        refreshPool();
+        if (positionTopics.has(message.topic)) {
+          window.dispatchEvent(new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } }));
+        }
+        queuePoolRefresh();
       },
     });
     const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refreshPool();
-    }, 5_000);
+      if (document.visibilityState === 'visible') queuePoolRefresh();
+    }, 30_000);
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshPool();
+      if (document.visibilityState === 'visible') queuePoolRefresh();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       stop();
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
       window.clearInterval(poll);
       document.removeEventListener('visibilitychange', onVisibility);
     };
@@ -144,6 +156,11 @@ export function PoolTerminal({
               liquidity={showBins ? liquidity : []}
               unit={unit}
               range={panelTab === 'create' ? position.draft : null}
+              onRangeChange={(bound, value) => position.dispatch({
+                type: 'range',
+                bound,
+                value: snapRangeBound(position.draft, bound, value, pool.binStepBps),
+              })}
               callouts={own.concat(callouts)}
               showCallouts={showCallouts}
             />

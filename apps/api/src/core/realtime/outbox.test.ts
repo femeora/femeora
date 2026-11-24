@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ConnectionLimiter, formatSseEvent, parseLastEventId, SSE_CONNECTIONS_PER_KEY } from './outbox.js';
+import { ConnectionLimiter, formatSseEvent, parseLastEventId, resolveInitialEventId, SSE_CONNECTIONS_PER_KEY } from './outbox.js';
 
 test('validates Last-Event-ID without accepting signs or non-decimal values', () => {
   assert.equal(parseLastEventId(undefined), null);
@@ -34,4 +34,17 @@ test('caps concurrent SSE connections per limiter key and releases capacity', ()
   assert.equal(limiter.acquire('session:other'), true);
   limiter.release('ip:127.0.0.1');
   assert.equal(limiter.acquire('ip:127.0.0.1'), true);
+});
+
+test('fresh streams start at the latest event instead of replaying backlog', async () => {
+  assert.equal(await resolveInitialEventId(null, async () => 91n), 91n);
+});
+
+test('reconnecting streams preserve Last-Event-ID without querying the latest row', async () => {
+  let queried = false;
+  assert.equal(await resolveInitialEventId(42n, async () => {
+    queried = true;
+    return 91n;
+  }), 42n);
+  assert.equal(queried, false);
 });

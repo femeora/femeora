@@ -6,7 +6,7 @@ import {
   ApiPositionQuoteSchema,
   type ApiPositionQuote,
 } from '@fomeora/types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +23,7 @@ import { executePreparedPosition } from '../model/executePosition';
 import { formatCompactUsd, formatUnit, toUnit, type ValueUnit } from '../model/format';
 import { toContractAmounts } from '../model/orientation';
 import type { Pool } from '../model/pool';
-import { applyPct, PRESETS, pricePosition, sideLabel } from '../model/range';
+import { applyPct, PRESETS, pricePosition, sideLabel, snapRangeBound } from '../model/range';
 
 import { AmountField } from './AmountField';
 import { BinsPreview } from './BinsPreview';
@@ -61,6 +61,19 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     setQuote(null);
     setQuoteError(null);
     setTransactionHash(null);
+  };
+  useEffect(() => {
+    setQuote(null);
+    setQuoteError(null);
+    setTransactionHash(null);
+  }, [draft.minPct, draft.maxPct, draft.shape]);
+  const updateRange = (bound: 'minPct' | 'maxPct', value: number) => {
+    invalidateQuote();
+    dispatch({
+      type: 'range',
+      bound,
+      value: snapRangeBound(draft, bound, value, pool.binStepBps),
+    });
   };
   const requestBody = () => {
     const amounts = toContractAmounts(
@@ -175,7 +188,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
           valueLabel={at(draft.minPct)}
           sliderMin={-90}
           sliderMax={100}
-          onChange={value => { invalidateQuote(); dispatch({ type: 'range', bound: 'minPct', value }); }}
+          onChange={value => updateRange('minPct', value)}
         />
         <RangeField
           label="Max"
@@ -183,9 +196,11 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
           valueLabel={at(draft.maxPct)}
           sliderMin={-90}
           sliderMax={200}
-          onChange={value => { invalidateQuote(); dispatch({ type: 'range', bound: 'maxPct', value }); }}
+          onChange={value => updateRange('maxPct', value)}
         />
       </div>
+
+      <p className="t-label text-faint">Type an exact percentage or drag the MIN and MAX handles directly on the chart.</p>
 
       <p className="t-label flex items-center justify-between text-muted">
         <span className="text-fg">{sideLabel(side, pool)}</span>
