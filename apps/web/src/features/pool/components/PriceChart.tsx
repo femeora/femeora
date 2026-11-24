@@ -8,8 +8,8 @@ import {
 } from 'lightweight-charts';
 import { useEffect, useMemo, useState } from 'react';
 
-import { CandlestickChart } from '@/components/ui/icons';
 import { Avatar } from '@/components/ui/Avatar';
+import { CandlestickChart } from '@/components/ui/icons';
 import { TokenPair } from '@/components/ui/TokenPair';
 import { rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
 import { cn } from '@/lib/cn';
