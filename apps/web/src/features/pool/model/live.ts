@@ -47,7 +47,21 @@ export function activeBinPrice(pool: ApiPoolDetail): number {
   }
 }
 
-export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined): Pool {
+function poolAge(createdAt: string | null | undefined): string | null {
+  if (!createdAt) return null;
+  const milliseconds = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return null;
+  const hours = Math.floor(milliseconds / 3_600_000);
+  if (hours < 1) return `${Math.max(1, Math.floor(milliseconds / 60_000))}m`;
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+export function apiPoolToPool(
+  pool: ApiPoolDetail,
+  latest: ApiCandle | undefined,
+  stats?: ApiPoolStats,
+): Pool {
   const latestPrice = latest ? finiteNumber(latest.close) : 0;
   const baseIsTokenX = pool.baseIsTokenX
     ?? pool.quoteToken?.toLowerCase() === pool.tokenY.toLowerCase();
@@ -71,11 +85,15 @@ export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined
     supply: 1,
     marketCapAvailable: false,
     priceUsd: latestPrice > 0 ? latestPrice : activeBinPrice(pool),
-    change24hPct: null,
-    tvlUsd: null,
-    volume24hUsd: null,
-    fee24hUsd: null,
-    age: null,
+    change24hPct: stats?.change24hPct === null || stats?.change24hPct === undefined
+      ? null : finiteNumber(stats.change24hPct),
+    tvlUsd: stats?.tvlQuote === null || stats?.tvlQuote === undefined
+      ? null : finiteNumber(stats.tvlQuote),
+    volume24hUsd: stats?.volume24hQuote === null || stats?.volume24hQuote === undefined
+      ? null : finiteNumber(stats.volume24hQuote),
+    fee24hUsd: stats?.fee24hQuote === null || stats?.fee24hQuote === undefined
+      ? null : finiteNumber(stats.fee24hQuote),
+    age: poolAge(stats?.createdAt),
     activeBinId: pool.activeBin ?? 0,
   };
 }

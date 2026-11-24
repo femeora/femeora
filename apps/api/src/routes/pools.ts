@@ -1,12 +1,14 @@
 import { prisma } from '@fomeora/database';
 import { PRICE_SCALE, priceFromBinX18, rawUnitsToDecimal, token0Value, token1Value } from '@fomeora/sdk';
 import type { FastifyInstance } from 'fastify';
+import { parseUnits } from 'viem';
 import { z } from 'zod';
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase());
 const poolParamsSchema = z.object({ pool: addressSchema });
 const limitSchema = z.coerce.number().int().min(1).max(200).default(50);
 const CANDLE_INTERVAL_MS = { '1m': 60_000, '5m': 300_000, '15m': 900_000, '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000 } as const;
+const DAY_MS = 86_400_000;
 
 interface SerializedCandle {
   timestamp: string;
@@ -159,6 +161,24 @@ function reserveCapStatus(pool: {
   };
 }
 
+export function baseRawToQuoteRaw(
+  baseRaw: bigint,
+  baseDecimals: number,
+  quoteDecimals: number,
+  quotePerBaseX18: bigint,
+): bigint {
+  if (baseRaw < 0n || quotePerBaseX18 < 0n) throw new Error('NEGATIVE_QUOTE_INPUT');
+  return baseRaw * quotePerBaseX18 * (10n ** BigInt(quoteDecimals))
+    / ((10n ** BigInt(baseDecimals)) * PRICE_SCALE);
+}
+
+function percentageChange(first: string, last: string): string | null {
+  const from = Number(first);
+  const to = Number(last);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from <= 0) return null;
+  return (((to / from) - 1) * 100).toFixed(8);
+}
+
 export async function registerPoolRoutes(app: FastifyInstance, chainId: number) {
   app.get('/v1/pools', async (request, reply) => {
     const parsed = z.object({ limit: limitSchema }).safeParse(request.query);
@@ -202,17 +222,93 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
         reserveCapX: true,
         reserveCapY: true,
         reserveUpdatedBlock: true,
+        tokenX: true,
+        tokenY: true,
+        tokenXDecimals: true,
+        tokenYDecimals: true,
+        quoteToken: true,
+        createdBlock: true,
       },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
-    const [swaps, openPositions] = await Promise.all([
+    const cutoff = new Date(Date.now() - DAY_MS);
+    const [swaps, openPositions, swaps24h, referenceHistory, latestReference, reference24h, createdBlock] = await Promise.all([
       prisma.swap.aggregate({
         where: { poolId: pool.id, canonical: true },
         _count: true,
         _sum: { amountIn: true, amountOut: true, totalFee: true, protocolFee: true },
       }),
       prisma.position.count({ where: { poolId: pool.id, status: 'open', canonical: true } }),
+      prisma.swap.findMany({
+        where: { poolId: pool.id, canonical: true, timestamp: { gte: cutoff } },
+        orderBy: [{ timestamp: 'asc' }, { logIndex: 'asc' }],
+        select: { timestamp: true, tokenIn: true, amountIn: true, totalFee: true },
+      }),
+      prisma.referenceCandle.findMany({
+        where: { poolId: pool.id, interval: '1m', bucketStart: { gte: cutoff } },
+        orderBy: { bucketStart: 'asc' },
+        select: { bucketStart: true, close: true },
+      }),
+      prisma.referenceCandle.findFirst({
+        where: { poolId: pool.id, interval: '1h' },
+        orderBy: { bucketStart: 'desc' },
+      }),
+      prisma.referenceCandle.findFirst({
+        where: { poolId: pool.id, interval: '1h', bucketStart: { lte: cutoff } },
+        orderBy: { bucketStart: 'desc' },
+      }),
+      prisma.canonicalBlock.findFirst({
+        where: { chainId, blockNumber: pool.createdBlock, canonical: true },
+        select: { timestamp: true },
+      }),
     ]);
+    const quote = pool.quoteToken?.toLowerCase();
+    const quoteIsY = quote === pool.tokenY.toLowerCase();
+    const quoteIsX = quote === pool.tokenX.toLowerCase();
+    const decimalsAvailable = pool.tokenXDecimals !== null && pool.tokenYDecimals !== null;
+    const baseDecimals = quoteIsY ? pool.tokenXDecimals : pool.tokenYDecimals;
+    const quoteDecimals = quoteIsY ? pool.tokenYDecimals : pool.tokenXDecimals;
+    const latestPriceX18 = latestReference ? parseUnits(latestReference.close.toString(), 18) : null;
+    const canValue = (quoteIsX || quoteIsY) && decimalsAvailable
+      && baseDecimals !== null && quoteDecimals !== null && latestPriceX18 !== null;
+    const reserveBase = quoteIsY ? pool.reserveX : pool.reserveY;
+    const reserveQuote = quoteIsY ? pool.reserveY : pool.reserveX;
+    const tvlRaw = canValue && reserveBase && reserveQuote
+      ? BigInt(reserveQuote.toString()) + baseRawToQuoteRaw(
+          BigInt(reserveBase.toString()), baseDecimals, quoteDecimals, latestPriceX18,
+        )
+      : null;
+    let volume24hRaw = 0n;
+    let fee24hRaw = 0n;
+    let feeAvailable = canValue;
+    if (canValue) {
+      let referenceIndex = 0;
+      for (const swap of swaps24h) {
+        while (
+          referenceIndex + 1 < referenceHistory.length
+          && referenceHistory[referenceIndex + 1]!.bucketStart <= swap.timestamp
+        ) referenceIndex += 1;
+        const referenceAtSwap = referenceHistory[referenceIndex];
+        const priceX18 = referenceAtSwap && referenceAtSwap.bucketStart <= swap.timestamp
+          ? parseUnits(referenceAtSwap.close.toString(), 18)
+          : latestPriceX18;
+        const tokenInIsQuote = swap.tokenIn.toLowerCase() === quote;
+        const tokenInIsBase = swap.tokenIn.toLowerCase() === (quoteIsY ? pool.tokenX : pool.tokenY).toLowerCase();
+        if (!tokenInIsQuote && !tokenInIsBase) continue;
+        const amountIn = BigInt(swap.amountIn.toString());
+        volume24hRaw += tokenInIsQuote
+          ? amountIn
+          : baseRawToQuoteRaw(amountIn, baseDecimals, quoteDecimals, priceX18);
+        if (swap.totalFee === null) {
+          feeAvailable = false;
+          continue;
+        }
+        const fee = BigInt(swap.totalFee.toString());
+        fee24hRaw += tokenInIsQuote
+          ? fee
+          : baseRawToQuoteRaw(fee, baseDecimals, quoteDecimals, priceX18);
+      }
+    }
     return {
       swapCount: swaps._count,
       openPositions,
@@ -221,6 +317,19 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       totalFee: swaps._sum.totalFee?.toString() ?? '0',
       protocolFee: swaps._sum.protocolFee?.toString() ?? '0',
       ...reserveCapStatus(pool),
+      change24hPct: latestReference && reference24h
+        ? percentageChange(reference24h.close.toString(), latestReference.close.toString())
+        : null,
+      tvlQuote: tvlRaw === null || quoteDecimals === null
+        ? null
+        : rawUnitsToDecimal(tvlRaw, quoteDecimals, 18),
+      volume24hQuote: !canValue || quoteDecimals === null
+        ? null
+        : rawUnitsToDecimal(volume24hRaw, quoteDecimals, 18),
+      fee24hQuote: !feeAvailable || quoteDecimals === null
+        ? null
+        : rawUnitsToDecimal(fee24hRaw, quoteDecimals, 18),
+      createdAt: createdBlock?.timestamp.toISOString() ?? null,
     };
   });
 

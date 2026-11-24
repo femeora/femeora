@@ -4,7 +4,7 @@ import { TokenIcon } from '@/components/ui/TokenPair';
 import { cn } from '@/lib/cn';
 import { tokenMeta } from '@/lib/tokens';
 
-import { formatCompactUsd, formatPct, formatUnit, toUnit } from '../model/format';
+import { formatPct, formatUnit, formatUsdMetric, toUnit } from '../model/format';
 import type { Pool } from '../model/pool';
 
 interface Stat {
@@ -29,9 +29,9 @@ function poolStats(pool: Pool): Stat[] {
         ? {}
         : { tone: pool.change24hPct >= 0 ? 'up' as const : 'down' as const }),
     },
-    { label: 'TVL', value: available(pool.tvlUsd, formatCompactUsd) },
-    { label: '24h Vol', value: available(pool.volume24hUsd, formatCompactUsd) },
-    { label: '24h Fee', value: available(pool.fee24hUsd, formatCompactUsd) },
+    { label: 'TVL', value: available(pool.tvlUsd, formatUsdMetric) },
+    { label: '24h Vol', value: available(pool.volume24hUsd, formatUsdMetric) },
+    { label: '24h Fee', value: available(pool.fee24hUsd, formatUsdMetric) },
     {
       label: 'Fees / TVL',
       value: pool.fee24hUsd === null || pool.tvlUsd === null || pool.tvlUsd === 0

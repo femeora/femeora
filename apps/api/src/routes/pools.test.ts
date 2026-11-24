@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { binQuoteValues, serializePool } from './pools.js';
+import { baseRawToQuoteRaw, binQuoteValues, serializePool } from './pools.js';
 
 const tokenX = '0x0000000000000000000000000000000000000001';
 const tokenY = '0x0000000000000000000000000000000000000002';
@@ -77,4 +77,14 @@ test('bin quote values are unavailable without canonical quote metadata', () => 
   }, { binId: 0, reserveX: unit, reserveY: unit }), {
     priceQuote: null, depthQuote: null, side: 'active',
   });
+});
+
+test('values base raw units into quote raw units with differing decimals', () => {
+  const quote = baseRawToQuoteRaw(
+    1_000000000000000000n,
+    18,
+    6,
+    1_687_053_100_000_000_000_000n,
+  );
+  assert.equal(quote, 1_687_053100n);
 });

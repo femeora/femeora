@@ -40,4 +40,9 @@ export function formatTokenAmount(amount: number): string {
   return amount.toLocaleString('en-US', { maximumFractionDigits: amount < 1 ? 6 : 2 });
 }
 
+export function formatUsdMetric(value: number): string {
+  if (value !== 0 && Math.abs(value) < 0.01) return value < 0 ? '>-$0.01' : '<$0.01';
+  return formatCompactUsd(value);
+}
+
 export { formatCompactUsd };

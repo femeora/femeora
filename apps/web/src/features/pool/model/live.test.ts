@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ApiPoolDetail } from '@/lib/api/types';
+import type { ApiPoolDetail, ApiPoolStats } from '@/lib/api/types';
 
 import { activeBinPrice, apiPoolToPool } from './live';
 
@@ -59,4 +59,31 @@ test('orients a token-Y base pool as WETH / USDG', () => {
   assert.equal(reversed.quote, 'USDG');
   assert.equal(reversed.baseAddress, pool.tokenX);
   assert.equal(reversed.quoteAddress, pool.tokenY);
+});
+
+test('maps canonical windowed stats into pool header metrics', () => {
+  const stats: ApiPoolStats = {
+    swapCount: 2,
+    openPositions: 0,
+    amountIn: '1',
+    amountOut: '1',
+    totalFee: '1',
+    protocolFee: '0',
+    reserveX: '1',
+    reserveY: '1',
+    reserveUpdatedBlock: '1',
+    reserveUtilizationBps: 0,
+    reserveCapStatus: 'normal',
+    change24hPct: '-4.71957457',
+    tvlQuote: '0.019648',
+    volume24hQuote: '0.0401',
+    fee24hQuote: '0.00012',
+    createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+  };
+  const mapped = apiPoolToPool(pool, undefined, stats);
+  assert.equal(mapped.change24hPct, -4.71957457);
+  assert.equal(mapped.tvlUsd, 0.019648);
+  assert.equal(mapped.volume24hUsd, 0.0401);
+  assert.equal(mapped.fee24hUsd, 0.00012);
+  assert.equal(mapped.age, '1h');
 });

@@ -105,7 +105,7 @@ export function ChartToolbar({
         value={showBins ? 'on' : 'off'}
         onChange={value => onShowBinsChange(value === 'on')}
       />
-      <p className="t-label ml-auto hidden text-faint lg:block">
+      <p className="t-label ml-auto hidden text-[0.6875rem] text-faint lg:block">
         Drag to pan · scroll or pinch to zoom
       </p>
     </div>

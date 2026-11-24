@@ -81,6 +81,11 @@ export default async function PoolPage({ params }: PageProps) {
     reserveUpdatedBlock: detail.reserveUpdatedBlock,
     reserveUtilizationBps: null,
     reserveCapStatus: 'unavailable',
+    change24hPct: null,
+    tvlQuote: null,
+    volume24hQuote: null,
+    fee24hQuote: null,
+    createdAt: null,
     counts: detail.counts,
   };
   const [stats, pool5m, pool15m, pool1h, pool4h, reference5m, reference15m, reference1h, reference4h, bins, trades, lps, callouts] = await Promise.all([
@@ -99,7 +104,7 @@ export default async function PoolPage({ params }: PageProps) {
     optional(getPoolCallouts(detail.address), emptyList),
   ]);
   const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
-  const pool = apiPoolToPool(detail, latest);
+  const pool = apiPoolToPool(detail, latest, stats);
   const liveStats: LivePoolStats = { ...stats, counts: detail.counts };
   return (
     <PoolTerminal

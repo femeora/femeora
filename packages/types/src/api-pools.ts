@@ -4,6 +4,7 @@ const AddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
 const HashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 const IntegerStringSchema = z.string().regex(/^\d+$/);
 const DecimalStringSchema = z.string().regex(/^\d+(?:\.\d+)?$/);
+const SignedDecimalStringSchema = z.string().regex(/^-?\d+(?:\.\d+)?$/);
 
 export const ApiPoolAssetSchema = z.object({
   address: AddressSchema,
@@ -104,6 +105,11 @@ export const ApiPoolStatsSchema = z.object({
   reserveUpdatedBlock: IntegerStringSchema.nullable(),
   reserveUtilizationBps: z.number().int().nonnegative().nullable(),
   reserveCapStatus: z.enum(['normal', 'warning', 'critical', 'unavailable']),
+  change24hPct: SignedDecimalStringSchema.nullable(),
+  tvlQuote: DecimalStringSchema.nullable(),
+  volume24hQuote: DecimalStringSchema.nullable(),
+  fee24hQuote: DecimalStringSchema.nullable(),
+  createdAt: z.string().datetime().nullable(),
 });
 export type ApiPoolStats = z.infer<typeof ApiPoolStatsSchema>;
 

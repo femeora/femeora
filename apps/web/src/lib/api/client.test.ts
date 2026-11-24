@@ -17,6 +17,11 @@ const validStats = {
   reserveUpdatedBlock: '123',
   reserveUtilizationBps: 8000,
   reserveCapStatus: 'warning',
+  change24hPct: '-4.5',
+  tvlQuote: '123.45',
+  volume24hQuote: '67.89',
+  fee24hQuote: '0.12',
+  createdAt: '2026-11-24T00:00:00.000Z',
 };
 
 test('browser API client uses only the same-origin proxy and validates responses', async () => {
