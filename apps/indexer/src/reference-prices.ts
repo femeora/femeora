@@ -12,9 +12,15 @@ const aggregatorV3Abi = [
       { type: 'uint80' }, { type: 'int256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint80' },
     ],
   },
+  {
+    type: 'function', name: 'getRoundData', stateMutability: 'view', inputs: [{ type: 'uint80' }],
+    outputs: [
+      { type: 'uint80' }, { type: 'int256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint80' },
+    ],
+  },
 ] as const;
 
-const INTERVALS = {
+export const REFERENCE_INTERVALS = {
   '1m': 60_000,
   '5m': 300_000,
   '15m': 900_000,
@@ -22,6 +28,21 @@ const INTERVALS = {
   '4h': 14_400_000,
   '1d': 86_400_000,
 } as const;
+
+export interface ReferenceObservation {
+  readonly answer: bigint;
+  readonly updatedAt: Date;
+}
+
+export interface ReferenceCandleValue {
+  readonly interval: string;
+  readonly bucketStart: Date;
+  readonly open: string;
+  readonly high: string;
+  readonly low: string;
+  readonly close: string;
+  readonly sourceUpdatedAt: Date;
+}
 
 function power10(exponent: number): bigint {
   return 10n ** BigInt(exponent);
@@ -39,6 +60,67 @@ export function pairPriceX18(
 
 function bucket(timestamp: Date, milliseconds: number): Date {
   return new Date(Math.floor(timestamp.getTime() / milliseconds) * milliseconds);
+}
+
+export function buildHistoricalReferenceCandles(
+  baseObservations: readonly ReferenceObservation[],
+  baseDecimals: number,
+  quoteObservations: readonly ReferenceObservation[],
+  quoteDecimals: number,
+  from: Date,
+  to: Date,
+): ReferenceCandleValue[] {
+  const events = [
+    ...baseObservations.map(value => ({ side: 'base' as const, value })),
+    ...quoteObservations.map(value => ({ side: 'quote' as const, value })),
+  ].sort((a, b) => a.value.updatedAt.getTime() - b.value.updatedAt.getTime());
+  const candles = new Map<string, {
+    interval: string;
+    bucketStart: Date;
+    open: bigint;
+    high: bigint;
+    low: bigint;
+    close: bigint;
+    sourceUpdatedAt: Date;
+  }>();
+  let base: ReferenceObservation | undefined;
+  let quote: ReferenceObservation | undefined;
+
+  for (const event of events) {
+    if (event.side === 'base') base = event.value;
+    else quote = event.value;
+    if (!base || !quote || event.value.updatedAt < from || event.value.updatedAt >= to) continue;
+    const price = pairPriceX18(base.answer, baseDecimals, quote.answer, quoteDecimals);
+    for (const [interval, milliseconds] of Object.entries(REFERENCE_INTERVALS)) {
+      const bucketStart = bucket(event.value.updatedAt, milliseconds);
+      const key = `${interval}:${bucketStart.toISOString()}`;
+      const existing = candles.get(key);
+      candles.set(key, existing
+        ? {
+            ...existing,
+            high: existing.high > price ? existing.high : price,
+            low: existing.low < price ? existing.low : price,
+            close: price,
+            sourceUpdatedAt: event.value.updatedAt,
+          }
+        : {
+            interval,
+            bucketStart,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            sourceUpdatedAt: event.value.updatedAt,
+          });
+    }
+  }
+  return [...candles.values()].map(candle => ({
+    ...candle,
+    open: rawUnitsToDecimal(candle.open, 18, 18),
+    high: rawUnitsToDecimal(candle.high, 18, 18),
+    low: rawUnitsToDecimal(candle.low, 18, 18),
+    close: rawUnitsToDecimal(candle.close, 18, 18),
+  }));
 }
 
 export async function refreshReferenceCandles(
@@ -90,7 +172,7 @@ export async function refreshReferenceCandles(
       : pairPriceX18(y.answer, y.decimals, x.answer, x.decimals);
     const price = rawUnitsToDecimal(priceX18, 18, 18);
     const sourceUpdatedAt = x.updatedAt < y.updatedAt ? x.updatedAt : y.updatedAt;
-    for (const [interval, milliseconds] of Object.entries(INTERVALS)) {
+    for (const [interval, milliseconds] of Object.entries(REFERENCE_INTERVALS)) {
       const bucketStart = bucket(now, milliseconds);
       const existing = await prisma.referenceCandle.findUnique({
         where: { poolId_interval_bucketStart: { poolId: pool.id, interval, bucketStart } },
