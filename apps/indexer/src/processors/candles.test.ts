@@ -76,6 +76,16 @@ test('uses post-swap active-bin price so opposite directions at one bin stay fla
   assert.equal(candle.close, '1');
 });
 
+test('active-bin candle price is independent from differing token decimals', () => {
+  const candles = projectCandles([{
+    timestamp: new Date('2026-11-23T10:07:01.000Z'), blockNumber: 1n, transactionIndex: 0, logIndex: 0,
+    tokenIn: pool.tokenX, amountIn: '1000000000000000000', amountOut: '1000000', activeBinAfter: 0,
+  }], pool);
+  const candle = candles.find(item => item.interval === '1m')!;
+  assert.equal(candle.open, '1');
+  assert.equal(candle.close, '1');
+});
+
 test('uses exact DAMM post-swap reserve ratio instead of execution price', () => {
   const dammPool = { ...pool, tokenYDecimals: 18, type: 'DAMM' };
   const candles = projectCandles([{

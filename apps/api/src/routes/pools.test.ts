@@ -49,6 +49,16 @@ test('bin quote depth values both sides when token Y is quote', () => {
   assert.deepEqual(above, { priceQuote: '1.01', depthQuote: '2.02', side: 'base' });
 });
 
+test('bin display price is independent from differing token decimals', () => {
+  const value = binQuoteValues({
+    tokenX, tokenY, quoteToken: tokenY,
+    tokenXDecimals: 18, tokenYDecimals: 6, binStep: 100, activeBin: 0,
+  }, { binId: 0, reserveX: 2n * 10n ** 18n, reserveY: 3n * 10n ** 6n });
+
+  assert.equal(value.priceQuote, '1');
+  assert.equal(value.depthQuote, '5');
+});
+
 test('bin quote depth is inverted when token X is quote', () => {
   const value = binQuoteValues({
     tokenX, tokenY, quoteToken: tokenX,

@@ -78,7 +78,9 @@ function execution(swap: CandleSwap, pool: CandlePool) {
       / (BigInt(swap.reserveXAfter) * 10n ** BigInt(pool.tokenYDecimals))
     : null;
   const priceX18 = pool.type === 'DLMM' && swap.activeBinAfter !== null && swap.activeBinAfter !== undefined && pool.binStep
-    ? priceFromBinX18(swap.activeBinAfter, pool.binStep) * 10n ** BigInt(pool.tokenXDecimals) / 10n ** BigInt(pool.tokenYDecimals)
+    // BinPriceMath is a whole-token tokenY/tokenX price. Decimal normalization
+    // is already handled by swap execution and reserve accounting paths.
+    ? priceFromBinX18(swap.activeBinAfter, pool.binStep)
     : dammPriceX18 ?? executionPriceX18;
   if (priceX18 === 0n) return null;
   return {

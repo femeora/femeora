@@ -8,7 +8,10 @@ export const runtime = 'nodejs';
 const MAX_BODY_BYTES = 1_000_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const SEGMENT = /^[A-Za-z0-9._~-]+$/;
-const FORWARDED_REQUEST_HEADERS = ['accept', 'content-type', 'cookie', 'last-event-id'] as const;
+// The API enforces the browser origin on every mutation. Keep the original
+// browser Origin intact so same-origin /api writes can pass that check while
+// cross-origin requests remain rejectable by the API.
+const FORWARDED_REQUEST_HEADERS = ['accept', 'content-type', 'cookie', 'last-event-id', 'origin'] as const;
 const FORWARDED_RESPONSE_HEADERS = [
   'cache-control',
   'content-type',

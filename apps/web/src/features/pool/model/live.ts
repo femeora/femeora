@@ -1,3 +1,7 @@
+import { PRICE_SCALE, priceFromBinX18, rawUnitsToDecimal } from '@fomeora/sdk';
+
+import type { Pool } from './pool';
+
 import type {
   ApiBin,
   ApiCandle,
@@ -7,8 +11,6 @@ import type {
   ApiTrade,
 } from '@/lib/api/types';
 import { tokenSymbol } from '@/lib/tokens';
-
-import type { Pool } from './pool';
 
 export interface LivePoolStats extends ApiPoolStats {
   counts: ApiPoolDetail['counts'];
@@ -26,7 +28,27 @@ function finiteNumber(value: string, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * DLMM pools have an authoritative price before their first swap/candle: the
+ * active-bin price. This keeps new pools usable without inventing market data.
+ */
+export function activeBinPrice(pool: ApiPoolDetail): number {
+  if (pool.type !== 'DLMM' || pool.activeBin === null || pool.binStep <= 0) return 0;
+  try {
+    const tokenYPerTokenX = priceFromBinX18(pool.activeBin, pool.binStep);
+    const baseIsTokenX = pool.baseIsTokenX
+      ?? pool.quoteToken?.toLowerCase() === pool.tokenY.toLowerCase();
+    const oriented = baseIsTokenX
+      ? tokenYPerTokenX
+      : PRICE_SCALE * PRICE_SCALE / tokenYPerTokenX;
+    return finiteNumber(rawUnitsToDecimal(oriented, 18, 18));
+  } catch {
+    return 0;
+  }
+}
+
 export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined): Pool {
+  const latestPrice = latest ? finiteNumber(latest.close) : 0;
   return {
     address: pool.address,
     tokenX: pool.tokenX,
@@ -39,7 +61,7 @@ export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined
     baseFeeBps: pool.baseFeePips / 100,
     supply: 1,
     marketCapAvailable: false,
-    priceUsd: latest ? finiteNumber(latest.close) : 0,
+    priceUsd: latestPrice > 0 ? latestPrice : activeBinPrice(pool),
     change24hPct: null,
     tvlUsd: null,
     volume24hUsd: null,

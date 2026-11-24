@@ -95,19 +95,19 @@ export function binQuoteValues(pool: {
   }
   const priceX18 = priceFromBinX18(bin.binId, pool.binStep);
   if (quoteIsY) {
-    const displayPrice = priceX18 * 10n ** BigInt(pool.tokenXDecimals) / 10n ** BigInt(pool.tokenYDecimals);
     const depth = token1Value(bin.reserveX, bin.reserveY, priceX18, pool.tokenXDecimals, pool.tokenYDecimals);
     return {
-      priceQuote: rawUnitsToDecimal(displayPrice, 18, 18),
+      // BinPriceMath is already expressed as whole tokenY per whole tokenX.
+      // Token decimals are used for reserve conversion, not for display price.
+      priceQuote: rawUnitsToDecimal(priceX18, 18, 18),
       depthQuote: rawUnitsToDecimal(depth, pool.tokenYDecimals, 18),
       side,
     };
   }
   const inverseX18 = PRICE_SCALE * PRICE_SCALE / priceX18;
-  const displayPrice = inverseX18 * 10n ** BigInt(pool.tokenYDecimals) / 10n ** BigInt(pool.tokenXDecimals);
   const depth = token0Value(bin.reserveX, bin.reserveY, priceX18, pool.tokenXDecimals, pool.tokenYDecimals);
   return {
-    priceQuote: rawUnitsToDecimal(displayPrice, 18, 18),
+    priceQuote: rawUnitsToDecimal(inverseX18, 18, 18),
     depthQuote: rawUnitsToDecimal(depth, pool.tokenXDecimals, 18),
     side,
   };

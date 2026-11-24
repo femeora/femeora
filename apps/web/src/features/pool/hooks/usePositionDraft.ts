@@ -3,8 +3,6 @@
 import { CalloutCaptionSchema } from '@fomeora/types';
 import { useMemo, useReducer } from 'react';
 
-import type { BinShape } from '@/types/callout';
-
 import type { Pool } from '../model/pool';
 import {
   binCount,
@@ -14,6 +12,8 @@ import {
   type Preset,
   type RangeSide,
 } from '../model/range';
+
+import type { BinShape } from '@/types/callout';
 
 export const CAPTION_MAX = 280;
 /** Counter turns amber here (brief 5.4.1). */
@@ -109,6 +109,9 @@ export function usePositionDraft(pool: Pool) {
     const quote = needs.quote ? toAmount(draft.quoteAmount) : 0;
     const base = needs.base ? toAmount(draft.baseAmount) : 0;
     const depositUsd = quote + base * pool.priceUsd;
+    const hasRequiredAmounts = pool.type === 'DAMM'
+      ? quote > 0 && base > 0
+      : (!needs.quote || quote > 0) && (!needs.base || base > 0);
 
     const caption = CalloutCaptionSchema.safeParse(draft.caption);
     const captionError =
@@ -118,7 +121,11 @@ export function usePositionDraft(pool: Pool) {
 
     const error =
       (pool.type === 'DAMM' ? null : rangeError(draft, pool.binStepBps)) ??
-      (pool.type === 'DAMM' && (quote <= 0 || base <= 0) ? 'Enter both token amounts' : depositUsd <= 0 ? 'Enter an amount' : null) ??
+      (!hasRequiredAmounts
+        ? pool.type === 'DAMM' || (needs.quote && needs.base)
+          ? 'Enter both token amounts'
+          : `Enter ${needs.quote ? pool.quote : pool.base} amount`
+        : null) ??
       captionError;
 
     return {
