@@ -47,27 +47,45 @@ await writeFile(
   'utf8',
 );
 
-const manifestPath = resolve(contractsRoot, 'deployments/testnet.json');
-const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-if (manifest.chainId !== 46_630 || manifest.network !== 'testnet') {
-  throw new Error('Unexpected testnet deployment manifest');
+const expectedNetworks = [
+  { network: 'testnet', chainId: 46_630 },
+  { network: 'mainnet', chainId: 4_663 },
+];
+
+const deployments = [];
+for (const expected of expectedNetworks) {
+  const manifestPath = resolve(contractsRoot, `deployments/${expected.network}.json`);
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  if (manifest.chainId !== expected.chainId || manifest.network !== expected.network) {
+    throw new Error(`Unexpected ${expected.network} deployment manifest`);
+  }
+  if (!Number.isSafeInteger(manifest.deploymentStartBlock) || manifest.deploymentStartBlock < 0) {
+    throw new Error(`Invalid deployment start block: ${expected.network}`);
+  }
+
+  const addresses = Object.fromEntries(
+    deploymentKeys.map((key) => {
+      const value = manifest[key];
+      if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(value)) {
+        throw new Error(`Invalid deployment address: ${expected.network}.${key}`);
+      }
+      return [key, value];
+    }),
+  );
+  deployments.push({ ...expected, addresses, deploymentStartBlock: manifest.deploymentStartBlock });
 }
 
-const addresses = Object.fromEntries(
-  deploymentKeys.map((key) => {
-    const value = manifest[key];
-    if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(value)) {
-      throw new Error(`Invalid deployment address: ${key}`);
-    }
-    return [key, value];
-  }),
-);
+const deploymentEntries = deployments
+  .map(
+    ({ chainId, addresses }) =>
+      `  [${chainId}]: ${JSON.stringify(addresses, null, 2).replaceAll('\n', '\n  ')},`,
+  )
+  .join('\n');
+const startBlockEntries = deployments
+  .map(({ chainId, deploymentStartBlock }) => `  [${chainId}]: ${BigInt(deploymentStartBlock)}n,`)
+  .join('\n');
 
-const deploymentSource = `${generatedHeader}export const fomeoraDeployments = {\n  [${manifest.chainId}]: ${JSON.stringify(
-  addresses,
-  null,
-  2,
-).replaceAll('\n', '\n  ')},\n} as const;\n\nexport const fomeoraDeploymentStartBlocks = {\n  [${manifest.chainId}]: ${BigInt(manifest.deploymentStartBlock)}n,\n} as const;\n\nexport type FomeoraChainId = keyof typeof fomeoraDeployments;\nexport type FomeoraDeployment = (typeof fomeoraDeployments)[FomeoraChainId];\n\nconst deploymentsByChainId: Readonly<Partial<Record<number, FomeoraDeployment>>> = fomeoraDeployments;\nconst startBlocksByChainId: Readonly<Partial<Record<number, bigint>>> = fomeoraDeploymentStartBlocks;\n\nexport function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = deploymentsByChainId[chainId];\n  if (!deployment) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return deployment;\n}\n\nexport function getFomeoraDeploymentStartBlock(chainId: number): bigint {\n  const startBlock = startBlocksByChainId[chainId];\n  if (startBlock === undefined) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return startBlock;\n}\n`;
+const deploymentSource = `${generatedHeader}export const fomeoraDeployments = {\n${deploymentEntries}\n} as const;\n\nexport const fomeoraDeploymentStartBlocks = {\n${startBlockEntries}\n} as const;\n\nexport type FomeoraChainId = keyof typeof fomeoraDeployments;\nexport type FomeoraDeployment = (typeof fomeoraDeployments)[FomeoraChainId];\n\nconst deploymentsByChainId: Readonly<Partial<Record<number, FomeoraDeployment>>> = fomeoraDeployments;\nconst startBlocksByChainId: Readonly<Partial<Record<number, bigint>>> = fomeoraDeploymentStartBlocks;\n\nexport function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = deploymentsByChainId[chainId];\n  if (!deployment) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return deployment;\n}\n\nexport function getFomeoraDeploymentStartBlock(chainId: number): bigint {\n  const startBlock = startBlocksByChainId[chainId];\n  if (startBlock === undefined) throw new Error(\`Fomeora is not deployed on chain \${chainId}\`);\n  return startBlock;\n}\n`;
 
 const deploymentSourceWithOptionalLookup = deploymentSource.replace(
   'export function getFomeoraDeployment(chainId: number): FomeoraDeployment {\n  const deployment = deploymentsByChainId[chainId];',

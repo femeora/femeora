@@ -11,10 +11,21 @@ export const fomeoraDeployments = {
     "feeSplitter": "0x641Da4A49715534400081A884F6ccc83c4692636",
     "dlmmLens": "0xE9B65506A564845857d290a6B1443EdAE24c14d0"
   },
+  [4663]: {
+    "poolRegistry": "0xF0D70f849Ce71748643e95fDC8F8aDCd73e1dD3C",
+    "poolFactory": "0x9250b27a4116D031d932251B44EC67c1F8390c20",
+    "dammPoolDeployer": "0xd74dE83c5900C6526b3A206ee0063Ff0e53FbF6C",
+    "dlmmPoolV2Deployer": "0x514bf0b69ADCABe39A82C79220ace8686F15D46E",
+    "positionManagerV2": "0x873573a41E0a8cBde1C773065fEe27c30b743777",
+    "swapRouter": "0xC9798a7F38FEeB0A98A8739ee3921D5759ccf54f",
+    "feeSplitter": "0xa477AC4712C5847218768D42127ac5a8287A7FaD",
+    "dlmmLens": "0x9E5463DD55aC3c5F24912aD388e07C98F18B4c79"
+  },
 } as const;
 
 export const fomeoraDeploymentStartBlocks = {
   [46630]: 156689900n,
+  [4663]: 121869016n,
 } as const;
 
 export type FomeoraChainId = keyof typeof fomeoraDeployments;
