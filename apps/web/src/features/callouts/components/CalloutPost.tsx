@@ -24,10 +24,12 @@ interface CalloutPostProps {
   callout: Callout;
   /** Marks the signed-in user's own callouts. */
   own?: boolean;
+  onChanged?: () => void;
 }
 
 /** A callout in a list: caller, caption, position card, update thread, actions. */
-export function CalloutPost({ callout, own = false }: CalloutPostProps) {
+export function CalloutPost({ callout, own = false, onChanged }: CalloutPostProps) {
+  const [deleted, setDeleted] = useState(false);
   const [captionOpen, setCaptionOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [following, setFollowing] = useState(callout.viewer.following);
@@ -60,6 +62,8 @@ export function CalloutPost({ callout, own = false }: CalloutPostProps) {
       setFollowPending(false);
     }
   };
+
+  if (deleted) return null;
 
   return (
     <article
@@ -124,7 +128,7 @@ export function CalloutPost({ callout, own = false }: CalloutPostProps) {
           </ol>
         ) : null}
 
-        <CalloutActions callout={callout} />
+        <CalloutActions callout={callout} own={own} {...(onChanged ? { onChanged } : {})} onCalloutDeleted={() => setDeleted(true)} />
       </div>
     </article>
   );

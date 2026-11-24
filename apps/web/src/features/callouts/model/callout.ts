@@ -4,6 +4,7 @@ import type { BinShape, RangeStatus, Span } from '@/types/callout';
 
 /** Identity from Sign in with X (brief 4.1). */
 export interface Caller {
+  id: string;
   handle: string;
   name: string;
   initials: string;

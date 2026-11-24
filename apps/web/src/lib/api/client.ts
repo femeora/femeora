@@ -14,12 +14,14 @@ export async function browserApiRequest<T>(
   options: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown } = {},
 ): Promise<T> {
   if (!path.startsWith('/v1/')) throw new BrowserApiError(400, 'INVALID_API_PATH');
+  const method = options.method ?? 'GET';
+  const mutation = method !== 'GET';
   const response = await fetch(`/api${path}`, {
-    method: options.method ?? 'GET',
+    method,
     credentials: 'same-origin',
     headers: {
       accept: 'application/json',
-      ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...(mutation ? { 'content-type': 'application/json' } : {}),
     },
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });

@@ -16,6 +16,7 @@ const CALLOUTS_PER_HOUR = 10;
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase());
 const calloutParamsSchema = z.object({ id: z.string().uuid() });
 const updateParamsSchema = z.object({ id: z.string().uuid(), updateId: z.string().uuid() });
+const replyParamsSchema = z.object({ id: z.string().uuid(), replyId: z.string().uuid() });
 const positionIdSchema = z.string().regex(/^[0-9]+$/).transform(value => BigInt(value));
 const captionSchema = z.string().max(280).transform(value => value.trim());
 const intentSchema = z.object({
@@ -313,6 +314,15 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
       data: { deletedAt: new Date(), status: 'deleted' },
     });
     if (updated.count !== 1) return reply.status(404).send({ error: 'CALLOUT_NOT_FOUND' });
+    await prisma.outboxEvent.create({
+      data: {
+        dedupKey: `callout.deleted:${params.data.id}:${randomUUID()}`,
+        topic: 'callout.update',
+        aggregateId: params.data.id,
+        chainId,
+        payload: { id: params.data.id, status: 'deleted' },
+      },
+    });
     return reply.status(204).send();
   });
 
@@ -422,5 +432,27 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
       return transaction.viewDaily.count({ where: { calloutId: callout.id } });
     });
     return { views };
+  });
+
+  app.delete('/v1/callouts/:id/replies/:replyId', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (request, reply) => {
+    const session = await requireSession(request, reply);
+    if (!session) return;
+    const params = replyParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'INVALID_REPLY_ID' });
+    const callout = await findVisibleCallout(params.data.id, chainId);
+    if (!callout) return reply.status(404).send({ error: 'CALLOUT_NOT_FOUND' });
+    const removed = await prisma.$transaction(async transaction => {
+      const row = await transaction.reply.findFirst({
+        where: { id: params.data.replyId, calloutId: callout.id, userId: session.userId, hidden: false },
+        select: { id: true, kind: true },
+      });
+      if (!row) return null;
+      await transaction.reply.updateMany({ where: { parentId: row.id }, data: { parentId: null } });
+      await transaction.reply.delete({ where: { id: row.id } });
+      await createStatsEvent(transaction, callout.id, chainId, `${row.kind}.removed`);
+      return row;
+    });
+    if (!removed) return reply.status(404).send({ error: 'REPLY_NOT_FOUND_OR_NOT_OWNED' });
+    return reply.status(204).send();
   });
 }

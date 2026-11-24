@@ -77,6 +77,7 @@ export function apiCalloutToCallout(
     id: callout.id,
     createdAt: callout.createdAt,
     caller: {
+      id: callout.user.id,
       handle,
       name: callout.user.name ?? handle,
       initials,
@@ -122,6 +123,7 @@ export function apiCalloutToCallout(
       body: comment.body,
       createdAt: comment.createdAt,
       caller: {
+        id: comment.user.id,
         handle: comment.user.handle.replace(/^@/, ''),
         name: comment.user.name ?? comment.user.handle,
         initials: (comment.user.name ?? comment.user.handle).slice(0, 2).toUpperCase(),

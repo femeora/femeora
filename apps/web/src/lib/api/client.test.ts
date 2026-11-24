@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ApiPoolStatsSchema } from '@fomeora/types';
+import { ApiPoolStatsSchema, ApiSocialToggleSchema } from '@fomeora/types';
 
 import { BrowserApiError, browserApiRequest } from './client';
 
@@ -53,6 +53,21 @@ test('browser API client rejects malformed upstream data and non-v1 paths', asyn
       browserApiRequest('https://attacker.invalid/v1/pools', ApiPoolStatsSchema),
       (error: unknown) => error instanceof BrowserApiError && error.code === 'INVALID_API_PATH',
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('browser API client marks bodyless mutations as JSON requests', async () => {
+  const originalFetch = globalThis.fetch;
+  let request: RequestInit | undefined;
+  globalThis.fetch = async (_input, init) => {
+    request = init;
+    return Response.json({ active: true });
+  };
+  try {
+    await browserApiRequest('/v1/callouts/id/like', ApiSocialToggleSchema, { method: 'POST' });
+    assert.equal(new Headers(request?.headers).get('content-type'), 'application/json');
   } finally {
     globalThis.fetch = originalFetch;
   }

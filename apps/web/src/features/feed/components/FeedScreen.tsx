@@ -7,6 +7,7 @@ import { useCallback, useId, useMemo, useState } from 'react';
 import { ArrowRight } from '@/components/ui/icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
+import { QuoteCalloutPost } from '@/features/callouts/components/QuoteCalloutPost';
 import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
 import { useSession } from '@/features/session/store';
 import { useApiResource } from '@/lib/api/useApiResource';
@@ -71,6 +72,12 @@ export function FeedScreen() {
     () => filterBySide((data?.data ?? []).map(callout => apiFeedCalloutToCallout(callout)), side),
     [data, side],
   );
+  const feedItems = useMemo(() => visible.flatMap(callout => [
+    { kind: 'callout' as const, id: callout.id, createdAt: callout.createdAt, callout },
+    ...callout.comments.filter(comment => comment.kind === 'quote').map(quote => ({
+      kind: 'quote' as const, id: quote.id, createdAt: quote.createdAt, callout, quote,
+    })),
+  ]).sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()), [visible]);
   const ownIds = new Set((data?.data ?? []).filter(callout => callout.user.id === user?.id).map(callout => callout.id));
   const showNew = async () => {
     await release();
@@ -92,8 +99,10 @@ export function FeedScreen() {
           {tab === 'following' && !user ? <div className="px-gutter py-16 text-center"><p className="text-lg">Sign in to view followed callers.</p><button type="button" onClick={openSignIn} className="mt-3 min-h-11 text-signal underline underline-offset-4">Sign in with X</button></div> : null}
           {path && isLoading ? <p className="px-gutter py-16 text-center text-muted">Loading canonical callouts…</p> : null}
           {path && error ? <div role="alert" className="px-gutter py-16 text-center"><p className="text-down">Feed unavailable.</p><button type="button" onClick={() => void refresh()} className="mt-3 min-h-11 text-signal underline underline-offset-4">Retry</button></div> : null}
-          {path && !isLoading && !error && visible.length === 0 ? <EmptyFeed filtered={side !== 'all'} onClear={() => setSide('all')} /> : null}
-          {path && !isLoading && !error ? visible.map(callout => <CalloutPost key={callout.id} callout={callout} own={ownIds.has(callout.id)} />) : null}
+          {path && !isLoading && !error && feedItems.length === 0 ? <EmptyFeed filtered={side !== 'all'} onClear={() => setSide('all')} /> : null}
+          {path && !isLoading && !error ? feedItems.map(item => item.kind === 'callout'
+            ? <CalloutPost key={`callout:${item.id}`} callout={item.callout} own={ownIds.has(item.callout.id)} onChanged={() => void refresh()} />
+            : <QuoteCalloutPost key={`quote:${item.id}`} quote={item.quote} source={item.callout} own={item.quote.caller.id === user?.id} onDeleted={() => void refresh()} />) : null}
           {streamError ? <p className="t-label px-gutter py-3 text-center text-muted">Realtime reconnecting; REST data remains available.</p> : null}
         </Tabs>
       </div>

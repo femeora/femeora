@@ -2,10 +2,11 @@
 
 import { ApiReplySchema, ApiSocialToggleSchema, ApiViewCountSchema } from '@fomeora/types';
 import { useEffect, useRef, useState } from 'react';
+import { z } from 'zod';
 
 import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
-import { BadgeCheck, Eye, Heart, MessageCircle, MessageSquareQuote, Repeat2, Share2 } from '@/components/ui/icons';
+import { BadgeCheck, Eye, Heart, MessageCircle, MessageSquareQuote, Repeat2, Share2, Trash2 } from '@/components/ui/icons';
 import { formatCompactUsd, formatPrice } from '@/features/pool/model/format';
 import { useSession } from '@/features/session/store';
 import { browserApiRequest } from '@/lib/api/client';
@@ -17,7 +18,7 @@ const actionClass =
   'inline-flex min-h-9 items-center gap-1.5 rounded-[2px] px-1.5 transition-colors hover:text-fg aria-pressed:text-signal';
 
 /** Share, like, repost, replies, views and the live market cap (brief 5.2 action bar). */
-export function CalloutActions({ callout }: { callout: Callout }) {
+export function CalloutActions({ callout, own, onChanged, onCalloutDeleted }: { callout: Callout; own: boolean; onChanged?: () => void; onCalloutDeleted: () => void }) {
   const [isLiked, setLiked] = useState(callout.viewer.liked);
   const [isReposted, setReposted] = useState(callout.viewer.reposted);
   const [replyCount, setReplyCount] = useState(callout.replies);
@@ -28,6 +29,8 @@ export function CalloutActions({ callout }: { callout: Callout }) {
   const [replyParent, setReplyParent] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState<'like' | 'repost' | 'reply' | 'quote' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<'callout' | string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   const showToast = useToast(state => state.show);
   const user = useSession(state => state.user);
@@ -117,6 +120,7 @@ export function CalloutActions({ callout }: { callout: Callout }) {
         body: response.body,
         createdAt: response.createdAt,
         caller: {
+          id: response.user.id,
           handle: response.user.handle,
           name,
           initials: name.slice(0, 2).toUpperCase(),
@@ -130,6 +134,7 @@ export function CalloutActions({ callout }: { callout: Callout }) {
       setComposer(null);
       setReplyParent(null);
       showToast(kind === 'quote' ? 'Quote callout posted.' : 'Reply posted.');
+      onChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : `${kind.toUpperCase()}_FAILED`, { title: `${kind === 'quote' ? 'Quote' : 'Reply'} failed`, tone: 'error' });
     } finally {
@@ -139,6 +144,33 @@ export function CalloutActions({ callout }: { callout: Callout }) {
 
   const likes = callout.likes + Number(isLiked) - Number(callout.viewer.liked);
   const reposts = callout.reposts + Number(isReposted) - Number(callout.viewer.reposted);
+
+  const deleteSelected = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget === 'callout') {
+        await browserApiRequest(`/v1/callouts/${callout.id}`, z.undefined(), { method: 'DELETE' });
+        showToast('Your callout was removed.', { title: 'Callout deleted' });
+        onCalloutDeleted();
+        return;
+      }
+      const removed = comments.find(comment => comment.id === deleteTarget);
+      await browserApiRequest(`/v1/callouts/${callout.id}/replies/${deleteTarget}`, z.undefined(), { method: 'DELETE' });
+      setComments(current => current
+        .filter(comment => comment.id !== deleteTarget)
+        .map(comment => comment.parentId === deleteTarget ? { ...comment, parentId: null } : comment));
+      if (removed?.kind === 'quote') setQuoteCount(count => Math.max(0, count - 1));
+      else setReplyCount(count => Math.max(0, count - 1));
+      setDeleteTarget(null);
+      showToast(removed?.kind === 'quote' ? 'Your quote was removed.' : 'Your comment was removed.', { title: 'Post deleted' });
+      onChanged?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'DELETE_FAILED', { title: 'Could not delete', tone: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div ref={actionsRef} className="t-label mt-2 text-muted">
@@ -191,11 +223,21 @@ export function CalloutActions({ callout }: { callout: Callout }) {
         <span className="sr-only">Views</span>
         {compactCount(viewCount)}
       </span>
+      {own ? <button type="button" onClick={() => setDeleteTarget('callout')} className={actionClass} aria-label="Delete callout">
+        <Trash2 aria-hidden="true" className="size-4" strokeWidth={1.75} />
+      </button> : null}
       <span className={cn('ml-auto whitespace-nowrap font-mono', mcUp ? 'text-up' : 'text-down')}>
         {marketValue}{' '}
         <span className="text-muted">{callout.valuation === 'quote' ? 'price' : 'MC'}</span>
       </span>
       </div>
+      {deleteTarget ? <div role="alertdialog" aria-label="Confirm deletion" className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-down/50 bg-down/5 p-3">
+        <p className="font-sans text-[0.875rem] text-fg">{deleteTarget === 'callout' ? 'Delete this callout and remove it from the feed?' : 'Delete this comment or quote?'}</p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="min-h-9 px-3 text-muted">Cancel</button>
+          <button type="button" onClick={() => void deleteSelected()} disabled={deleting} className="min-h-9 border border-down px-3 text-down disabled:opacity-50">{deleting ? 'Deleting…' : 'Delete'}</button>
+        </div>
+      </div> : null}
       {composer ? (
         <form className="mt-3 flex gap-2" onSubmit={event => { event.preventDefault(); void submitMessage(); }}>
           <label className="sr-only" htmlFor={`message-${callout.id}`}>{composer === 'quote' ? 'Quote callout' : 'Reply'}</label>
@@ -204,14 +246,14 @@ export function CalloutActions({ callout }: { callout: Callout }) {
         </form>
       ) : null}
       {comments.length > 0 ? <ol className="mt-3 grid gap-2 border-t border-line pt-3">
-        {comments.map(comment => <li key={comment.id} className={cn('flex gap-2 rounded-[2px] bg-panel-2/60 p-3', comment.parentId && 'ml-6')}>
+        {comments.filter(comment => comment.kind === 'reply').map(comment => <li key={comment.id} className={cn('flex gap-2 rounded-[2px] bg-panel-2/60 p-3', comment.parentId && 'ml-6')}>
           <Avatar seed={comment.caller.handle} src={comment.caller.avatarUrl} alt={`${comment.caller.name} avatar`} size="xs" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="font-sans text-[0.8125rem] font-medium text-fg">{comment.caller.name}</span>
               {comment.caller.verified ? <BadgeCheck aria-label="X verified" className="size-3.5 text-signal" /> : null}
               <span className="text-faint">@{comment.caller.handle}</span>
-              {comment.kind === 'quote' ? <span className="border border-line px-1.5 py-0.5 text-faint">Quote</span> : null}
+              {user?.id === comment.caller.id ? <button type="button" onClick={() => setDeleteTarget(comment.id)} className="ml-auto grid size-8 place-items-center text-muted hover:text-down" aria-label={`Delete ${comment.kind}`}><Trash2 aria-hidden="true" className="size-3.5" /></button> : null}
             </div>
             <p className="mt-1 whitespace-pre-wrap break-words font-sans text-[0.875rem] text-fg">{comment.body}</p>
             {comment.kind === 'reply' ? <button type="button" onClick={() => openComposer('reply', comment.id)} className="mt-1 min-h-8 text-signal">Reply</button> : null}

@@ -19,6 +19,7 @@ export {
   MessageSquareQuote,
   Repeat2,
   Share2,
+  Trash2,
   TriangleAlert,
   Trophy,
   Wallet,
