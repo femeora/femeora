@@ -1,13 +1,10 @@
 import { priceFromBinX18 } from '@fomeora/sdk';
 
 import type { ApiCallout, ApiCandle, ApiPoolDetail } from '@/lib/api/types';
+import { tokenSymbol } from '@/lib/tokens';
 import type { BinShape } from '@/types/callout';
 
 import type { Callout } from './callout';
-
-function short(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 function number(value: string | null, fallback = 0): number {
   if (value === null) return fallback;
@@ -66,6 +63,10 @@ export function apiCalloutToCallout(
   const lowerPct = pool.type === 'DAMM' ? -100 : percentFromActive(callout.lowerBin, active, pool.binStep);
   const upperPct = pool.type === 'DAMM' ? 100 : percentFromActive(callout.upperBin, active, pool.binStep);
   const handle = callout.user.handle.replace(/^@/, '');
+  const quoteAddress = pool.quoteToken ?? pool.tokenY;
+  const baseAddress = quoteAddress.toLowerCase() === pool.tokenX.toLowerCase()
+    ? pool.tokenY
+    : pool.tokenX;
   const initials = (callout.user.name ?? handle)
     .split(/\s+/)
     .map(part => part[0] ?? '')
@@ -84,8 +85,12 @@ export function apiCalloutToCallout(
     caption: callout.caption,
     edited: callout.captionEditedAt !== null,
     pool: {
-      base: short(pool.tokenX),
-      quote: short(pool.quoteToken ?? pool.tokenY),
+      base: tokenSymbol(baseAddress),
+      quote: tokenSymbol(quoteAddress),
+      baseAddress,
+      quoteAddress,
+      tokenX: pool.tokenX,
+      tokenY: pool.tokenY,
       type: pool.type,
       binStepBps: pool.binStep,
       supply: 1,

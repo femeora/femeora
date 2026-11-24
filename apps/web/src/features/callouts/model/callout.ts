@@ -26,7 +26,17 @@ export interface Callout {
   postedAgo: string;
   caption: string | null;
   edited: boolean;
-  pool: { base: string; quote: string; type: 'DLMM' | 'DAMM'; binStepBps: number; supply: number };
+  pool: {
+    base: string;
+    quote: string;
+    baseAddress: string;
+    quoteAddress: string;
+    tokenX: string;
+    tokenY: string;
+    type: 'DLMM' | 'DAMM';
+    binStepBps: number;
+    supply: number;
+  };
   shape: BinShape;
   /** Range as % from the market cap at post time. */
   minPct: number;

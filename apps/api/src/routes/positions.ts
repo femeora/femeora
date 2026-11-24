@@ -42,11 +42,21 @@ function loadPosition(chainId: number, id: bigint) {
 export async function registerPositionRoutes(app: FastifyInstance, chainId: number) {
   app.get('/v1/positions', async (request, reply) => {
     const query = z
-      .object({ owner: addressSchema, limit: z.coerce.number().int().min(1).max(200).default(50) })
+      .object({
+        owner: addressSchema.optional(),
+        pool: addressSchema.optional(),
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+      })
+      .refine(value => value.owner || value.pool, { message: 'OWNER_OR_POOL_REQUIRED' })
       .safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
     const positions = await prisma.position.findMany({
-      where: { chainId, owner: query.data.owner, canonical: true },
+      where: {
+        chainId,
+        canonical: true,
+        ...(query.data.owner ? { owner: query.data.owner } : {}),
+        ...(query.data.pool ? { pool: { address: query.data.pool } } : {}),
+      },
       include: {
         bins: { orderBy: { binId: 'asc' } },
         pool: true,

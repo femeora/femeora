@@ -6,6 +6,12 @@ export interface Pool {
   address: string;
   tokenX: string;
   tokenY: string;
+  tokenXDecimals: number | null;
+  tokenYDecimals: number | null;
+  /** User-facing base/quote orientation; contract calls still use tokenX/tokenY. */
+  baseAddress: string;
+  quoteAddress: string;
+  baseIsTokenX: boolean;
   base: string;
   quote: string;
   chain: string;

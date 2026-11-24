@@ -2,11 +2,13 @@
 
 import { ApiPositionActionPreparationSchema, type ApiIndexedPosition, type ApiPositionActionPreparation } from '@fomeora/types';
 import { useState } from 'react';
+import { formatUnits } from 'viem';
 
 import { Button } from '@/components/ui/Button';
 import { TxButton } from '@/features/pool/components/TxButton';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
+import { tokenSymbol } from '@/lib/tokens';
 
 import { executePositionAction } from '../executePositionAction';
 
@@ -23,6 +25,10 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
   const [stage, setStage] = useState('Preparing transaction…');
   const [hash, setHash] = useState<string | null>(null);
   const { account, config } = useWallet();
+  const tokenX = tokenSymbol(position.pool.tokenX);
+  const tokenY = tokenSymbol(position.pool.tokenY);
+  const displayAmount = (raw: string, decimals: number | null, symbol: string) =>
+    decimals === null ? `${symbol} amount unavailable` : `${formatUnits(BigInt(raw), decimals)} ${symbol}`;
 
   const path = `/v1/positions/${position.id}/${kind}-prepare`;
   const body = () => ({
@@ -53,12 +59,12 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
         <Button key={actionKind} variant={kind === actionKind ? 'primary' : 'ghost'} onClick={() => choose(actionKind)} className="min-h-9 capitalize">{actionKind}</Button>
       ))}</div>
       {kind === 'increase' ? <div className="grid gap-2 sm:grid-cols-2">
-        <label className="t-label text-muted">Token X amount<input className="glass-control mt-1 w-full rounded-[2px] p-2 font-mono text-fg" inputMode="decimal" value={amountX} onChange={event => { setAmountX(event.target.value); setPreparation(null); }} /></label>
-        <label className="t-label text-muted">Token Y amount<input className="glass-control mt-1 w-full rounded-[2px] p-2 font-mono text-fg" inputMode="decimal" value={amountY} onChange={event => { setAmountY(event.target.value); setPreparation(null); }} /></label>
+        <label className="t-label text-muted">Amount {tokenX}<input aria-label={`Amount ${tokenX}`} className="glass-control mt-1 w-full rounded-[2px] p-2 font-mono text-fg" inputMode="decimal" value={amountX} onChange={event => { setAmountX(event.target.value); setPreparation(null); }} /></label>
+        <label className="t-label text-muted">Amount {tokenY}<input aria-label={`Amount ${tokenY}`} className="glass-control mt-1 w-full rounded-[2px] p-2 font-mono text-fg" inputMode="decimal" value={amountY} onChange={event => { setAmountY(event.target.value); setPreparation(null); }} /></label>
       </div> : null}
       {kind === 'decrease' ? <label className="t-label text-muted">Remove {bps / 100}%<input type="range" min={100} max={9_900} step={100} value={bps} onChange={event => { setBps(Number(event.target.value)); setPreparation(null); }} className="block h-11 w-full accent-[rgb(var(--signal))]" /></label> : null}
       {kind === 'close' ? <p className="text-sm text-down">Closing removes all liquidity and burns the position NFT. Review the minimum outputs before signing.</p> : null}
-      {preparation ? <dl className="t-label grid gap-1 text-muted"><div className="flex justify-between"><dt>Expected token X</dt><dd className="text-fg">{preparation.quote.amountXRaw} raw</dd></div><div className="flex justify-between"><dt>Expected token Y</dt><dd className="text-fg">{preparation.quote.amountYRaw} raw</dd></div><div className="flex justify-between"><dt>Safe block</dt><dd className="text-fg">{preparation.quote.blockNumber}</dd></div></dl> : null}
+      {preparation ? <dl className="t-label grid gap-1 text-muted"><div className="flex justify-between"><dt>Expected {tokenX}</dt><dd className="text-fg">{displayAmount(preparation.quote.amountXRaw, position.pool.tokenXDecimals, tokenX)}</dd></div><div className="flex justify-between"><dt>Expected {tokenY}</dt><dd className="text-fg">{displayAmount(preparation.quote.amountYRaw, position.pool.tokenYDecimals, tokenY)}</dd></div><div className="flex justify-between"><dt>Safe block</dt><dd className="text-fg">{preparation.quote.blockNumber}</dd></div></dl> : null}
       <Button onClick={() => void review()} disabled={!account || !valid || reviewing}>{reviewing ? 'Reading safe-block state…' : `Review ${kind}`}</Button>
       <p role="alert" className="t-label min-h-4 text-down">{reviewError}</p>
       <TxButton label={`${kind[0]!.toUpperCase()}${kind.slice(1)} position`} error={preparation ? null : `Review ${kind} first`} onExecute={execute} pendingLabel={stage} />

@@ -10,6 +10,7 @@ import { AmountField } from '@/features/pool/components/AmountField';
 import { TxButton } from '@/features/pool/components/TxButton';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
+import { tokenSymbol } from '@/lib/tokens';
 
 import type { Callout, TailMode } from '../model/callout';
 import { executePreparedTail } from '../model/executeTail';
@@ -51,6 +52,8 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
   const [hash, setHash] = useState<string | null>(null);
   const titleId = useId();
   const { account, config } = useWallet();
+  const tokenX = tokenSymbol(callout.pool.tokenX);
+  const tokenY = tokenSymbol(callout.pool.tokenY);
   const invalidate = () => { setQuote(null); setQuoteError(null); setHash(null); };
   const requestQuote = async () => {
     setQuoting(true); setQuoteError(null); setHash(null);
@@ -60,8 +63,8 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
     finally { setQuoting(false); }
   };
   const amountError = !quote ? 'Review tail range first'
-    : quote.requiresTokenX && !(Number(amountX) > 0) ? `Enter ${callout.pool.base} amount`
-      : quote.requiresTokenY && !(Number(amountY) > 0) ? `Enter ${callout.pool.quote} amount` : null;
+    : quote.requiresTokenX && !(Number(amountX) > 0) ? `Enter amount ${tokenX}`
+      : quote.requiresTokenY && !(Number(amountY) > 0) ? `Enter amount ${tokenY}` : null;
   const execute = async () => {
     if (!account || !quote) throw new Error('WALLET_OR_TAIL_QUOTE_REQUIRED');
     setStage('Creating tail intent…');
@@ -85,8 +88,8 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
       <SegmentedControl label="Tail mode" size="md" className="w-full" options={MODES} value={mode} onChange={value => { setMode(value); invalidate(); }} />
       {quote?.warnings.map(warning => <p key={warning} role="status" className="flex gap-2 rounded-[2px] border border-down/50 p-3 text-[0.9375rem] text-down"><TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" strokeWidth={2} />{warning.replaceAll('_', ' ').toLowerCase()}</p>)}
       {quote ? <div className="glass rounded-[2px] p-3 text-sm"><p>{quote.poolType === 'DLMM' ? `Bins ${quote.lowerBin} to ${quote.upperBin}` : 'Full-range DAMM'}</p><p className="t-label mt-1 text-muted">Shape {quote.shape} · active bin {quote.expectedActiveBin ?? 'n/a'}</p></div> : null}
-      {quote?.requiresTokenX ? <AmountField token={`Token X · ${callout.pool.base}`} tokenAddress={callout.pool.base} value={amountX} usdPerToken={1} enabled onChange={value => { setAmountX(value); setHash(null); }} /> : null}
-      {quote?.requiresTokenY ? <AmountField token={`Token Y · ${callout.pool.quote}`} tokenAddress={callout.pool.quote} value={amountY} usdPerToken={1} enabled onChange={value => { setAmountY(value); setHash(null); }} /> : null}
+      {quote?.requiresTokenX ? <AmountField token={`Amount ${tokenX}`} tokenAddress={callout.pool.tokenX} value={amountX} usdPerToken={1} enabled onChange={value => { setAmountX(value); setHash(null); }} /> : null}
+      {quote?.requiresTokenY ? <AmountField token={`Amount ${tokenY}`} tokenAddress={callout.pool.tokenY} value={amountY} usdPerToken={1} enabled onChange={value => { setAmountY(value); setHash(null); }} /> : null}
       <Button block onClick={() => void requestQuote()} disabled={quoting}>{quoting ? 'Reading canonical range…' : 'Review tail range'}</Button>
       <p role="alert" className="t-label min-h-4 text-down">{quoteError}</p>
       <TxButton label="Tail this range" error={amountError} onExecute={execute} pendingLabel={stage} />

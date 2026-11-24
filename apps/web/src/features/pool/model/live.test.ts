@@ -43,3 +43,20 @@ test('prefers a positive indexed candle over the bootstrap price', () => {
   });
   assert.equal(mapped.priceUsd, 1705);
 });
+
+test('orients a token-Y base pool as WETH / USDG', () => {
+  const reversed = apiPoolToPool({
+    ...pool,
+    chainId: 46_630,
+    tokenX: pool.tokenY,
+    tokenY: pool.tokenX,
+    tokenXDecimals: 6,
+    tokenYDecimals: 18,
+    quoteToken: pool.tokenY,
+    baseIsTokenX: false,
+  }, undefined);
+  assert.equal(reversed.base, 'WETH');
+  assert.equal(reversed.quote, 'USDG');
+  assert.equal(reversed.baseAddress, pool.tokenX);
+  assert.equal(reversed.quoteAddress, pool.tokenY);
+});

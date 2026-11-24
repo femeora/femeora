@@ -1,17 +1,18 @@
 'use client';
 
-import Link from 'next/link';
+import { ApiIndexedPositionListSchema, type ApiIndexedPosition } from '@fomeora/types';
 import { useState, type ReactNode } from 'react';
+import { formatUnits } from 'viem';
 
 import { Tabs } from '@/components/ui/Tabs';
+import { TokenPair } from '@/components/ui/TokenPair';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
 import type { Callout } from '@/features/callouts/model/callout';
 import { useAllCallouts } from '@/features/callouts/useAllCallouts';
-import { usePositions } from '@/features/portfolio/usePositions';
-import { useSession } from '@/features/session/store';
+import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
+import { tokenSymbol } from '@/lib/tokens';
 
-import { formatTokenAmount } from '../model/format';
 import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
 import type { Pool } from '../model/pool';
 
@@ -47,39 +48,41 @@ function Table({ head, children }: { head: readonly string[]; children: ReactNod
   );
 }
 
-/** The signed-in user's positions in this pool, or a sign-in prompt. */
+function positionStatus(position: ApiIndexedPosition): string {
+  if (position.status !== 'open') return position.status;
+  const active = position.pool.activeBin;
+  if (active === null) return position.pool.type === 'DAMM' ? 'in range' : 'unknown';
+  return active >= position.lowerBin && active <= position.upperBin ? 'in range' : 'out of range';
+}
+
+function tradeAmount(raw: string, address: string, pool: Pool): string {
+  const tokenX = address.toLowerCase() === pool.tokenX.toLowerCase();
+  const decimals = tokenX ? pool.tokenXDecimals : pool.tokenYDecimals;
+  const symbol = tokenSymbol(address);
+  return decimals === null ? `${symbol} unavailable` : `${formatUnits(BigInt(raw), decimals)} ${symbol}`;
+}
+
+/** All canonical positions for this pool. Portfolio remains wallet-scoped. */
 function PoolPositions({ pool }: { pool: Pool }) {
-  const user = useSession(state => state.user);
-  const openSignIn = useSession(state => state.openSignIn);
-  const pair = `${pool.base} / ${pool.quote}`;
-  const { data } = usePositions();
-  const count = data?.data.filter(position =>
-    position.pool.address.toLowerCase() === pool.address.toLowerCase() && position.status === 'open'
-  ).length ?? 0;
-
-  if (!user) {
-    return (
-      <p className="py-10 text-center text-muted">
-        <button
-          type="button"
-          onClick={openSignIn}
-          className="min-h-11 text-fg underline underline-offset-4"
-        >
-          Sign in
-        </button>{' '}
-        to see your {pool.base} positions, earned fees and callouts.
-      </p>
-    );
-  }
-
-  return (
-    <p className="py-10 text-center text-muted">
-      You have {count} open {count === 1 ? 'position' : 'positions'} in {pair}.{' '}
-      <Link href="/portfolio" className="text-fg underline underline-offset-4">
-        View portfolio
-      </Link>
-    </p>
+  const { data, error, isLoading, mutate } = useApiResource(
+    `/v1/positions?pool=${encodeURIComponent(pool.address)}&limit=200`,
+    ApiIndexedPositionListSchema,
   );
+  const positions = data?.data ?? [];
+  if (isLoading) return <p className="py-10 text-center text-muted">Loading canonical pool positions…</p>;
+  if (error) return <div role="alert" className="py-10 text-center"><p className="text-down">Pool positions are temporarily unavailable.</p><button type="button" onClick={() => void mutate()} className="t-label mt-3 min-h-11 underline underline-offset-4">Retry</button></div>;
+  if (positions.length === 0) return <p className="py-10 text-center text-muted">No indexed positions in this pool yet.</p>;
+  return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status']}>
+    {positions.map(position => <tr key={`${position.chainId}:${position.id}`}>
+      <td className={cn(cellClass, 'font-sans')}><TokenPair tokenX={pool.baseAddress} tokenY={pool.quoteAddress} compact /></td>
+      <td className={cellClass}>{shortAddress(position.owner)}</td>
+      <td className={cellClass}>{['Spot', 'Curve', 'Bid-Ask', 'Custom'][position.shape] ?? 'Custom'}</td>
+      <td className={cellClass}>{position.lowerBin}–{position.upperBin}<span className="block text-faint">{position.bins.length} bins</span></td>
+      <td className={cellClass}>{position.valueQuote ?? 'Unavailable'}</td>
+      <td className={cn(cellClass, 'text-up')}>{position.earnedQuote}</td>
+      <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
+    </tr>)}
+  </Table>;
 }
 
 const cellClass = 'border-t border-line py-3 pr-4 align-middle last:pr-0 last:text-right';
@@ -128,22 +131,25 @@ export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: Poo
       ) : null}
 
       {tab === 'trades' ? (
-        <Table head={['Side', 'Out (raw)', 'In (raw)', 'Trader', 'Time']}>
+        <Table head={['Side', 'Amount received', 'Amount paid', 'Trader', 'Time']}>
           {trades.map(trade => {
-            const tokenXIn = trade.tokenIn.toLowerCase() === pool.tokenX.toLowerCase();
+            const baseIn = trade.tokenIn.toLowerCase() === pool.baseAddress.toLowerCase();
+            const tokenOut = trade.tokenIn.toLowerCase() === pool.tokenX.toLowerCase()
+              ? pool.tokenY
+              : pool.tokenX;
             return (
             <tr key={`${trade.transactionHash}:${trade.logIndex}`}>
               <td
                 className={cn(
                   cellClass,
-                  tokenXIn ? 'text-down' : 'text-up',
+                  baseIn ? 'text-down' : 'text-up',
                   'uppercase'
                 )}
               >
-                {tokenXIn ? 'sell' : 'buy'}
+                {baseIn ? 'sell' : 'buy'}
               </td>
-              <td className={cellClass}>{formatTokenAmount(Number(trade.amountOut))}</td>
-              <td className={cellClass}>{formatTokenAmount(Number(trade.amountIn))}</td>
+              <td className={cellClass}>{tradeAmount(trade.amountOut, tokenOut, pool)}</td>
+              <td className={cellClass}>{tradeAmount(trade.amountIn, trade.tokenIn, pool)}</td>
               <td className={cellClass}>{shortAddress(trade.sender)}</td>
               <td className={cellClass}>{new Date(trade.timestamp).toLocaleString()}</td>
             </tr>

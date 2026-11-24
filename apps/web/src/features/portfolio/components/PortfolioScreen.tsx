@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { XLogo } from '@/components/ui/icons';
+import { TokenPair } from '@/components/ui/TokenPair';
 import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
@@ -53,12 +54,15 @@ function positionStatus(position: ApiIndexedPosition): string {
 /** Canonical owner portfolio. The indexer/API is the only position source of truth. */
 export function PortfolioScreen() {
   const { user, openSignIn, signOut } = useSession();
-  const { account, config, connect } = useWallet();
+  const { account, config, connect, status: walletStatus } = useWallet();
   const { data, error, isLoading, mutate } = usePositions();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [managingId, setManagingId] = useState<string | null>(null);
   const showToast = useToast(state => state.show);
 
+  if (!account && (walletStatus === 'idle' || walletStatus === 'connecting')) {
+    return <div className="mx-auto max-w-md px-gutter py-24 text-center text-muted">Loading connected wallet…</div>;
+  }
   if (!account) return <WalletRequired onConnect={() => void connect()} />;
   const positions = data?.data ?? [];
   const openPositions = positions.filter(position => position.status === 'open');
@@ -115,7 +119,13 @@ export function PortfolioScreen() {
           <thead><tr className="t-label text-faint">{['Pool', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Callout', 'Actions'].map(head => <th key={head} scope="col" className="py-3 pr-4 font-normal">{head}</th>)}</tr></thead>
           <tbody className="font-mono text-[0.8125rem] tabular-nums">{positions.map(position => (
             <Fragment key={`${position.chainId}:${position.id}`}><tr>
-              <td className={`${cell} font-sans`}><Link className="hover:underline" href={`/p/${position.chainId}/${position.pool.address}`}>{short(position.pool.tokenX)} / {short(position.pool.tokenY)}</Link></td>
+              <td className={`${cell} font-sans`}><Link className="inline-flex hover:underline" href={`/p/${position.chainId}/${position.pool.address}`}>
+                <TokenPair
+                  tokenX={position.pool.baseIsTokenX === false ? position.pool.tokenY : position.pool.tokenX}
+                  tokenY={position.pool.baseIsTokenX === false ? position.pool.tokenX : position.pool.tokenY}
+                  compact
+                />
+              </Link></td>
               <td className={cell}>{shapeLabel[position.shape] ?? 'Custom'}</td>
               <td className={cell}>Bin {position.lowerBin} to {position.upperBin}<span className="block text-faint">{position.bins.length} owned bins</span></td>
               <td className={cell}>{position.valueQuote ?? 'Unavailable'}</td><td className={cell}>{position.earnedQuote}</td>

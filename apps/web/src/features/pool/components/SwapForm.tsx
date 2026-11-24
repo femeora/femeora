@@ -2,6 +2,7 @@
 
 import { ApiSwapPreparationSchema, ApiSwapQuoteSchema, type ApiSwapQuote } from '@fomeora/types';
 import { useState } from 'react';
+import { formatUnits } from 'viem';
 
 import { Button } from '@/components/ui/Button';
 import { ArrowUpDown } from '@/components/ui/icons';
@@ -32,7 +33,10 @@ export function SwapForm({ pool }: { pool: Pool }) {
 
   const tokenIn = direction === 'buy' ? pool.quote : pool.base;
   const tokenOut = direction === 'buy' ? pool.base : pool.quote;
-  const tokenInAddress = direction === 'buy' ? pool.tokenY : pool.tokenX;
+  const tokenInAddress = direction === 'buy' ? pool.quoteAddress : pool.baseAddress;
+  const tokenInDecimals = tokenInAddress.toLowerCase() === pool.tokenX.toLowerCase()
+    ? pool.tokenXDecimals
+    : pool.tokenYDecimals;
   const amountIn = Number.parseFloat(amount) || 0;
 
   const requestBody = () => ({
@@ -95,7 +99,12 @@ export function SwapForm({ pool }: { pool: Pool }) {
   const rows = quote ? [
     { label: 'Expected output', value: `${quote.amountOut} ${tokenOut}` },
     { label: 'Minimum received', value: `${quote.minimumAmountOut} ${tokenOut}` },
-    { label: 'Fee (raw input units)', value: quote.totalFeeRaw },
+    {
+      label: `Fee ${tokenIn}`,
+      value: tokenInDecimals === null
+        ? 'Unavailable'
+        : `${formatUnits(BigInt(quote.totalFeeRaw), tokenInDecimals)} ${tokenIn}`,
+    },
     { label: 'Bins crossed', value: String(quote.binCrossings) },
     { label: 'Slippage limit', value: `${quote.slippageBps / 100}%` },
   ] : [];

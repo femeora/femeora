@@ -49,12 +49,21 @@ export function activeBinPrice(pool: ApiPoolDetail): number {
 
 export function apiPoolToPool(pool: ApiPoolDetail, latest: ApiCandle | undefined): Pool {
   const latestPrice = latest ? finiteNumber(latest.close) : 0;
+  const baseIsTokenX = pool.baseIsTokenX
+    ?? pool.quoteToken?.toLowerCase() === pool.tokenY.toLowerCase();
+  const baseAddress = baseIsTokenX ? pool.tokenX : pool.tokenY;
+  const quoteAddress = baseIsTokenX ? pool.tokenY : pool.tokenX;
   return {
     address: pool.address,
     tokenX: pool.tokenX,
     tokenY: pool.tokenY,
-    base: tokenSymbol(pool.tokenX),
-    quote: tokenSymbol(pool.tokenY),
+    tokenXDecimals: pool.tokenXDecimals,
+    tokenYDecimals: pool.tokenYDecimals,
+    baseAddress,
+    quoteAddress,
+    baseIsTokenX,
+    base: tokenSymbol(baseAddress),
+    quote: tokenSymbol(quoteAddress),
     chain: String(pool.chainId),
     type: pool.type,
     binStepBps: pool.binStep,

@@ -63,7 +63,7 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
     <GlowCard>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3 p-3.5">
         <div className="min-w-0">
-          <TokenPair tokenX={callout.pool.base} tokenY={callout.pool.quote} compact />
+          <TokenPair tokenX={callout.pool.baseAddress} tokenY={callout.pool.quoteAddress} compact />
           <p className="t-label whitespace-nowrap text-muted">
             {SHAPE_LABEL[callout.shape]} · {callout.pool.type}
           </p>

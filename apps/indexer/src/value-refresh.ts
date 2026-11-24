@@ -225,9 +225,19 @@ export async function refreshPositionValues(
 
     await prisma.$transaction(async transaction => {
       for (const [positionId, valueQuote] of values) {
+        const position = pool.positions.find(candidate => candidate.id === positionId);
         await transaction.position.update({
           where: { chainId_id: { chainId, id: positionId } },
-          data: { valueQuote, valueQuoteUpdatedAt: valuedAt, valueQuoteBlock: safeBlock },
+          data: {
+            valueQuote,
+            valueQuoteUpdatedAt: valuedAt,
+            valueQuoteBlock: safeBlock,
+            // PositionOpened does not include deposit amounts. Capture the first
+            // available canonical valuation (including legacy backfills) as cost basis.
+            ...(valueQuote !== null && position?.depositedQuote.toString() === '0'
+              ? { depositedQuote: valueQuote }
+              : {}),
+          },
         });
       }
       await transaction.pool.update({ where: { id: pool.id }, data: { lastValueRefreshAt: now } });

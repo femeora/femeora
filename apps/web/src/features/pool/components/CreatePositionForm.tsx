@@ -20,6 +20,7 @@ import type { BinShape } from '@/types/callout';
 import type { PositionDraftState } from '../hooks/usePositionDraft';
 import { executePreparedPosition } from '../model/executePosition';
 import { formatCompactUsd, formatUnit, toUnit, type ValueUnit } from '../model/format';
+import { toContractAmounts } from '../model/orientation';
 import type { Pool } from '../model/pool';
 import { applyPct, PRESETS, pricePosition, sideLabel } from '../model/range';
 
@@ -60,14 +61,20 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     setQuoteError(null);
     setTransactionHash(null);
   };
-  const requestBody = () => ({
-    shape: draft.shape,
-    minPct: draft.minPct,
-    maxPct: draft.maxPct,
-    amountX: damm || needs.base ? draft.baseAmount : '0',
-    amountY: damm || needs.quote ? draft.quoteAmount : '0',
-    slippageBps: 50,
-  });
+  const requestBody = () => {
+    const amounts = toContractAmounts(
+      pool.baseIsTokenX,
+      damm || needs.base ? draft.baseAmount : '0',
+      damm || needs.quote ? draft.quoteAmount : '0',
+    );
+    return {
+      shape: draft.shape,
+      minPct: draft.minPct,
+      maxPct: draft.maxPct,
+      ...amounts,
+      slippageBps: 50,
+    };
+  };
   const setPostAsCallout = (value: boolean) => {
     if (value && (!user || !user.wallet)) {
       openSignIn();
@@ -193,7 +200,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       <div className="grid gap-2">
         <AmountField
           token={pool.quote}
-          tokenAddress={pool.tokenY}
+          tokenAddress={pool.quoteAddress}
           value={draft.quoteAmount}
           usdPerToken={1}
           enabled={damm || needs.quote}
@@ -201,7 +208,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         />
         <AmountField
           token={pool.base}
-          tokenAddress={pool.tokenX}
+          tokenAddress={pool.baseAddress}
           value={draft.baseAmount}
           usdPerToken={pool.priceUsd}
           enabled={damm || needs.base}
@@ -226,7 +233,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       {quote ? (
         <dl className="glass grid gap-1.5 rounded-[2px] p-3">
           <div className="t-label flex justify-between gap-4"><dt className="text-muted">{damm ? 'Liquidity model' : 'Canonical bins'}</dt><dd>{damm ? 'DAMM · both tokens' : `${quote.bins[0]} to ${quote.bins.at(-1)} · ${quote.bins.length}`}</dd></div>
-          <div className="t-label flex justify-between gap-4"><dt className="text-muted">Deposit</dt><dd>{quote.amountX} {pool.base} + {quote.amountY} {pool.quote}</dd></div>
+          <div className="t-label flex justify-between gap-4"><dt className="text-muted">Deposit</dt><dd>{pool.baseIsTokenX ? quote.amountX : quote.amountY} {pool.base} + {pool.baseIsTokenX ? quote.amountY : quote.amountX} {pool.quote}</dd></div>
           <div className="t-label flex justify-between gap-4"><dt className="text-muted">Slippage limit</dt><dd>{quote.slippageBps / 100}%</dd></div>
         </dl>
       ) : null}
