@@ -14,7 +14,7 @@ export interface ReadoutCell {
 }
 
 export interface SystemNode {
-  layer: 'Client' | 'On-chain' | 'Off-chain';
+  layer: 'Client' | 'On-chain' | 'Indexing layer' | 'Delivery layer';
   title: string;
   detail: string;
 }
@@ -86,7 +86,7 @@ export const appPreview = {
   cue: 'Cue 01',
   label: 'The app',
   title: 'One terminal to open a range, post it and tail it.',
-  body: 'The pool page carries indexed candles, liquidity bins, canonical callouts and the Create Position panel in one place. Empty testnet data stays empty instead of being replaced with a demo market.',
+  body: 'The pool page carries indexed candles, liquidity bins, canonical callouts and the Create Position panel in one place. Empty market data stays empty instead of being replaced with a demo market.',
   cta: { label: 'Open the terminal', href: '/pools' },
   systemTitle: 'How a callout moves through the system',
   system: [
@@ -101,14 +101,14 @@ export const appPreview = {
       detail: 'PositionManagerV2 mints the range with a callout tag',
     },
     {
-      layer: 'Off-chain',
-      title: 'Indexer',
-      detail: 'Binds the tag to its on-chain position, tracks earned fees and time in range',
+      layer: 'Indexing layer',
+      title: 'Canonical Indexer',
+      detail: 'Reads verified on-chain events to bind tags, fees and time in range; never holds user funds',
     },
     {
-      layer: 'Off-chain',
-      title: 'API',
-      detail: 'Serves the feed, callouts and tail quotes with realtime updates over SSE',
+      layer: 'Delivery layer',
+      title: 'Realtime API',
+      detail: 'Delivers indexed feed data and transaction quotes over SSE; never signs or holds user funds',
     },
     {
       layer: 'Client',

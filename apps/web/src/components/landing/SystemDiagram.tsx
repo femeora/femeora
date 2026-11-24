@@ -6,7 +6,8 @@ import { cn } from '@/lib/cn';
 const LAYER_TONE: Record<SystemNode['layer'], string> = {
   Client: 'text-fg',
   'On-chain': 'text-signal',
-  'Off-chain': 'text-up',
+  'Indexing layer': 'text-up',
+  'Delivery layer': 'text-up',
 };
 
 /**

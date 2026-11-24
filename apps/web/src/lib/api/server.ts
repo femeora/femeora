@@ -7,6 +7,7 @@ import {
   ApiCandleSchema,
   ApiLpSchema,
   ApiPoolDetailSchema,
+  ApiPoolAssetListSchema,
   ApiPoolSchema,
   ApiPoolStatsSchema,
   ApiTradeSchema,
@@ -44,6 +45,8 @@ async function request<T>(path: string, schema: ZodType<T>): Promise<T> {
 
 export const getPools = (limit = 50) =>
   request(`/v1/pools?limit=${limit}`, apiListSchema(ApiPoolSchema));
+
+export const getPoolAssets = () => request('/v1/pool-assets', ApiPoolAssetListSchema);
 
 export const getPool = (address: string) =>
   request(`/v1/pools/${encodeURIComponent(address)}`, ApiPoolDetailSchema);

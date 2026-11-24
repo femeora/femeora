@@ -52,7 +52,7 @@ export function PoolAssetSelect({ label, value, exclude, assets, onChange }: {
   </div>;
 }
 
-function AssetLogo({ asset }: { asset: ApiPoolAsset }) {
+export function AssetLogo({ asset }: { asset: ApiPoolAsset }) {
   const companyLogo = asset.category === 'stock' || asset.category === 'etf'
     ? `https://logoapi.sh/ticker/${encodeURIComponent(asset.symbol)}.png`
     : null;

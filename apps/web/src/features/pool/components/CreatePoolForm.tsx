@@ -18,12 +18,12 @@ import { TxButton } from './TxButton';
 
 const control = 'glass-control mt-2 min-h-11 w-full rounded-[2px] px-3 text-fg';
 
-export function CreatePoolForm() {
+export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { initialTokenA?: string; initialTokenB?: string }) {
   const { account, config, connect, chainId, switchNetwork } = useWallet();
   const assets = useApiResource('/v1/pool-assets', ApiPoolAssetListSchema);
   const [model, setModel] = useState<'DLMM' | 'DAMM'>('DLMM');
-  const [tokenA, setTokenA] = useState('');
-  const [tokenB, setTokenB] = useState('');
+  const [tokenA, setTokenA] = useState(initialTokenA);
+  const [tokenB, setTokenB] = useState(initialTokenB);
   const [fee, setFee] = useState('0.3');
   const [binStep, setBinStep] = useState('25');
   const [initialPrice, setInitialPrice] = useState('1');
