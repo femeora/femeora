@@ -59,34 +59,42 @@ export default async function PoolPage({ params }: PageProps) {
   const from = Math.max(-10_000, activeBin - 40);
   const to = Math.min(10_000, activeBin + 40);
   try {
-    const [stats, candles5m, candles15m, candles1h, candles4h, bins, trades, lps, callouts] = await Promise.all([
+    const [stats, pool5m, pool15m, pool1h, pool4h, reference5m, reference15m, reference1h, reference4h, bins, trades, lps, callouts] = await Promise.all([
       getPoolStats(detail.address),
-      getPoolCandles(detail.address, '5m', candleLimits['5m']),
-      getPoolCandles(detail.address, '15m', candleLimits['15m']),
-      getPoolCandles(detail.address, '1h', candleLimits['1h']),
-      getPoolCandles(detail.address, '4h', candleLimits['4h']),
+      getPoolCandles(detail.address, '5m', candleLimits['5m'], 'pool'),
+      getPoolCandles(detail.address, '15m', candleLimits['15m'], 'pool'),
+      getPoolCandles(detail.address, '1h', candleLimits['1h'], 'pool'),
+      getPoolCandles(detail.address, '4h', candleLimits['4h'], 'pool'),
+      getPoolCandles(detail.address, '5m', candleLimits['5m'], 'reference'),
+      getPoolCandles(detail.address, '15m', candleLimits['15m'], 'reference'),
+      getPoolCandles(detail.address, '1h', candleLimits['1h'], 'reference'),
+      getPoolCandles(detail.address, '4h', candleLimits['4h'], 'reference'),
       detail.type === 'DLMM' ? getPoolBins(detail.address, from, to) : Promise.resolve({ data: [] }),
       getPoolTrades(detail.address),
       getPoolLps(detail.address),
       getPoolCallouts(detail.address),
     ]);
-    const latest = candles15m.data.at(-1) ?? candles1h.data.at(-1);
+    const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
     const pool = apiPoolToPool(detail, latest);
     const liveStats: LivePoolStats = { ...stats, counts: detail.counts };
     return (
       <PoolTerminal
         pool={pool}
         stats={liveStats}
-        candlesByInterval={{
-          '5m': apiCandlesToChart(candles5m.data),
-          '15m': apiCandlesToChart(candles15m.data),
-          '1h': apiCandlesToChart(candles1h.data),
-          '4h': apiCandlesToChart(candles4h.data),
+        candlesBySource={{
+          pool: {
+            '5m': apiCandlesToChart(pool5m.data), '15m': apiCandlesToChart(pool15m.data),
+            '1h': apiCandlesToChart(pool1h.data), '4h': apiCandlesToChart(pool4h.data),
+          },
+          reference: {
+            '5m': apiCandlesToChart(reference5m.data), '15m': apiCandlesToChart(reference15m.data),
+            '1h': apiCandlesToChart(reference1h.data), '4h': apiCandlesToChart(reference4h.data),
+          },
         }}
         liquidity={apiBinsToLiquidity(bins.data, activeBin)}
         trades={trades.data}
         lps={lps.data}
-        callouts={callouts.data.map(callout => apiCalloutToCallout(callout, detail, candles15m.data))}
+        callouts={callouts.data.map(callout => apiCalloutToCallout(callout, detail, reference15m.data.length > 0 ? reference15m.data : pool15m.data))}
       />
     );
   } catch {

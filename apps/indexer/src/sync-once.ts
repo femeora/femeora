@@ -11,7 +11,7 @@ try {
   const result = await runIndexerCycle(environment, client);
   // eslint-disable-next-line no-console
   console.info(
-    `Fomeora Indexer sync complete chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} valuePools=${result.valuePools} valuePositions=${result.valuePositions} statsUsers=${result.statsUsers} statsRows=${result.statsRows}`,
+    `Fomeora Indexer sync complete chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} valuePools=${result.valuePools} valuePositions=${result.valuePositions} referencePools=${result.referencePools} referenceCandles=${result.referenceCandles} statsUsers=${result.statsUsers} statsRows=${result.statsRows}`,
   );
 } catch (error) {
   // eslint-disable-next-line no-console

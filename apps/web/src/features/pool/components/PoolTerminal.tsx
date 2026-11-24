@@ -23,7 +23,7 @@ import { TradePanel, type PanelTab } from './TradePanel';
 interface PoolTerminalProps {
   pool: Pool;
   stats: LivePoolStats;
-  candlesByInterval: Readonly<Record<ChartInterval, readonly Candle[]>>;
+  candlesBySource: Readonly<Record<'pool' | 'reference', Readonly<Record<ChartInterval, readonly Candle[]>>>>;
   liquidity: readonly LiquidityBin[];
   trades: readonly LiveTrade[];
   lps: readonly LiveLp[];
@@ -38,7 +38,7 @@ interface PoolTerminalProps {
 export function PoolTerminal({
   pool,
   stats,
-  candlesByInterval,
+  candlesBySource,
   liquidity,
   trades,
   lps,
@@ -50,10 +50,18 @@ export function PoolTerminal({
   const [unit, setUnit] = useState<ValueUnit>(pool.marketCapAvailable ? 'mcap' : 'price');
   const [showCallouts, setShowCallouts] = useState(true);
   const [showBins, setShowBins] = useState(true);
+  const [chartSource, setChartSource] = useState<'combined' | 'pool' | 'reference'>('combined');
   const [panelTab, setPanelTab] = useState<PanelTab>('create');
   const position = usePositionDraft(pool);
   const { own } = useAllCallouts(false);
-  const candles = useMemo(() => candlesByInterval[interval], [candlesByInterval, interval]);
+  const referenceAvailable = candlesBySource.reference[interval].length > 0;
+  const candles = useMemo(() => {
+    if (chartSource === 'pool') return candlesBySource.pool[interval];
+    if (chartSource === 'reference') return candlesBySource.reference[interval];
+    return candlesBySource.reference[interval].length > 0
+      ? candlesBySource.reference[interval]
+      : candlesBySource.pool[interval];
+  }, [candlesBySource, chartSource, interval]);
 
   useEffect(() => {
     const refreshPool = () => {
@@ -118,7 +126,16 @@ export function PoolTerminal({
             onShowCalloutsChange={setShowCallouts}
             showBins={showBins}
             onShowBinsChange={setShowBins}
+            source={chartSource}
+            onSourceChange={setChartSource}
+            referenceAvailable={referenceAvailable}
           />
+          <div className="mb-2 flex items-center gap-2 text-[0.6875rem] uppercase tracking-[0.12em] text-faint">
+            <span className="inline-block size-1.5 rounded-full bg-signal" />
+            {candles[0]?.source === 'reference'
+              ? `Reference market · Chainlink${candles.at(-1)?.stale ? ' · delayed' : ''} · pool volume excluded`
+              : 'Femeora pool trades · on-chain swaps only'}
+          </div>
           <div className="glass h-[320px] rounded-[2px] sm:h-[440px]">
             <PriceChart
               pool={pool}

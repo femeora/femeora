@@ -118,6 +118,9 @@ export const ApiCandleSchema = z.object({
   volumeQuote: DecimalStringSchema.nullable().optional(),
   swapCount: z.number().int().nonnegative(),
   synthetic: z.boolean().optional(),
+  source: z.enum(['pool', 'reference']).optional(),
+  sourceUpdatedAt: z.string().datetime().optional(),
+  stale: z.boolean().optional(),
 });
 export type ApiCandle = z.infer<typeof ApiCandleSchema>;
 

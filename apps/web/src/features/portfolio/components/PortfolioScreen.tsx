@@ -4,10 +4,6 @@ import { ApiCalloutSchema, type ApiIndexedPosition } from '@fomeora/types';
 import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 
-import { usePositions } from '../usePositions';
-
-import { PositionActionPanel } from './PositionActionPanel';
-
 import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +14,10 @@ import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
 import { openApiEventStream } from '@/lib/api/realtime';
+
+import { usePositions } from '../usePositions';
+
+import { PositionActionPanel } from './PositionActionPanel';
 
 const cell = 'border-t border-line py-3 pr-4 align-middle last:pr-0';
 const shapeLabel = ['Spot', 'Curve', 'Bid-Ask', 'Custom'] as const;

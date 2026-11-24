@@ -45,7 +45,16 @@ interface ChartToolbarProps {
   onShowCalloutsChange: (show: boolean) => void;
   showBins: boolean;
   onShowBinsChange: (show: boolean) => void;
+  source: 'combined' | 'pool' | 'reference';
+  onSourceChange: (source: 'combined' | 'pool' | 'reference') => void;
+  referenceAvailable: boolean;
 }
+
+const sourceOptions = [
+  { value: 'combined', label: 'Combined' },
+  { value: 'pool', label: 'Pool trades' },
+  { value: 'reference', label: 'Reference' },
+] as const;
 
 /** Chart controls (brief 8.1 toolbar). */
 export function ChartToolbar({
@@ -58,9 +67,18 @@ export function ChartToolbar({
   onShowCalloutsChange,
   showBins,
   onShowBinsChange,
+  source,
+  onSourceChange,
+  referenceAvailable,
 }: ChartToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 py-3">
+      <SegmentedControl
+        label="Price source"
+        options={sourceOptions}
+        value={source}
+        onChange={value => onSourceChange(value === 'reference' && !referenceAvailable ? 'pool' : value)}
+      />
       <SegmentedControl
         label="Interval"
         options={intervalOptions}

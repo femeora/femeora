@@ -19,6 +19,9 @@ interface SerializedCandle {
   volumeQuote: string | null;
   swapCount: number;
   synthetic: boolean;
+  source?: 'pool' | 'reference';
+  sourceUpdatedAt?: string;
+  stale?: boolean;
 }
 
 export function fillCandleGaps(input: readonly SerializedCandle[], interval: keyof typeof CANDLE_INTERVAL_MS, limit: number, now = new Date()): SerializedCandle[] {
@@ -40,6 +43,9 @@ export function fillCandleGaps(input: readonly SerializedCandle[], interval: key
       output.push({
         timestamp: new Date(timestamp).toISOString(), open: close, high: close, low: close, close,
         volumeX: '0', volumeY: '0', volumeQuote: '0', swapCount: 0, synthetic: true,
+        ...(input[0]!.source ? { source: input[0]!.source } : {}),
+        ...(input[0]!.sourceUpdatedAt ? { sourceUpdatedAt: input[0]!.sourceUpdatedAt } : {}),
+        ...(input[0]!.stale !== undefined ? { stale: input[0]!.stale } : {}),
       });
     }
   }
@@ -297,6 +303,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       .object({
         interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d']),
         limit: z.coerce.number().int().min(1).max(500).default(200),
+        source: z.enum(['pool', 'reference', 'combined']).default('combined'),
       })
       .safeParse(request.query);
     if (!params.success || !query.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
@@ -305,12 +312,26 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       select: { id: true, tokenX: true, tokenY: true, quoteToken: true, tokenXDecimals: true, tokenYDecimals: true },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
-    const candles = await prisma.candle.findMany({
+    const poolCandles = await prisma.candle.findMany({
       where: { poolId: pool.id, interval: query.data.interval },
       orderBy: { bucketStart: 'desc' },
       take: query.data.limit,
     });
-    const serialized = candles.reverse().map(candle => {
+    const referenceCandles = query.data.source === 'pool' ? [] : await prisma.referenceCandle.findMany({
+      where: { poolId: pool.id, interval: query.data.interval },
+      orderBy: { bucketStart: 'desc' },
+      take: query.data.limit,
+    });
+    if (query.data.source === 'reference' || (query.data.source === 'combined' && referenceCandles.length > 0)) {
+      const serialized: SerializedCandle[] = referenceCandles.reverse().map(candle => ({
+        timestamp: candle.bucketStart.toISOString(),
+        open: candle.open.toString(), high: candle.high.toString(), low: candle.low.toString(), close: candle.close.toString(),
+        volumeX: '0', volumeY: '0', volumeQuote: null, swapCount: 0, synthetic: false,
+        source: 'reference', sourceUpdatedAt: candle.sourceUpdatedAt.toISOString(), stale: candle.stale,
+      }));
+      return { data: fillCandleGaps(serialized, query.data.interval, query.data.limit) };
+    }
+    const serialized: SerializedCandle[] = poolCandles.reverse().map(candle => {
       const quoteIsX = pool.quoteToken?.toLowerCase() === pool.tokenX.toLowerCase();
       const quoteIsY = pool.quoteToken?.toLowerCase() === pool.tokenY.toLowerCase();
       const quoteDecimals = quoteIsX ? pool.tokenXDecimals : quoteIsY ? pool.tokenYDecimals : null;
@@ -328,6 +349,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
           : null,
         swapCount: candle.swapCount,
         synthetic: false,
+        source: 'pool',
       };
     });
     return { data: fillCandleGaps(serialized, query.data.interval, query.data.limit) };

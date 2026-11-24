@@ -98,6 +98,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance, chainId: numb
       topics: [
         'pool.swap',
         'pool.cap',
+        'pool.reference',
         'position.created',
         'position.increased',
         'position.decreased',

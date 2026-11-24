@@ -54,9 +54,9 @@ export const getPool = (address: string) =>
 export const getPoolStats = (address: string) =>
   request(`/v1/pools/${encodeURIComponent(address)}/stats`, ApiPoolStatsSchema);
 
-export const getPoolCandles = (address: string, interval: string, limit: number) =>
+export const getPoolCandles = (address: string, interval: string, limit: number, source: 'pool' | 'reference' | 'combined' = 'combined') =>
   request(
-    `/v1/pools/${encodeURIComponent(address)}/candles?interval=${encodeURIComponent(interval)}&limit=${limit}`,
+    `/v1/pools/${encodeURIComponent(address)}/candles?interval=${encodeURIComponent(interval)}&limit=${limit}&source=${source}`,
     apiListSchema(ApiCandleSchema),
   );
 

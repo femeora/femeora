@@ -44,6 +44,7 @@ model Pool {
   shareCheckpoints PositionShareCheckpoint[]
   feeCredits       PositionFeeCredit[]
   candles          Candle[]
+  referenceCandles ReferenceCandle[]
   intents          CalloutIntent[]
 
   @@unique([chainId, address])
@@ -264,6 +265,45 @@ model Candle {
   @@id([poolId, interval, bucketStart])
   @@index([poolId, interval, bucketStart])
   @@map("candles")
+}
+
+model AssetPriceSource {
+  id               String   @id @default(uuid()) @db.Uuid
+  chainId          Int      @map("chain_id")
+  tokenAddress     String   @map("token_address") @db.VarChar(42)
+  sourceType       String   @map("source_type") @db.VarChar(24)
+  feedAddress      String?  @map("feed_address") @db.VarChar(42)
+  symbol           String   @db.VarChar(32)
+  quoteCurrency    String   @default("USD") @map("quote_currency") @db.VarChar(12)
+  heartbeatSeconds Int      @default(86400) @map("heartbeat_seconds")
+  priority         Int      @default(100)
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([chainId, tokenAddress, sourceType])
+  @@index([chainId, enabled, priority])
+  @@map("asset_price_sources")
+}
+
+model ReferenceCandle {
+  poolId          String   @map("pool_id") @db.Uuid
+  interval        String   @db.VarChar(8)
+  bucketStart     DateTime @map("bucket_start")
+  open            Decimal  @db.Decimal(78, 18)
+  high            Decimal  @db.Decimal(78, 18)
+  low             Decimal  @db.Decimal(78, 18)
+  close           Decimal  @db.Decimal(78, 18)
+  sourceType      String   @map("source_type") @db.VarChar(24)
+  sourceUpdatedAt DateTime @map("source_updated_at")
+  stale           Boolean  @default(false)
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  pool Pool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  @@id([poolId, interval, bucketStart])
+  @@index([poolId, interval, bucketStart])
+  @@map("reference_candles")
 }
 
 model Position {

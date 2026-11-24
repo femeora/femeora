@@ -20,7 +20,7 @@ export function openApiEventStream(path: string, options: ApiEventStreamOptions)
 
   const source = new EventSource(`/api${path}`, { withCredentials: true });
   const topics = [
-    'callout.new', 'callout.update', 'callout.stats', 'pool.swap', 'pool.cap',
+    'callout.new', 'callout.update', 'callout.stats', 'pool.swap', 'pool.cap', 'pool.reference',
     'position.created', 'position.increased', 'position.decreased', 'position.closed', 'position.transferred',
   ];
 

@@ -89,7 +89,10 @@ export function apiCandlesToChart(candles: readonly ApiCandle[]) {
     const volume = finiteNumber(candle.volumeQuote ?? candle.volumeY);
     const timestamp = Math.floor(new Date(candle.timestamp).getTime() / 1_000);
     return [open, high, low, close, timestamp].every(Number.isFinite)
-      ? [{ open, high, low, close, volume, timestamp }]
+      ? [{
+          open, high, low, close, volume, timestamp, source: candle.source ?? 'pool',
+          ...(candle.stale !== undefined ? { stale: candle.stale } : {}),
+        }]
       : [];
   });
 }

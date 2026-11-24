@@ -38,6 +38,8 @@ export interface Candle {
   close: number;
   volume: number;
   timestamp?: number;
+  source: 'pool' | 'reference';
+  stale?: boolean;
 }
 
 /** Liquidity in one bin, as distance from the active bin and USD depth. */
