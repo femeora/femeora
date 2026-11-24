@@ -2,7 +2,11 @@
 
 import { ApiCalloutSchema, type ApiIndexedPosition } from '@fomeora/types';
 import Link from 'next/link';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+
+import { usePositions } from '../usePositions';
+
+import { PositionActionPanel } from './PositionActionPanel';
 
 import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
@@ -13,10 +17,7 @@ import { TokenPair } from '@/components/ui/TokenPair';
 import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
-
-import { usePositions } from '../usePositions';
-
-import { PositionActionPanel } from './PositionActionPanel';
+import { openApiEventStream } from '@/lib/api/realtime';
 
 const cell = 'border-t border-line py-3 pr-4 align-middle last:pr-0';
 const shapeLabel = ['Spot', 'Curve', 'Bid-Ask', 'Custom'] as const;
@@ -60,6 +61,13 @@ export function PortfolioScreen() {
   const [managingId, setManagingId] = useState<string | null>(null);
   const showToast = useToast(state => state.show);
 
+  useEffect(() => {
+    if (!account) return undefined;
+    return openApiEventStream(`/v1/positions/${account}/stream`, {
+      onMessage: () => void mutate(),
+    });
+  }, [account, mutate]);
+
   if (!account && (walletStatus === 'idle' || walletStatus === 'connecting')) {
     return <div className="mx-auto max-w-md px-gutter py-24 text-center text-muted">Loading connected wallet…</div>;
   }
@@ -68,6 +76,7 @@ export function PortfolioScreen() {
   const openPositions = positions.filter(position => position.status === 'open');
   const totals = [
     { label: 'Deposited · quote', value: sumDecimal(positions.map(position => position.depositedQuote)) },
+    { label: 'Withdrawn · quote', value: sumDecimal(positions.map(position => position.withdrawnQuote)) },
     { label: 'Earned · quote', value: sumDecimal(positions.map(position => position.earnedQuote)) },
     { label: 'Open positions', value: String(openPositions.length) },
     { label: 'Callouts', value: String(positions.filter(position => position.calloutId).length) },
@@ -105,7 +114,7 @@ export function PortfolioScreen() {
           <Button onClick={openSignIn} className="min-h-9"><XLogo className="size-3.5" /> Connect X <span className="text-muted">· optional</span></Button>
         )}
       </header>
-      <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">{totals.map(total => (
+      <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">{totals.map(total => (
         <div key={total.label} className="glass rounded-[2px] p-4"><dt className="t-label text-muted">{total.label}</dt><dd className="mt-1 break-all text-xl font-medium tabular-nums">{total.value}</dd></div>
       ))}</dl>
       <h2 className="t-label mb-2 mt-8 text-muted">Positions</h2>
@@ -116,7 +125,7 @@ export function PortfolioScreen() {
       ) : null}
       {!isLoading && !error && positions.length > 0 ? (
         <div className="glass overflow-x-auto rounded-[2px] px-4"><table className="w-full min-w-[58rem] text-left">
-          <thead><tr className="t-label text-faint">{['Pool', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Callout', 'Actions'].map(head => <th key={head} scope="col" className="py-3 pr-4 font-normal">{head}</th>)}</tr></thead>
+          <thead><tr className="t-label text-faint">{['Pool', 'Shape', 'Range', 'Deposited', 'Withdrawn', 'Value · quote', 'Earned', 'Status', 'Callout', 'Actions'].map(head => <th key={head} scope="col" className="py-3 pr-4 font-normal">{head}</th>)}</tr></thead>
           <tbody className="font-mono text-[0.8125rem] tabular-nums">{positions.map(position => (
             <Fragment key={`${position.chainId}:${position.id}`}><tr>
               <td className={`${cell} font-sans`}><Link className="inline-flex hover:underline" href={`/p/${position.chainId}/${position.pool.address}`}>
@@ -128,6 +137,7 @@ export function PortfolioScreen() {
               </Link></td>
               <td className={cell}>{shapeLabel[position.shape] ?? 'Custom'}</td>
               <td className={cell}>Bin {position.lowerBin} to {position.upperBin}<span className="block text-faint">{position.bins.length} owned bins</span></td>
+              <td className={cell}>{position.depositedQuote}</td><td className={cell}>{position.withdrawnQuote}</td>
               <td className={cell}>{position.valueQuote ?? 'Unavailable'}</td><td className={cell}>{position.earnedQuote}</td>
               <td className={`${cell} capitalize`}>{positionStatus(position)}</td><td className={cell}>{position.calloutId ? 'Posted' : 'Not posted'}</td>
               <td className={cell}><div className="flex gap-2">
@@ -135,7 +145,7 @@ export function PortfolioScreen() {
                 {position.status === 'open' ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
               </div></td>
             </tr>
-            {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={mutate} /></td></tr> : null}</Fragment>
+            {managingId === position.id ? <tr><td colSpan={10}><PositionActionPanel position={position} onConfirmed={mutate} /></td></tr> : null}</Fragment>
           ))}</tbody>
         </table></div>
       ) : null}

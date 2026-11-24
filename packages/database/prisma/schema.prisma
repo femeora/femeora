@@ -279,6 +279,7 @@ model Position {
   status              String    @db.VarChar(20) // 'open' | 'closed' | 'transferred'
   depositedQuote      Decimal   @default(0) @map("deposited_quote") @db.Decimal(36, 18)
   withdrawnQuote      Decimal   @default(0) @map("withdrawn_quote") @db.Decimal(36, 18)
+  openingQuote        Decimal   @default(0) @map("opening_quote") @db.Decimal(36, 18)
   earnedQuote         Decimal   @default(0) @map("earned_quote") @db.Decimal(36, 18)
   valueQuote          Decimal?  @map("value_quote") @db.Decimal(36, 18)
   valueQuoteUpdatedAt DateTime? @map("value_quote_updated_at")
@@ -331,6 +332,8 @@ model PositionEvent {
   owner           String?  @db.VarChar(42)
   canonical       Boolean  @default(true)
   payload         Json
+  cashFlowType    String?  @map("cash_flow_type") @db.VarChar(16)
+  amountQuote     Decimal? @map("amount_quote") @db.Decimal(36, 18)
 
   position Position        @relation(fields: [chainId, positionId], references: [chainId, id], onDelete: Cascade)
   updates  CalloutUpdate[]

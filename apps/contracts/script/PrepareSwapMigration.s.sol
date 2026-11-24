@@ -5,6 +5,7 @@ import {PoolFactory} from "../src/core/PoolFactory.sol";
 import {PoolRegistry} from "../src/core/PoolRegistry.sol";
 import {DlmmPoolV2} from "../src/core/DlmmPoolV2.sol";
 import {DlmmPoolV2Deployer} from "../src/core/DlmmPoolV2Deployer.sol";
+import {PoolKey, PoolKeyLib, PoolModel} from "../src/core/PoolTypes.sol";
 
 interface SwapMigrationVm {
     function envAddress(string calldata name) external view returns (address);
@@ -71,6 +72,8 @@ contract PrepareSwapMigration {
         bytes memory activateDeployer = abi.encodeCall(PoolFactory.setPoolDeployers, (PoolFactory(factoryProxy).dammDeployer(), deployer));
         bytes memory pauseLegacy = abi.encodeCall(DlmmPoolV2.setPaused, (true));
         bytes memory replacePool = abi.encodeCall(PoolFactory.replaceDlmmPool, (legacyPool, baseToken, quoteToken, uint24(feePips), uint16(binStepBps), int24(initialActiveBin)));
+        PoolKey memory poolKey = PoolKeyLib.normalize(baseToken, quoteToken, PoolModel.DLMM, uint24(feePips), uint16(binStepBps));
+        address predictedReplacement = deployer.predict(poolKey, factoryProxy, int24(initialActiveBin));
 
         string memory key = "swapMigration";
         vm.serializeString(key, "network", network);
@@ -82,6 +85,7 @@ contract PrepareSwapMigration {
         vm.serializeAddress(key, "poolFactoryImplementation", address(factoryImplementation));
         vm.serializeBytes(key, "poolFactoryUpgradeCalldata", factoryUpgrade);
         vm.serializeAddress(key, "dlmmPoolV2Deployer", address(deployer));
+        vm.serializeAddress(key, "predictedReplacementPool", predictedReplacement);
         vm.serializeBytes(key, "activatePoolDeployerCalldata", activateDeployer);
         vm.serializeAddress(key, "legacyPool", legacyPool);
         vm.serializeBytes(key, "pauseLegacyPoolCalldata", pauseLegacy);

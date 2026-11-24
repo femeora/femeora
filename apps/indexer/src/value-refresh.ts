@@ -161,7 +161,14 @@ export async function refreshPositionValues(
       bins: true,
       positions: {
         where: { canonical: true, status: { in: ['open', 'transferred'] } },
-        include: { bins: true },
+        include: {
+          bins: true,
+          events: {
+            where: { canonical: true, cashFlowType: 'deposit' },
+            select: { id: true },
+            take: 1,
+          },
+        },
       },
     },
   });
@@ -234,8 +241,8 @@ export async function refreshPositionValues(
             valueQuoteBlock: safeBlock,
             // PositionOpened does not include deposit amounts. Capture the first
             // available canonical valuation (including legacy backfills) as cost basis.
-            ...(valueQuote !== null && position?.depositedQuote.toString() === '0'
-              ? { depositedQuote: valueQuote }
+            ...(valueQuote !== null && position?.depositedQuote.toString() === '0' && position.events.length === 0
+              ? { openingQuote: valueQuote, depositedQuote: valueQuote }
               : {}),
           },
         });

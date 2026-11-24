@@ -1,5 +1,5 @@
 import { dlmmPoolV2Abi, positionManagerV2Abi } from '@fomeora/contracts-sdk';
-import type { Address, Hex } from 'viem';
+import { decodeFunctionData, type Address, type Hex } from 'viem';
 
 import type { IndexerClient } from './chain-client.js';
 
@@ -90,7 +90,11 @@ function eventOwner(eventName: string, args: unknown): Address | null {
   return null;
 }
 
-function eventPayload(eventName: string, args: unknown) {
+function eventPayload(
+  eventName: string,
+  args: unknown,
+  transactionInput?: { functionName: string; args: readonly unknown[] },
+) {
   switch (eventName) {
     case 'RangePositionCreated': {
       const value = args as {
@@ -101,6 +105,9 @@ function eventPayload(eventName: string, args: unknown) {
         tag: Hex;
         referrer: Address;
       };
+      const create = transactionInput?.functionName === 'createRangePosition'
+        ? transactionInput.args[0] as { bins: readonly number[]; amountsX: readonly bigint[]; amountsY: readonly bigint[] }
+        : null;
       return {
         pool: value.pool.toLowerCase(),
         lowerBin: value.lowerBin,
@@ -108,6 +115,11 @@ function eventPayload(eventName: string, args: unknown) {
         shape: value.shape,
         tag: value.tag,
         referrer: value.referrer.toLowerCase(),
+        ...(create ? {
+          bins: create.bins,
+          amountsX: create.amountsX.map(amount => amount.toString()),
+          amountsY: create.amountsY.map(amount => amount.toString()),
+        } : {}),
       };
     }
     case 'DammPositionCreated': {
@@ -169,6 +181,23 @@ export async function collectPositionEvents(
   const relevant = logs
     .map(log => ({ log, positionId: eventPositionId(log) }))
     .filter((item): item is typeof item & { positionId: bigint } => item.positionId !== null);
+
+  const transactionInputByHash = new Map<Hex, { functionName: string; args: readonly unknown[] }>();
+  const inputEvents = relevant.filter(({ log }) => log.eventName === 'RangePositionCreated');
+  await Promise.all(
+    [...new Set(inputEvents.map(({ log }) => mined(log.transactionHash, 'TRANSACTION_HASH')))].map(
+      async transactionHash => {
+        if (typeof client.getTransaction !== 'function') return;
+        const transaction = await client.getTransaction({ hash: transactionHash }).catch(() => null);
+        if (!transaction) return;
+        const decoded = decodeFunctionData({ abi: positionManagerV2Abi, data: transaction.input });
+        transactionInputByHash.set(transactionHash, {
+          functionName: decoded.functionName,
+          args: (decoded.args ?? []) as readonly unknown[],
+        });
+      },
+    ),
+  );
 
   const timestampByBlock = new Map<bigint, Date>();
   await Promise.all(
@@ -253,7 +282,11 @@ export async function collectPositionEvents(
         timestamp,
         owner: eventOwner(log.eventName, log.args),
         state,
-        payload: eventPayload(log.eventName, log.args),
+        payload: eventPayload(
+          log.eventName,
+          log.args,
+          transactionInputByHash.get(mined(log.transactionHash, 'TRANSACTION_HASH')),
+        ),
       };
     })
     .sort((left, right) =>

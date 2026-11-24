@@ -4,6 +4,7 @@ import type { IndexerEnvironment } from '@fomeora/env';
 
 import { backfillPoolRegistry } from './backfill.js';
 import { createIndexerClient, type IndexerClient, verifyIndexerChain } from './chain-client.js';
+import { reconcilePositionAccounting } from './position-accounting.js';
 import { rollupUserStats } from './stats-rollup.js';
 import { refreshPoolReserveSnapshots, refreshPositionValues } from './value-refresh.js';
 
@@ -69,6 +70,10 @@ export async function runIndexerCycle(
   const backfill = await backfillPoolRegistry(client, environment, chain, deployment).catch(error => {
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'INDEXER_BACKFILL_FAILED' : code);
+  });
+  await reconcilePositionAccounting(chain.chainId).catch(error => {
+    const code = safeIndexerErrorCode(error);
+    throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POSITION_ACCOUNTING_FAILED' : code);
   });
   const valueRefresh = await refreshPositionValues(
     client,

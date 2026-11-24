@@ -22,6 +22,7 @@ export type EventFilter = {
   chainId: number;
   topics: string[];
   aggregateId?: string;
+  owner?: string;
 };
 
 export function parseLastEventId(value: string | undefined): bigint | null {
@@ -138,6 +139,7 @@ export async function readOutboxEvents(afterId: bigint, filter: EventFilter): Pr
       canonical: true,
       topic: { in: filter.topics },
       ...(filter.aggregateId ? { aggregateId: filter.aggregateId } : {}),
+      ...(filter.owner ? { payload: { path: ['owner'], equals: filter.owner } } : {}),
     },
     select: { id: true, topic: true, aggregateId: true, payload: true, createdAt: true },
     orderBy: { id: 'asc' },

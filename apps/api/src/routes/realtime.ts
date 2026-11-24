@@ -110,4 +110,20 @@ export async function registerRealtimeRoutes(app: FastifyInstance, chainId: numb
       aggregateId: parsed.data.pool,
     });
   });
+
+  app.get('/v1/positions/:owner/stream', async (request, reply) => {
+    const parsed = z.object({ owner: addressSchema }).safeParse(request.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'INVALID_WALLET_ADDRESS' });
+    return streamEvents(request, reply, wakeup, {
+      chainId,
+      topics: [
+        'position.created',
+        'position.increased',
+        'position.decreased',
+        'position.closed',
+        'position.transferred',
+      ],
+      owner: parsed.data.owner,
+    });
+  });
 }

@@ -26,6 +26,7 @@ import {
   type PositionShareChange,
 } from './processors/fee-credits.js';
 import { resolveCalloutIntent, resolveTailIntent } from './processors/intent-linking.js';
+import { positionCashFlow } from './processors/position-accounting.js';
 import {
   calculateAlwaysInRangeClock,
   calculateRangeClock,
@@ -552,9 +553,12 @@ export async function backfillPoolRegistry(
           });
         }
 
+        const accountingPositionIds = new Set<bigint>();
         for (const event of positionEvents) {
           const poolId = poolIdByAddress.get(event.state.pool.toLowerCase());
           if (!poolId) throw new Error('POSITION_POOL_ID_MISSING');
+          const accountingPool = await transaction.pool.findUniqueOrThrow({ where: { id: poolId } });
+          const cashFlow = positionCashFlow(event, accountingPool);
           const current = await transaction.position.findUnique({
             where: { chainId_id: { chainId: chain.chainId, id: event.positionId } },
           });
@@ -634,15 +638,24 @@ export async function backfillPoolRegistry(
               eventType: event.kind,
               owner,
               payload: event.payload,
+              ...(cashFlow ? {
+                cashFlowType: cashFlow.direction,
+                amountQuote: cashFlow.amountQuote,
+              } : {}),
             },
             update: {
               blockHash: event.blockHash,
               timestamp: event.timestamp,
               owner,
               payload: event.payload,
+              ...(cashFlow ? {
+                cashFlowType: cashFlow.direction,
+                amountQuote: cashFlow.amountQuote,
+              } : {}),
               canonical: true,
             },
           });
+          if (cashFlow) accountingPositionIds.add(event.positionId);
           const eventDedupKey = `${chain.chainId}:${event.transactionHash}:${event.logIndex}:position.${event.kind}`;
           await transaction.outboxEvent.upsert({
             where: { dedupKey: eventDedupKey },
@@ -820,6 +833,30 @@ export async function backfillPoolRegistry(
               type: calloutUpdateType,
             });
           }
+        }
+
+        for (const positionId of accountingPositionIds) {
+          const [position, deposits, withdrawals] = await Promise.all([
+            transaction.position.findUniqueOrThrow({
+              where: { chainId_id: { chainId: chain.chainId, id: positionId } },
+              select: { openingQuote: true },
+            }),
+            transaction.positionEvent.aggregate({
+              where: { chainId: chain.chainId, positionId, canonical: true, cashFlowType: 'deposit' },
+              _sum: { amountQuote: true },
+            }),
+            transaction.positionEvent.aggregate({
+              where: { chainId: chain.chainId, positionId, canonical: true, cashFlowType: 'withdrawal' },
+              _sum: { amountQuote: true },
+            }),
+          ]);
+          await transaction.position.update({
+            where: { chainId_id: { chainId: chain.chainId, id: positionId } },
+            data: {
+              depositedQuote: position.openingQuote.add(deposits._sum.amountQuote ?? 0),
+              withdrawnQuote: withdrawals._sum.amountQuote ?? 0,
+            },
+          });
         }
 
         const shareChanges: PositionShareChange[] = [];

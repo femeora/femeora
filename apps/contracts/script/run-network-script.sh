@@ -4,10 +4,10 @@ set -euo pipefail
 network="${1:-}"
 operation="${2:-}"
 if [[ "$network" != "testnet" && "$network" != "mainnet" ]]; then
-  echo "usage: ./script/run-network-script.sh <testnet|mainnet> <deploy|safe|timelock|prepare-handover|verify-handover|prepare-accounting|prepare-accounting-schedule|create-initial-pool>" >&2
+  echo "usage: ./script/run-network-script.sh <testnet|mainnet> <deploy|safe|timelock|prepare-handover|verify-handover|prepare-accounting|prepare-accounting-schedule|create-initial-pool|prepare-swap-migration|prepare-swap-migration-schedule|verify-swap-migration>" >&2
   exit 1
 fi
-if [[ "$operation" != "deploy" && "$operation" != "safe" && "$operation" != "timelock" && "$operation" != "prepare-handover" && "$operation" != "verify-handover" && "$operation" != "prepare-accounting" && "$operation" != "prepare-accounting-schedule" && "$operation" != "create-initial-pool" ]]; then
+if [[ "$operation" != "deploy" && "$operation" != "safe" && "$operation" != "timelock" && "$operation" != "prepare-handover" && "$operation" != "verify-handover" && "$operation" != "prepare-accounting" && "$operation" != "prepare-accounting-schedule" && "$operation" != "create-initial-pool" && "$operation" != "prepare-swap-migration" && "$operation" != "prepare-swap-migration-schedule" && "$operation" != "verify-swap-migration" ]]; then
   echo "unsupported deployment operation" >&2
   exit 1
 fi
@@ -60,5 +60,14 @@ case "$operation" in
     ;;
   create-initial-pool)
     forge script script/CreateInitialPool.s.sol:CreateInitialPool --sender "$DEPLOYER_ADDRESS" --broadcast
+    ;;
+  prepare-swap-migration)
+    WRITE_SWAP_MIGRATION_MANIFEST=true forge script script/PrepareSwapMigration.s.sol:PrepareSwapMigration --sender "$DEPLOYER_ADDRESS" --broadcast
+    ;;
+  prepare-swap-migration-schedule)
+    WRITE_SWAP_MIGRATION_SCHEDULE=true forge script script/PrepareSwapMigrationSchedule.s.sol:PrepareSwapMigrationSchedule
+    ;;
+  verify-swap-migration)
+    forge script script/VerifySwapMigration.s.sol:VerifySwapMigration
     ;;
 esac

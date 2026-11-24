@@ -335,6 +335,30 @@ export async function ensureCanonicalCursor(
       where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
       data: { canonical: false },
     });
+    for (const positionId of affectedPositionIds) {
+      const [position, deposits, withdrawals] = await Promise.all([
+        transaction.position.findUnique({
+          where: { chainId_id: { chainId, id: positionId } },
+          select: { openingQuote: true },
+        }),
+        transaction.positionEvent.aggregate({
+          where: { chainId, positionId, canonical: true, cashFlowType: 'deposit' },
+          _sum: { amountQuote: true },
+        }),
+        transaction.positionEvent.aggregate({
+          where: { chainId, positionId, canonical: true, cashFlowType: 'withdrawal' },
+          _sum: { amountQuote: true },
+        }),
+      ]);
+      if (!position) continue;
+      await transaction.position.update({
+        where: { chainId_id: { chainId, id: positionId } },
+        data: {
+          depositedQuote: position.openingQuote.add(deposits._sum.amountQuote ?? 0),
+          withdrawnQuote: withdrawals._sum.amountQuote ?? 0,
+        },
+      });
+    }
     await transaction.canonicalBlock.updateMany({
       where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
       data: { canonical: false },
