@@ -352,7 +352,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
         source: 'pool',
       };
     });
-    return { data: fillCandleGaps(serialized, query.data.interval, query.data.limit) };
+    return { data: serialized };
   });
 
   app.get('/v1/pools/:pool/lps', async (request, reply) => {
