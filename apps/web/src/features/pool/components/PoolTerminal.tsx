@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useToast } from '@/components/feedback/toast';
 import type { Callout } from '@/features/callouts/model/callout';

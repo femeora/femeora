@@ -4,8 +4,8 @@ import { ApiAssetReferencePriceSchema, ApiPoolAssetListSchema, ApiPoolCreationPr
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/Button';
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
+import { Button } from '@/components/ui/Button';
 import { TokenIcon } from '@/components/ui/TokenPair';
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
 import { useWallet } from '@/features/wallet/store';
