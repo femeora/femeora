@@ -1,6 +1,6 @@
+import type { ApiPoolAsset } from '@fomeora/types';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { ApiPoolAsset } from '@fomeora/types';
 import { formatUnits } from 'viem';
 
 import { ButtonLink } from '@/components/ui/ButtonLink';
