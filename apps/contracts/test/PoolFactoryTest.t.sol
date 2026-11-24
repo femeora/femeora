@@ -75,4 +75,32 @@ contract PoolFactoryTest {
         require(address(factory.dammDeployer()) == address(nextDamm), "damm deployer");
         require(address(factory.dlmmDeployer()) == address(nextDlmm), "dlmm deployer");
     }
+
+    function testGovernanceCanReplaceCanonicalDlmmWithoutOrphaningLegacyPositions() public {
+        address previousPool = factory.createDlmmPool(address(tokenA), address(tokenB), 3_000, 10, 0);
+        PoolKey memory key = PoolKeyLib.normalize(address(tokenA), address(tokenB), PoolModel.DLMM, 3_000, 10);
+
+        (bool unpausedSuccess,) = address(factory).call(
+            abi.encodeCall(
+                PoolFactory.replaceDlmmPool,
+                (previousPool, address(tokenA), address(tokenB), uint24(3_000), uint16(10), int24(0))
+            )
+        );
+        require(!unpausedSuccess, "unpaused legacy pool replaced");
+
+        DlmmPoolV2(previousPool).setPaused(true);
+        DlmmPoolV2Deployer correctedDeployer = new DlmmPoolV2Deployer(address(factory));
+        factory.setPoolDeployers(factory.dammDeployer(), correctedDeployer);
+        address replacement = factory.replaceDlmmPool(
+            previousPool, address(tokenA), address(tokenB), 3_000, 10, 0
+        );
+
+        require(replacement != previousPool, "replacement address unchanged");
+        require(registry.poolById(PoolKeyLib.id(key)) == replacement, "replacement not canonical");
+        require(registry.isRegisteredPool(previousPool), "legacy positions orphaned");
+        require(registry.isRegisteredPool(replacement), "replacement not registered");
+        require(DlmmPoolV2(replacement).swapMathVersion() == 2, "incorrect swap math");
+        require(DlmmPoolV2(replacement).administrator() == address(this), "replacement administrator");
+        require(DlmmPoolV2(replacement).protocolFeeRecipient() == TREASURY, "replacement treasury");
+    }
 }

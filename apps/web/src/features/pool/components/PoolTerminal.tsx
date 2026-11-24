@@ -3,10 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
-import type { Callout } from '@/features/callouts/model/callout';
-import { useAllCallouts } from '@/features/callouts/useAllCallouts';
-import { openApiEventStream } from '@/lib/api/realtime';
 
 import { usePositionDraft } from '../hooks/usePositionDraft';
 import type { ValueUnit } from '../model/format';
@@ -19,6 +15,11 @@ import { PoolHeader } from './PoolHeader';
 import { PoolTabs } from './PoolTabs';
 import { PriceChart } from './PriceChart';
 import { TradePanel, type PanelTab } from './TradePanel';
+
+import { useToast } from '@/components/feedback/toast';
+import type { Callout } from '@/features/callouts/model/callout';
+import { useAllCallouts } from '@/features/callouts/useAllCallouts';
+import { openApiEventStream } from '@/lib/api/realtime';
 
 interface PoolTerminalProps {
   pool: Pool;
@@ -55,40 +56,51 @@ export function PoolTerminal({
   const { own } = useAllCallouts(false);
   const candles = useMemo(() => candlesByInterval[interval], [candlesByInterval, interval]);
 
-  useEffect(() => openApiEventStream(`/v1/pools/${pool.address}/stream`, {
-    onMessage: message => {
-      if (message.topic !== 'pool.cap') return;
-      const payload = message.payload;
-      const record = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
-        ? payload as Record<string, unknown>
-        : null;
-      const status = record && typeof record.status === 'string'
-        ? record.status
-        : 'unavailable';
-      const utilizationBps = record && typeof record.utilizationBps === 'number'
-        ? record.utilizationBps
-        : null;
-      const usage = utilizationBps === null ? '' : ` (${(utilizationBps / 100).toFixed(2)}%)`;
-      if (status === 'critical') {
-        showToast(`Liquidity reserve usage is critical${usage}. New deposits or swaps may reach the configured safety limit.`, {
-          title: 'Pool reserve limit',
-          tone: 'error',
-          userFacing: true,
-        });
-      } else if (status === 'warning') {
-        showToast(`Liquidity reserve usage is approaching its safety limit${usage}.`, {
-          title: 'Pool reserve warning',
-          tone: 'info',
-        });
-      } else if (status === 'normal') {
-        showToast('Liquidity reserve usage has returned to the normal range.', {
-          title: 'Pool reserve recovered',
-          tone: 'success',
-        });
-      }
+  useEffect(() => {
+    const refreshPool = () => {
       router.refresh();
-    },
-  }), [pool.address, router, showToast]);
+      window.dispatchEvent(new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } }));
+    };
+    const stop = openApiEventStream(`/v1/pools/${pool.address}/stream`, {
+      onMessage: message => {
+        if (message.topic === 'pool.cap') {
+          const payload = message.payload;
+          const record = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+            ? payload as Record<string, unknown>
+            : null;
+          const status = record && typeof record.status === 'string' ? record.status : 'unavailable';
+          const utilizationBps = record && typeof record.utilizationBps === 'number' ? record.utilizationBps : null;
+          const usage = utilizationBps === null ? '' : ` (${(utilizationBps / 100).toFixed(2)}%)`;
+          if (status === 'critical') {
+            showToast(`Liquidity reserve usage is critical${usage}. New deposits or swaps may reach the configured safety limit.`, {
+              title: 'Pool reserve limit', tone: 'error', userFacing: true,
+            });
+          } else if (status === 'warning') {
+            showToast(`Liquidity reserve usage is approaching its safety limit${usage}.`, {
+              title: 'Pool reserve warning', tone: 'info',
+            });
+          } else if (status === 'normal') {
+            showToast('Liquidity reserve usage has returned to the normal range.', {
+              title: 'Pool reserve recovered', tone: 'success',
+            });
+          }
+        }
+        refreshPool();
+      },
+    });
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshPool();
+    }, 5_000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshPool();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [pool.address, router, showToast]);
 
   return (
     <div className="flex flex-col gap-4 px-gutter py-5">

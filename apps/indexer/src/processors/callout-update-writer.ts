@@ -18,7 +18,7 @@ export async function persistCalloutUpdate(
 ): Promise<string | null> {
   const callout = await transaction.callout.findUnique({
     where: { chainId_positionId: { chainId: input.chainId, positionId: input.positionId } },
-    select: { id: true },
+    select: { id: true, pool: { select: { address: true } } },
   });
   if (!callout) return null;
   const update = await transaction.calloutUpdate.upsert({
@@ -36,7 +36,7 @@ export async function persistCalloutUpdate(
     create: {
       dedupKey,
       topic: 'callout.update',
-      aggregateId: callout.id,
+      aggregateId: callout.pool.address.toLowerCase(),
       chainId: input.chainId,
       blockNumber: input.blockNumber,
       payload: {

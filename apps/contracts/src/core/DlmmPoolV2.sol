@@ -72,6 +72,7 @@ contract DlmmPoolV2 is ReentrancyGuard {
     uint8 public immutable token1Decimals;
     PoolModel public constant model = PoolModel.DLMM;
     uint8 public constant version = 2;
+    uint8 public constant swapMathVersion = 2;
     uint24 public immutable feePips;
     uint24 public immutable maxVolatilityAccumulator;
     uint16 public immutable binStepBps;
@@ -390,9 +391,9 @@ contract DlmmPoolV2 is ReentrancyGuard {
             if (outputReserve != 0) {
                 uint256 output = remainingOut < outputReserve ? remainingOut : outputReserve;
                 uint256 priceX18 = DlmmV2LiquidityMath.price(currentBin, binStepBps);
-                uint256 netInput = token0ToToken1
-                    ? FullMath.mulDivRoundingUp(output, 1e18, priceX18)
-                    : FullMath.mulDivRoundingUp(output, priceX18, 1e18);
+                uint256 netInput = DlmmV2LiquidityMath.quoteAtPrice(
+                    output, priceX18, !token0ToToken1, token0Decimals, token1Decimals, true
+                );
                 uint24 effectiveFeePips = currentFeePips();
                 amountIn += FullMath.mulDivRoundingUp(netInput, FEE_DENOMINATOR, FEE_DENOMINATOR - effectiveFeePips);
                 remainingOut -= output;
@@ -539,12 +540,14 @@ contract DlmmPoolV2 is ReentrancyGuard {
         uint256 priceX18 = DlmmV2LiquidityMath.price(binId, binStepBps);
         totalFee = FullMath.mulDivRoundingUp(availableInput, effectiveFeePips, FEE_DENOMINATOR);
         uint256 netInput = availableInput - totalFee;
-        output = token0ToToken1 ? FullMath.mulDiv(netInput, priceX18, 1e18) : FullMath.mulDiv(netInput, 1e18, priceX18);
+        output = DlmmV2LiquidityMath.quoteAtPrice(
+            netInput, priceX18, token0ToToken1, token0Decimals, token1Decimals, false
+        );
         if (output > outputReserve) {
             output = outputReserve;
-            netInput = token0ToToken1
-                ? FullMath.mulDivRoundingUp(output, 1e18, priceX18)
-                : FullMath.mulDivRoundingUp(output, priceX18, 1e18);
+            netInput = DlmmV2LiquidityMath.quoteAtPrice(
+                output, priceX18, !token0ToToken1, token0Decimals, token1Decimals, true
+            );
             consumed = FullMath.mulDivRoundingUp(netInput, FEE_DENOMINATOR, FEE_DENOMINATOR - effectiveFeePips);
             totalFee = consumed - netInput;
         } else {
@@ -571,9 +574,9 @@ contract DlmmPoolV2 is ReentrancyGuard {
         if (outputReserve == 0) return (0, 0, 0, 0);
         output = requestedOutput < outputReserve ? requestedOutput : outputReserve;
         uint256 priceX18 = DlmmV2LiquidityMath.price(binId, binStepBps);
-        uint256 netInput = token0ToToken1
-            ? FullMath.mulDivRoundingUp(output, 1e18, priceX18)
-            : FullMath.mulDivRoundingUp(output, priceX18, 1e18);
+        uint256 netInput = DlmmV2LiquidityMath.quoteAtPrice(
+            output, priceX18, !token0ToToken1, token0Decimals, token1Decimals, true
+        );
         input = FullMath.mulDivRoundingUp(netInput, FEE_DENOMINATOR, FEE_DENOMINATOR - effectiveFeePips);
         totalFee = input - netInput;
         protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, FEE_DENOMINATOR);

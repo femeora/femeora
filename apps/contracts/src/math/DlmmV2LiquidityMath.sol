@@ -14,6 +14,33 @@ library DlmmV2LiquidityMath {
     error StaleActiveBin();
     error ZeroLiquidityValue();
 
+    function quoteAtPrice(
+        uint256 amount,
+        uint256 priceX18,
+        bool token0ToToken1,
+        uint8 decimals0,
+        uint8 decimals1,
+        bool roundUp
+    ) internal pure returns (uint256) {
+        if (decimals0 > 36 || decimals1 > 36) revert InvalidDecimals();
+        uint256 numeratorFactor = PRICE_SCALE;
+        uint256 denominator = priceX18;
+        if (token0ToToken1) {
+            numeratorFactor = priceX18;
+            denominator = PRICE_SCALE;
+        }
+        uint8 sourceDecimals = token0ToToken1 ? decimals0 : decimals1;
+        uint8 targetDecimals = token0ToToken1 ? decimals1 : decimals0;
+        if (targetDecimals > sourceDecimals) {
+            numeratorFactor *= 10 ** uint256(targetDecimals - sourceDecimals);
+        } else if (sourceDecimals > targetDecimals) {
+            denominator *= 10 ** uint256(sourceDecimals - targetDecimals);
+        }
+        return roundUp
+            ? FullMath.mulDivRoundingUp(amount, numeratorFactor, denominator)
+            : FullMath.mulDiv(amount, numeratorFactor, denominator);
+    }
+
     function validateDeposit(
         int24 binId,
         int24 activeBin,

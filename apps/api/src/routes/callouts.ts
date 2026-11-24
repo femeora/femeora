@@ -65,7 +65,8 @@ async function createStatsEvent(
   chainId: number,
   action: string,
 ): Promise<void> {
-  const [likes, reposts, replies, tails] = await Promise.all([
+  const [callout, likes, reposts, replies, tails] = await Promise.all([
+    transaction.callout.findUnique({ where: { id: calloutId }, select: { pool: { select: { address: true } } } }),
     transaction.like.count({ where: { calloutId } }),
     transaction.repost.count({ where: { calloutId } }),
     transaction.reply.count({ where: { calloutId, hidden: false } }),
@@ -75,7 +76,7 @@ async function createStatsEvent(
     data: {
       dedupKey: `social:${action}:${calloutId}:${randomUUID()}`,
       topic: 'callout.stats',
-      aggregateId: calloutId,
+      aggregateId: callout?.pool.address.toLowerCase() ?? calloutId,
       chainId,
       payload: { id: calloutId, likes, reposts, replies, tails },
     },
@@ -197,7 +198,7 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
           data: {
             dedupKey: `callout-existing:${chainId}:${position.id.toString()}`,
             topic: 'callout.new',
-            aggregateId: created.id,
+            aggregateId: position.pool.address.toLowerCase(),
             chainId,
             blockNumber: latestEvent?.blockNumber ?? null,
             payload: {

@@ -177,11 +177,19 @@ export async function backfillPoolRegistry(
   while (nextBlock <= chain.safeBlock) {
     const configuredEnd = nextBlock + BigInt(environment.INDEXER_BATCH_SIZE) - 1n;
     const endBlock = configuredEnd < chain.safeBlock ? configuredEnd : chain.safeBlock;
-    const [logs, initializedLogs, end] = await Promise.all([
+    const [logs, replacementLogs, initializedLogs, end] = await Promise.all([
       client.getContractEvents({
         address: deployment.poolFactory,
         abi: poolFactoryAbi,
         eventName: 'PoolCreated',
+        fromBlock: nextBlock,
+        toBlock: endBlock,
+        strict: true,
+      }),
+      client.getContractEvents({
+        address: deployment.poolFactory,
+        abi: poolFactoryAbi,
+        eventName: 'DlmmPoolReplaced',
         fromBlock: nextBlock,
         toBlock: endBlock,
         strict: true,
@@ -196,9 +204,16 @@ export async function backfillPoolRegistry(
       }),
       client.getBlock({ blockNumber: endBlock }),
     ]);
+    const discoveryLogs = [...logs, ...replacementLogs];
 
     const existingPools = await prisma.pool.findMany({
-      where: { chainId: chain.chainId, canonical: true },
+      where: {
+        chainId: chain.chainId,
+        OR: [
+          { canonical: true },
+          { positions: { some: { canonical: true, status: { in: ['open', 'transferred'] } } } },
+        ],
+      },
     });
     const descriptorByAddress = new Map<string, PoolDescriptor>();
     for (const pool of existingPools) {
@@ -209,7 +224,7 @@ export async function backfillPoolRegistry(
         tokenY: pool.tokenY as Address,
       });
     }
-    for (const log of logs) {
+    for (const log of discoveryLogs) {
       descriptorByAddress.set(log.args.pool.toLowerCase(), {
         address: log.args.pool,
         type: Number(log.args.key.model) === 0 ? 'DAMM' : 'DLMM',
@@ -226,7 +241,7 @@ export async function backfillPoolRegistry(
         Number(log.args.initialActiveBin),
       ])
     );
-    for (const log of logs) {
+    for (const log of discoveryLogs) {
       if (Number(log.args.key.model) !== 1) continue;
       const initialActiveBin = initialActiveBinByAddress.get(log.args.pool.toLowerCase());
       if (initialActiveBin === undefined) throw new Error('INITIAL_ACTIVE_BIN_EVENT_MISSING');
@@ -239,7 +254,7 @@ export async function backfillPoolRegistry(
     }
     const missingTokens = [
       ...new Set(
-        logs
+        discoveryLogs
           .flatMap(log => [log.args.key.token0.toLowerCase(), log.args.key.token1.toLowerCase()])
           .filter(token => !tokenDecimals.has(token))
       ),
@@ -261,7 +276,7 @@ export async function backfillPoolRegistry(
     );
     const poolCaps = new Map<string, { reserveCapX: string; reserveCapY: string }>();
     await Promise.all(
-      logs.map(async log => {
+      discoveryLogs.map(async log => {
         const blockNumber = requireMinedValue(log.blockNumber, 'BLOCK_NUMBER');
         const type = Number(log.args.key.model) === 0 ? 'DAMM' : 'DLMM';
         const caps = await readPoolReserveCaps(
@@ -316,7 +331,13 @@ export async function backfillPoolRegistry(
           existingPositionPools.map(position => [position.id, position.poolId])
         );
         const storedFeeAccruals: FeeAccrualEvent[] = [];
-        for (const log of logs) {
+        for (const replacement of replacementLogs) {
+          await transaction.pool.updateMany({
+            where: { chainId: chain.chainId, address: replacement.args.previousPool.toLowerCase() },
+            data: { canonical: false },
+          });
+        }
+        for (const log of discoveryLogs) {
           const blockNumber = requireMinedValue(log.blockNumber, 'BLOCK_NUMBER');
           const { key, pool } = log.args;
           const quoteToken = configuredQuoteToken(
@@ -628,7 +649,7 @@ export async function backfillPoolRegistry(
             create: {
               dedupKey: eventDedupKey,
               topic: `position.${event.kind}`,
-              aggregateId: `${chain.chainId}:${event.positionId}`,
+              aggregateId: event.state.pool.toLowerCase(),
               chainId: chain.chainId,
               blockNumber: event.blockNumber,
               payload: {
@@ -712,7 +733,7 @@ export async function backfillPoolRegistry(
                   create: {
                     dedupKey: calloutDedupKey,
                     topic: 'callout.new',
-                    aggregateId: callout.id,
+                    aggregateId: event.state.pool.toLowerCase(),
                     chainId: chain.chainId,
                     blockNumber: event.blockNumber,
                     payload: {
@@ -1017,7 +1038,7 @@ export async function backfillPoolRegistry(
       { maxWait: 10_000, timeout: 60_000 }
     );
 
-    poolsDiscovered += logs.length;
+    poolsDiscovered += discoveryLogs.length;
     binsProjected += poolEvents.bins.length;
     binFeesProjected += poolEvents.binFees.length;
     swapsProjected += poolEvents.swaps.length;

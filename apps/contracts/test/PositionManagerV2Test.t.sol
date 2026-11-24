@@ -96,6 +96,7 @@ contract PositionManagerV2Test {
     function testCloseBurnsNftAndReturnsLiquidity() public {
         uint256 beforeBalance = token1.balanceOf(address(this));
         uint256 id = manager.createRangePosition(_params(false, bytes32(0)));
+        pool.setPaused(true);
         manager.closeRange(id, 0, 0, address(this), block.timestamp + 1);
         require(token1.balanceOf(address(this)) > beforeBalance - 36 ether, "liquidity returned");
         (,,,,,, bool open) = manager.positions(id);

@@ -1,8 +1,11 @@
 'use client';
 
 import { ApiIndexedPositionListSchema, type ApiIndexedPosition } from '@fomeora/types';
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { formatUnits } from 'viem';
+
+import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
+import type { Pool } from '../model/pool';
 
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
@@ -16,8 +19,6 @@ import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 import { tokenSymbol } from '@/lib/tokens';
 
-import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
-import type { Pool } from '../model/pool';
 
 type PoolTab = 'callouts' | 'positions' | 'top-lps' | 'trades';
 
@@ -66,16 +67,17 @@ function tradeAmount(raw: string, address: string, pool: Pool): string {
 }
 
 /** All canonical positions for this pool. Portfolio remains wallet-scoped. */
-function PoolPositions({ pool }: { pool: Pool }) {
+function PoolPositions({ pool, positions, error, isLoading, refresh }: {
+  pool: Pool;
+  positions: readonly ApiIndexedPosition[];
+  error: Error | undefined;
+  isLoading: boolean;
+  refresh: () => Promise<unknown>;
+}) {
   const account = useWallet(state => state.account);
   const [managingId, setManagingId] = useState<string | null>(null);
-  const { data, error, isLoading, mutate } = useApiResource(
-    `/v1/positions?pool=${encodeURIComponent(pool.address)}&limit=200`,
-    ApiIndexedPositionListSchema,
-  );
-  const positions = data?.data ?? [];
   if (isLoading) return <p className="py-10 text-center text-muted">Loading canonical pool positions…</p>;
-  if (error) return <div role="alert" className="py-10 text-center"><p className="text-down">Pool positions are temporarily unavailable.</p><button type="button" onClick={() => void mutate()} className="t-label mt-3 min-h-11 underline underline-offset-4">Retry</button></div>;
+  if (error) return <div role="alert" className="py-10 text-center"><p className="text-down">Pool positions are temporarily unavailable.</p><button type="button" onClick={() => void refresh()} className="t-label mt-3 min-h-11 underline underline-offset-4">Retry</button></div>;
   if (positions.length === 0) return <p className="py-10 text-center text-muted">No indexed positions in this pool yet.</p>;
   return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Actions']}>
     {positions.map(position => {
@@ -92,7 +94,7 @@ function PoolPositions({ pool }: { pool: Pool }) {
           <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
           <td className={cellClass}>{manageable ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : <span className="text-faint">—</span>}</td>
         </tr>
-        {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={mutate} /></td></tr> : null}
+        {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={refresh} /></td></tr> : null}
       </Fragment>;
     })}
   </Table>;
@@ -102,13 +104,26 @@ const cellClass = 'border-t border-line py-3 pr-4 align-middle last:pr-0 last:te
 
 /** Bottom tabs of the pool page (brief 8.1). */
 export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: PoolTabsProps) {
-  const [tab, setTab] = useState<PoolTab>('callouts');
+  const [tab, setTab] = useState<PoolTab>('positions');
   const { own } = useAllCallouts(false);
+  const positionsResource = useApiResource(
+    `/v1/positions?pool=${encodeURIComponent(pool.address)}&limit=200`,
+    ApiIndexedPositionListSchema,
+  );
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ pool?: string }>).detail;
+      if (detail?.pool?.toLowerCase() === pool.address.toLowerCase()) void positionsResource.mutate();
+    };
+    window.addEventListener('fomeora:pool-update', refresh);
+    return () => window.removeEventListener('fomeora:pool-update', refresh);
+  }, [pool.address, positionsResource]);
+  const positions = positionsResource.data?.data ?? [];
   const callouts = [...own, ...canonicalCallouts];
   const ownIds = new Set(own.map(callout => callout.id));
   const tabItems: readonly { value: PoolTab; label: string }[] = [
     { value: 'callouts', label: `Callouts · ${callouts.length}` },
-    { value: 'positions', label: 'Positions' },
+    { value: 'positions', label: `Positions · ${positions.length}` },
     { value: 'top-lps', label: 'Top LPs' },
     { value: 'trades', label: 'Trades' },
   ];
@@ -127,7 +142,13 @@ export function PoolTabs({ pool, trades, lps, callouts: canonicalCallouts }: Poo
         )
       ) : null}
 
-      {tab === 'positions' ? <PoolPositions pool={pool} /> : null}
+      {tab === 'positions' ? <PoolPositions
+        pool={pool}
+        positions={positions}
+        error={positionsResource.error}
+        isLoading={positionsResource.isLoading}
+        refresh={() => positionsResource.mutate()}
+      /> : null}
 
       {tab === 'top-lps' ? (
         <Table head={['#', 'LP', 'Value', 'Earned', 'Range']}>

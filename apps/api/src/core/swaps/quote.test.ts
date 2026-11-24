@@ -18,6 +18,8 @@ test('consumes DLMM output reserves across bins with Solidity rounding', () => {
     token0ToToken1: true,
     feePips: 0,
     binStepBps: 100,
+    decimals0: 18,
+    decimals1: 18,
     maximumBinCrossings: 2,
     bins: [
       { binId: 0, reserve0: 0n, reserve1: 1_000n },
@@ -32,7 +34,25 @@ test('rejects a DLMM quote when the crossing cap cannot consume all input', () =
     token0ToToken1: true,
     feePips: 0,
     binStepBps: 100,
+    decimals0: 18,
+    decimals1: 18,
     maximumBinCrossings: 1,
     bins: [{ binId: 0, reserve0: 0n, reserve1: 1_000n }],
   }), /INSUFFICIENT_LIQUIDITY/);
+});
+
+test('normalizes a USDG to WETH quote across 6 and 18 decimals', () => {
+  const quote = quoteDlmmExactInput({
+    amountIn: 50_000n,
+    token0ToToken1: false,
+    feePips: 3_000,
+    binStepBps: 100,
+    decimals0: 18,
+    decimals1: 6,
+    maximumBinCrossings: 1,
+    bins: [{ binId: 746, reserve0: 10n ** 18n, reserve1: 1_000_000n }],
+  });
+
+  assert.ok(quote.amountOut > 10_000_000_000_000n, 'must return WETH wei, not a two-digit raw amount');
+  assert.ok(quote.amountOut < 100_000_000_000_000n, 'quote remains within the expected 0.00001-0.0001 WETH range');
 });

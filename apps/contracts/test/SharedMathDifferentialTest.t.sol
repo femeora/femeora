@@ -23,5 +23,14 @@ contract SharedMathDifferentialTest {
             DlmmV2LiquidityMath.token1Value(2e18, 3e6, 1e18, 18, 6) == 5e6,
             "decimal value"
         );
+        require(
+            DlmmV2LiquidityMath.quoteAtPrice(50_000, 1_680e18, false, 18, 6, false)
+                == 29_761_904_761_904,
+            "USDG to WETH decimal quote"
+        );
+        require(
+            DlmmV2LiquidityMath.quoteAtPrice(1e15, 1_680e18, true, 18, 6, false) == 1_680_000,
+            "WETH to USDG decimal quote"
+        );
     }
 }

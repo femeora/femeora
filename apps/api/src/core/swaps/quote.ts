@@ -28,6 +28,31 @@ export function quoteDammExactInput(input: {
 
 export type QuoteBin = { binId: number; reserve0: bigint; reserve1: bigint };
 
+function quoteAtPrice(input: {
+  amount: bigint;
+  priceX18: bigint;
+  token0ToToken1: boolean;
+  decimals0: number;
+  decimals1: number;
+  roundUp: boolean;
+}) {
+  const { amount, priceX18, token0ToToken1, decimals0, decimals1, roundUp } = input;
+  if (![decimals0, decimals1].every(value => Number.isInteger(value) && value >= 0 && value <= 36)) {
+    throw new RangeError('INVALID_DECIMALS');
+  }
+  let numeratorFactor = token0ToToken1 ? priceX18 : PRICE_SCALE;
+  let denominator = token0ToToken1 ? PRICE_SCALE : priceX18;
+  const sourceDecimals = token0ToToken1 ? decimals0 : decimals1;
+  const targetDecimals = token0ToToken1 ? decimals1 : decimals0;
+  if (targetDecimals > sourceDecimals) {
+    numeratorFactor *= 10n ** BigInt(targetDecimals - sourceDecimals);
+  } else if (sourceDecimals > targetDecimals) {
+    denominator *= 10n ** BigInt(sourceDecimals - targetDecimals);
+  }
+  const numerator = amount * numeratorFactor;
+  return roundUp ? ceilDiv(numerator, denominator) : numerator / denominator;
+}
+
 // Branches mirror the audited Solidity per-bin rounding path.
 // eslint-disable-next-line complexity
 export function quoteDlmmExactInput(input: {
@@ -35,6 +60,8 @@ export function quoteDlmmExactInput(input: {
   token0ToToken1: boolean;
   feePips: number;
   binStepBps: number;
+  decimals0: number;
+  decimals1: number;
   maximumBinCrossings: number;
   bins: readonly QuoteBin[];
 }) {
@@ -60,15 +87,25 @@ export function quoteDlmmExactInput(input: {
     const priceX18 = priceFromBinX18(bin.binId, binStepBps);
     let fee = ceilDiv(remaining * feePips, FEE_DENOMINATOR);
     let netInput = remaining - fee;
-    let output = token0ToToken1
-      ? netInput * priceX18 / PRICE_SCALE
-      : netInput * PRICE_SCALE / priceX18;
+    let output = quoteAtPrice({
+      amount: netInput,
+      priceX18,
+      token0ToToken1,
+      decimals0: input.decimals0,
+      decimals1: input.decimals1,
+      roundUp: false,
+    });
     let consumed = remaining;
     if (output > outputReserve) {
       output = outputReserve;
-      netInput = token0ToToken1
-        ? ceilDiv(output * PRICE_SCALE, priceX18)
-        : ceilDiv(output * priceX18, PRICE_SCALE);
+      netInput = quoteAtPrice({
+        amount: output,
+        priceX18,
+        token0ToToken1: !token0ToToken1,
+        decimals0: input.decimals0,
+        decimals1: input.decimals1,
+        roundUp: true,
+      });
       consumed = ceilDiv(netInput * FEE_DENOMINATOR, FEE_DENOMINATOR - feePips);
       fee = consumed - netInput;
     }

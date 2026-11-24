@@ -227,6 +227,61 @@ export const poolRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "replacePool",
+    "inputs": [
+      {
+        "name": "poolId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "expectedPool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "key",
+        "type": "tuple",
+        "internalType": "struct PoolKey",
+        "components": [
+          {
+            "name": "token0",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "token1",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "model",
+            "type": "uint8",
+            "internalType": "enum PoolModel"
+          },
+          {
+            "name": "feePips",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "binStepBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setRole",
     "inputs": [
       {
@@ -275,6 +330,64 @@ export const poolRegistryAbi = [
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "key",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct PoolKey",
+        "components": [
+          {
+            "name": "token0",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "token1",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "model",
+            "type": "uint8",
+            "internalType": "enum PoolModel"
+          },
+          {
+            "name": "feePips",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "binStepBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PoolReplaced",
+    "inputs": [
+      {
+        "name": "poolId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "previousPool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       },
       {
         "name": "pool",
@@ -389,6 +502,11 @@ export const poolRegistryAbi = [
   {
     "type": "error",
     "name": "PoolAlreadyRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PoolNotRegistered",
     "inputs": []
   },
   {
@@ -828,6 +946,50 @@ export const poolFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "replaceDlmmPool",
+    "inputs": [
+      {
+        "name": "expectedPool",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenA",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenB",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "feePips",
+        "type": "uint24",
+        "internalType": "uint24"
+      },
+      {
+        "name": "binStepBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "initialActiveBin",
+        "type": "int24",
+        "internalType": "int24"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPoolDeployers",
     "inputs": [
       {
@@ -960,6 +1122,64 @@ export const poolFactoryAbi = [
         "type": "int24",
         "indexed": false,
         "internalType": "int24"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DlmmPoolReplaced",
+    "inputs": [
+      {
+        "name": "poolId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "previousPool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "key",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct PoolKey",
+        "components": [
+          {
+            "name": "token0",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "token1",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "model",
+            "type": "uint8",
+            "internalType": "enum PoolModel"
+          },
+          {
+            "name": "feePips",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "binStepBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
       }
     ],
     "anonymous": false
@@ -2853,6 +3073,19 @@ export const dlmmPoolV2Abi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "swapMathVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

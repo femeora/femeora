@@ -77,4 +77,32 @@ contract DlmmFeeEventTest {
             );
         require(!success, "reserve cap bypassed");
     }
+
+    function test_SwapNormalizesUnequalTokenDecimals() public {
+        MockERC20 eighteen = new MockERC20("Wrapped Ether", "WETH", 18);
+        MockERC20 six = new MockERC20("Global Dollar", "USDG", 6);
+        PoolKey memory key = PoolKeyLib.normalize(address(eighteen), address(six), PoolModel.DLMM, 3_000, 100);
+        MockERC20 first = MockERC20(key.token0);
+        MockERC20 second = MockERC20(key.token1);
+        DlmmPoolV2 decimalPool = new DlmmPoolV2(key, address(this), 0);
+        decimalPool.setReserveCaps(type(uint256).max, type(uint256).max);
+
+        uint256 firstUnit = 10 ** first.decimals();
+        uint256 secondUnit = 10 ** second.decimals();
+        first.mint(address(this), 2 * firstUnit);
+        second.mint(address(this), 2 * secondUnit);
+        first.approve(address(decimalPool), type(uint256).max);
+        second.approve(address(decimalPool), type(uint256).max);
+
+        DlmmPoolV2.AddBin[] memory additions = new DlmmPoolV2.AddBin[](1);
+        additions[0] = DlmmPoolV2.AddBin(0, firstUnit, secondUnit, 0);
+        decimalPool.addLiquidityBatch(bytes32("decimal-swap"), additions, 0, address(this), block.timestamp + 1);
+
+        bool sixToEighteen = address(six) == key.token0;
+        (uint256 amountOut,) = decimalPool.swapExactInput(
+            sixToEighteen, 50_000, 0, 1, address(this), block.timestamp + 1
+        );
+        require(amountOut > 49_000_000_000_000_000, "output not normalized to 18 decimals");
+        require(amountOut < 50_000_000_000_000_000, "fee not applied");
+    }
 }

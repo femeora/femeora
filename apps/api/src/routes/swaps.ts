@@ -16,7 +16,6 @@ import {
 } from 'viem';
 import { z } from 'zod';
 
-import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import type { ApiChainClient } from '../core/chain-client.js';
 import { quoteDammExactInput, quoteDlmmExactInput } from '../core/swaps/quote.js';
 
@@ -33,6 +32,7 @@ const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
 ]);
+const swapMathVersionAbi = parseAbi(['function swapMathVersion() view returns (uint8)']);
 const QUOTE_TTL_SECONDS = 30;
 const SWAP_DEADLINE_SECONDS = 10 * 60;
 
@@ -80,12 +80,12 @@ async function buildQuote(
   if (!token0ToToken1 && input.tokenIn !== pool.tokenY.toLowerCase()) {
     throw new SwapRouteError(400, 'TOKEN_NOT_IN_POOL');
   }
+  if (pool.tokenXDecimals === null || pool.tokenYDecimals === null) {
+    throw new SwapRouteError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
+  }
   const tokenOut = (token0ToToken1 ? pool.tokenY : pool.tokenX) as Address;
   const tokenInDecimals = token0ToToken1 ? pool.tokenXDecimals : pool.tokenYDecimals;
   const tokenOutDecimals = token0ToToken1 ? pool.tokenYDecimals : pool.tokenXDecimals;
-  if (tokenInDecimals === null || tokenOutDecimals === null) {
-    throw new SwapRouteError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
-  }
   let amountInRaw: bigint;
   try {
     amountInRaw = parseUnits(input.amountIn, tokenInDecimals);
@@ -95,6 +95,23 @@ async function buildQuote(
   if (amountInRaw <= 0n) throw new SwapRouteError(400, 'INVALID_TOKEN_AMOUNT');
   const blockNumber = await blockProvider(chainId);
   const poolAddress = pool.address as Address;
+
+  // Older DLMM pools used raw token units in swap math. Unequal-decimal pairs
+  // must remain unavailable until their canonical pool is migrated.
+  if (pool.type === 'DLMM' && pool.tokenXDecimals !== pool.tokenYDecimals) {
+    try {
+      const mathVersion = await client.readContract({
+        address: poolAddress,
+        abi: swapMathVersionAbi,
+        functionName: 'swapMathVersion',
+        blockNumber,
+      });
+      if (mathVersion < 2) throw new SwapRouteError(409, 'SWAP_POOL_MIGRATION_REQUIRED');
+    } catch (error) {
+      if (error instanceof SwapRouteError) throw error;
+      throw new SwapRouteError(409, 'SWAP_POOL_MIGRATION_REQUIRED');
+    }
+  }
 
   let result: { amountOut: bigint; totalFee: bigint; binCrossings: number };
   try {
@@ -136,6 +153,8 @@ async function buildQuote(
         token0ToToken1,
         feePips,
         binStepBps: pool.binStep,
+        decimals0: pool.tokenXDecimals,
+        decimals1: pool.tokenYDecimals,
         maximumBinCrossings: input.maximumBinCrossings,
         bins: rows.map(bin => ({
           binId: bin.binId,
@@ -202,14 +221,9 @@ export async function registerSwapRoutes(
   });
 
   app.post('/v1/pools/:pool/swap-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {
-    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
-    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
     const params = paramsSchema.safeParse(request.params);
     const body = prepareSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_SWAP_PREPARATION' });
-    if (!session.user.wallets.some(wallet => wallet.address.toLowerCase() === body.data.walletAddress)) {
-      return reply.status(403).send({ error: 'WALLET_NOT_LINKED' });
-    }
     try {
       const pool = await canonicalPool(chainId, params.data.pool);
       if (!pool) throw new SwapRouteError(404, 'POOL_NOT_FOUND');

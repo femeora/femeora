@@ -28,6 +28,7 @@ contract PoolFactory is ProtocolAccess, UUPSUpgradeable {
     event PoolGovernanceConfigured(address indexed administrator, address indexed feeRecipient, uint24 feeSharePips);
     event PoolDeployersUpdated(address indexed dammDeployer, address indexed dlmmDeployer);
     event TokenReserveCapUpdated(address indexed token, uint256 reserveCap);
+    event DlmmPoolReplaced(bytes32 indexed poolId, address indexed previousPool, address indexed pool, PoolKey key);
 
     constructor() {
         _disableInitializers();
@@ -125,6 +126,40 @@ contract PoolFactory is ProtocolAccess, UUPSUpgradeable {
         if (binStepBps == 0 || binStepBps > 1_000) revert InvalidConfiguration();
         PoolKey memory key = PoolKeyLib.normalize(tokenA, tokenB, PoolModel.DLMM, feePips, binStepBps);
         pool = _createPool(key, initialActiveBin);
+    }
+
+    /// @notice Deploys a corrected DLMM pool and atomically makes it canonical in the registry.
+    /// @dev Governance must pause `expectedPool` in the same timelock batch before calling this function.
+    ///      The legacy pool remains registered so existing positions can still be decreased or closed.
+    function replaceDlmmPool(
+        address expectedPool,
+        address tokenA,
+        address tokenB,
+        uint24 feePips,
+        uint16 binStepBps,
+        int24 initialActiveBin
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (address pool) {
+        if (expectedPool == address(0) || tokenA.code.length == 0 || tokenB.code.length == 0) {
+            revert InvalidConfiguration();
+        }
+        if (feePips == 0 || feePips >= 1_000_000 || binStepBps == 0 || binStepBps > 1_000) {
+            revert InvalidConfiguration();
+        }
+        PoolKey memory key = PoolKeyLib.normalize(tokenA, tokenB, PoolModel.DLMM, feePips, binStepBps);
+        bytes32 poolId = PoolKeyLib.id(key);
+        if (registry.poolById(poolId) != expectedPool || !DlmmPoolV2(expectedPool).paused()) {
+            revert InvalidConfiguration();
+        }
+        uint256 reserveCap0 = tokenReserveCaps[key.token0];
+        uint256 reserveCap1 = tokenReserveCaps[key.token1];
+        if (reserveCap0 == 0 || reserveCap1 == 0) revert TokenReserveCapMissing();
+        pool = dlmmDeployer.deploy(key, address(this), initialActiveBin);
+        DlmmPoolV2(pool).setReserveCaps(reserveCap0, reserveCap1);
+        DlmmPoolV2(pool).setProtocolFeeConfiguration(protocolFeeRecipient, protocolFeeSharePips);
+        DlmmPoolV2(pool).setAdministrator(poolAdministrator);
+        registry.replacePool(poolId, expectedPool, pool, key);
+        emit DlmmPoolReplaced(poolId, expectedPool, pool, key);
+        emit DlmmPoolInitialized(pool, initialActiveBin);
     }
 
     function predictPoolAddress(PoolKey calldata key, address administrator) external view returns (address predicted) {
