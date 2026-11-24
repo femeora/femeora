@@ -75,6 +75,20 @@ model AssetCatalog {
   @@map("asset_catalog")
 }
 
+model AssetDisplayConfig {
+  chainId          Int      @map("chain_id")
+  address          String   @db.VarChar(42)
+  candidateEnabled Boolean  @default(true) @map("candidate_enabled")
+  candidateRank    Int?     @map("candidate_rank")
+  logoUrl          String?  @map("logo_url") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@id([chainId, address])
+  @@index([chainId, candidateEnabled, candidateRank])
+  @@map("asset_display_configs")
+}
+
 model ChainCursor {
   chainId            Int      @id @map("chain_id")
   nextBlock          BigInt   @map("next_block")

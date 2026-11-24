@@ -28,8 +28,8 @@ export function TokenPair({ tokenX, tokenY, compact = false }: { tokenX: string;
   return (
     <span className="inline-flex min-w-0 items-center gap-3">
       <span className="flex shrink-0 items-center pl-1">
-        <TokenIcon token={tokenX} className={compact ? 'size-7' : undefined} />
-        <TokenIcon token={tokenY} className={cn('-ml-2', compact && 'size-7')} />
+        <TokenIcon token={tokenX} className={cn('z-10', compact && 'size-7')} />
+        <TokenIcon token={tokenY} className={cn('-ml-3', compact && 'size-7')} />
       </span>
       <span className="min-w-0">
         <span className="block font-medium">{first.symbol} / {second.symbol}</span>

@@ -58,7 +58,11 @@ export default async function PoolsPage() {
   const liveTokens = new Set(result.data.flatMap(pool => [pool.tokenX.toLowerCase(), pool.tokenY.toLowerCase()]));
   const quote = assets.find(asset => asset.executable && asset.symbol.toUpperCase() === 'USDG' && asset.category === 'stablecoin');
   const candidates = quote
-    ? assets.filter(asset => asset.executable && (asset.category === 'stock' || asset.category === 'etf') && !liveTokens.has(asset.address.toLowerCase())).slice(0, 18)
+    ? assets
+      .filter(asset => asset.executable && (asset.category === 'stock' || asset.category === 'etf') && !liveTokens.has(asset.address.toLowerCase()))
+      .filter(asset => asset.candidateEnabled)
+      .sort((a, b) => (a.candidateRank ?? Number.MAX_SAFE_INTEGER) - (b.candidateRank ?? Number.MAX_SAFE_INTEGER) || a.symbol.localeCompare(b.symbol))
+      .slice(0, 24)
     : [];
 
   return (
@@ -113,7 +117,7 @@ export default async function PoolsPage() {
       {quote && candidates.length > 0 ? <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {candidates.map(asset => <li key={`${asset.chainId}:${asset.address}`} className="glass rounded-[2px] p-5">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3"><span className="flex pl-1"><AssetLogo asset={asset} /><AssetLogo asset={quote} /></span><div className="min-w-0"><h3 className="truncate font-medium">{asset.symbol} / {quote.symbol}</h3><p className="truncate text-sm text-muted">{asset.name}</p></div></div>
+            <div className="flex min-w-0 items-center gap-3"><span className="flex items-center pl-1"><AssetLogo asset={asset} className="z-10" /><AssetLogo asset={quote} className="-ml-3" /></span><div className="min-w-0"><h3 className="truncate font-medium">{asset.symbol} / {quote.symbol}</h3><p className="truncate text-sm text-muted">{asset.name}</p></div></div>
             <span className="t-label border border-signal/40 bg-signal/10 px-2 py-1 text-signal">Candidate</span>
           </div>
           <dl className="t-label mt-5 grid grid-cols-2 gap-3 border-y border-line py-4 text-muted">

@@ -18,6 +18,8 @@ export const ApiPoolAssetSchema = z.object({
   isin: z.string().nullable(),
   tradingStatus: z.object({ market: z.string().nullable(), extended: z.string().nullable(), overnight: z.string().nullable() }).nullable(),
   currentMultiplier: z.string().nullable(),
+  candidateEnabled: z.boolean(),
+  candidateRank: z.number().int().positive().nullable(),
 });
 export const ApiPoolAssetListSchema = z.object({ data: z.array(ApiPoolAssetSchema) });
 export type ApiPoolAsset = z.infer<typeof ApiPoolAssetSchema>;

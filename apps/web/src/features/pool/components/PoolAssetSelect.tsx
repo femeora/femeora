@@ -4,6 +4,7 @@ import type { ApiPoolAsset } from '@fomeora/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { TokenIcon } from '@/components/ui/TokenPair';
+import { cn } from '@/lib/cn';
 
 type Category = 'all' | ApiPoolAsset['category'];
 
@@ -52,18 +53,21 @@ export function PoolAssetSelect({ label, value, exclude, assets, onChange }: {
   </div>;
 }
 
-export function AssetLogo({ asset }: { asset: ApiPoolAsset }) {
+export function AssetLogo({ asset, className }: { asset: ApiPoolAsset; className?: string }) {
   const companyLogo = asset.category === 'stock' || asset.category === 'etf'
     ? `https://logoapi.sh/ticker/${encodeURIComponent(asset.symbol)}.png`
     : null;
-  const candidates = useMemo(() => [companyLogo, asset.logoUrl].filter((url): url is string => Boolean(url)), [asset.logoUrl, companyLogo]);
+  const candidates = useMemo(
+    () => [asset.logoUrl, companyLogo].filter((url): url is string => Boolean(url)),
+    [asset.logoUrl, companyLogo],
+  );
   const [candidate, setCandidate] = useState(0);
   useEffect(() => setCandidate(0), [asset.address, candidates]);
   const logoUrl = candidates[candidate];
 
   return logoUrl
-    ? <span className="relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-white p-1"><img src={logoUrl} alt={`${asset.name} logo`} className="size-full object-contain" onError={() => setCandidate(current => current + 1)} /></span>
-    : <TokenIcon token={asset.address} />;
+    ? <span className={cn('relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line-strong bg-white p-1 shadow-[0_3px_14px_rgb(0_0_0/0.32)]', className)}><img src={logoUrl} alt={`${asset.name} logo`} className="size-full object-contain" onError={() => setCandidate(current => current + 1)} /></span>
+    : <TokenIcon token={asset.address} className={className} />;
 }
 
 function statusLabel(status: string | null) {

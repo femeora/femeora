@@ -57,7 +57,11 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
   const deployment = tryGetFomeoraDeployment(chainId);
 
   app.get('/v1/pool-assets', async () => {
-    const pools = await prisma.pool.findMany({ where: { chainId, canonical: true }, select: { tokenX: true, tokenY: true } });
+    const [pools, displayConfigs] = await Promise.all([
+      prisma.pool.findMany({ where: { chainId, canonical: true }, select: { tokenX: true, tokenY: true } }),
+      prisma.assetDisplayConfig.findMany({ where: { chainId } }),
+    ]);
+    const displayByAddress = new Map(displayConfigs.map(config => [config.address.toLowerCase(), config]));
     const tokens = [...new Set(pools.flatMap(pool => [pool.tokenX, pool.tokenY]))] as Address[];
     const chainAssets = (await Promise.all(tokens.map(token => metadata(client, token)))).map(asset => ({
       ...asset, chainId, logoUrl: null, category: asset.symbol.toUpperCase().includes('USD') ? 'stablecoin' as const : 'crypto' as const,
@@ -82,7 +86,18 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       }));
     }
     const byIdentity = new Map([...chainAssets, ...stocks].map(asset => [`${asset.chainId}:${asset.address.toLowerCase()}`, asset]));
-    return { data: [...byIdentity.values()].sort((a, b) => Number(b.executable) - Number(a.executable) || a.symbol.localeCompare(b.symbol)) };
+    const data = [...byIdentity.values()].map(asset => {
+      const display = displayByAddress.get(asset.address.toLowerCase());
+      return {
+        ...asset,
+        logoUrl: display?.logoUrl ?? asset.logoUrl,
+        candidateEnabled: display?.candidateEnabled ?? asset.source === 'robinhood',
+        candidateRank: display?.candidateRank ?? null,
+      };
+    });
+    return { data: data.sort((a, b) => Number(b.executable) - Number(a.executable)
+      || (a.candidateRank ?? Number.MAX_SAFE_INTEGER) - (b.candidateRank ?? Number.MAX_SAFE_INTEGER)
+      || a.symbol.localeCompare(b.symbol)) };
   });
 
   app.get('/v1/pool-assets/:asset/reference-price', async (request, reply) => {
@@ -160,8 +175,8 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       if (existingPool === zeroAddress) gas = await client.estimateGas({ account: input.wallet, to: deployment.poolFactory, data, value: 0n });
       return {
         chainId, factory: deployment.poolFactory, poolId, model: input.model,
-        token0: { ...token0, chainId, logoUrl: null, category: token0.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null },
-        token1: { ...token1, chainId, logoUrl: null, category: token1.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null },
+        token0: { ...token0, chainId, logoUrl: null, category: token0.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null },
+        token1: { ...token1, chainId, logoUrl: null, category: token1.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null },
         feePips: input.feePips, binStepBps: input.binStepBps, initialActiveBin, representedPrice,
         existingPool: existingPool === zeroAddress ? null : existingPool, predictedPool,
         transaction: { chainId, to: deployment.poolFactory, data, value: '0x0', ...(gas ? { gas: toHex(gas) } : {}) },
