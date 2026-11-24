@@ -36,7 +36,7 @@ const MAX_BAR = 15;
 export function Avatar({ seed, src = null, alt = '', size = 'md', self = false, className }: AvatarProps) {
   const { bars, accent, background, barTone } = avatarSpec(seed);
   const frame = cn(
-    'shrink-0 overflow-hidden rounded-full bg-panel-2',
+    'inline-flex aspect-square shrink-0 overflow-hidden rounded-full bg-panel-2 align-middle',
     self ? 'ring-2 ring-signal ring-offset-2 ring-offset-bg' : 'ring-1 ring-fg/15',
     sizes[size],
     className

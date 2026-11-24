@@ -17,6 +17,15 @@ export interface CalloutUpdate {
   ago: string;
 }
 
+export interface CalloutComment {
+  id: string;
+  parentId: string | null;
+  kind: 'reply' | 'quote';
+  body: string;
+  createdAt: string;
+  caller: Caller;
+}
+
 /**
  * A callout: one post attached to one on-chain position (brief 5). Numbers are the
  * shape of `GET /v1/callouts/:id`; display strings are derived, never stored.
@@ -30,6 +39,8 @@ export interface Callout {
   caption: string | null;
   edited: boolean;
   pool: {
+    chainId: number;
+    address: string;
     base: string;
     quote: string;
     baseAddress: string;
@@ -55,8 +66,10 @@ export interface Callout {
   likes: number;
   reposts: number;
   replies: number;
+  quotes: number;
   viewer: { liked: boolean; reposted: boolean; following: boolean };
   views: number;
+  comments: readonly CalloutComment[];
   mcAtPostUsd: number;
   mcNowUsd: number;
   /** Minutes between posting and removing 50%+, when that happened within 30 min. */

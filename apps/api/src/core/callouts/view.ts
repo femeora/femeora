@@ -59,7 +59,20 @@ export const calloutInclude = {
       },
     },
   },
-  _count: { select: { likes: true, reposts: true, replies: true, tails: true } },
+  replies: {
+    where: { hidden: false },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      calloutId: true,
+      parentId: true,
+      kind: true,
+      body: true,
+      createdAt: true,
+      user: { select: { id: true, handle: true, name: true, avatarUrl: true, xVerified: true } },
+    },
+  },
+  _count: { select: { likes: true, reposts: true, tails: true, views: true } },
 } satisfies Prisma.CalloutInclude;
 
 export type CalloutView = Prisma.CalloutGetPayload<{ include: typeof calloutInclude }>;
@@ -140,7 +153,14 @@ export function serializeCallout(
       inRangeSeconds: callout.position.inRangeSeconds.toString(),
       openSeconds: callout.position.openSeconds.toString(),
     },
-    stats: callout._count,
+    stats: {
+      likes: callout._count.likes,
+      reposts: callout._count.reposts,
+      replies: callout.replies.filter(reply => reply.kind === 'reply').length,
+      quotes: callout.replies.filter(reply => reply.kind === 'quote').length,
+      views: callout._count.views,
+      tails: callout._count.tails,
+    },
     viewer,
     updates: callout.updates
       .filter(update => update.positionEvent.canonical)
@@ -153,5 +173,10 @@ export function serializeCallout(
         timestamp: update.positionEvent.timestamp.toISOString(),
         createdAt: update.createdAt.toISOString(),
       })),
+    comments: callout.replies.map(reply => ({
+      ...reply,
+      kind: reply.kind === 'quote' ? 'quote' : 'reply',
+      createdAt: reply.createdAt.toISOString(),
+    })),
   };
 }

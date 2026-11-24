@@ -227,6 +227,8 @@ export const ApiCalloutSchema = z.object({
     likes: z.number().int().nonnegative(),
     reposts: z.number().int().nonnegative(),
     replies: z.number().int().nonnegative(),
+    quotes: z.number().int().nonnegative(),
+    views: z.number().int().nonnegative(),
     tails: z.number().int().nonnegative(),
   }),
   viewer: z.object({
@@ -245,6 +247,21 @@ export const ApiCalloutSchema = z.object({
       createdAt: z.string().datetime(),
     })
   ),
+  comments: z.array(z.object({
+    id: z.string().uuid(),
+    calloutId: z.string().uuid(),
+    parentId: z.string().uuid().nullable(),
+    kind: z.enum(['reply', 'quote']),
+    body: z.string().min(1),
+    createdAt: z.string().datetime(),
+    user: z.object({
+      id: z.string().uuid(),
+      handle: z.string().min(1),
+      name: z.string().nullable(),
+      avatarUrl: z.string().url().nullable(),
+      xVerified: z.boolean(),
+    }),
+  })),
 });
 export type ApiCallout = z.infer<typeof ApiCalloutSchema>;
 
@@ -254,9 +271,18 @@ export const ApiReplySchema = z.object({
   id: z.string().uuid(),
   calloutId: z.string().uuid(),
   parentId: z.string().uuid().nullable(),
+  kind: z.enum(['reply', 'quote']),
   body: z.string().min(1),
   createdAt: z.string().datetime(),
+  user: z.object({
+    id: z.string().uuid(),
+    handle: z.string().min(1),
+    name: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    xVerified: z.boolean(),
+  }),
 });
+export const ApiViewCountSchema = z.object({ views: z.number().int().nonnegative() });
 
 export const ApiFeedSchema = z.object({
   data: z.array(ApiCalloutSchema),
@@ -398,6 +424,13 @@ export const ApiCalloutIntentSchema = z.object({
   expiresAt: z.string().datetime(),
 });
 export type ApiCalloutIntent = z.infer<typeof ApiCalloutIntentSchema>;
+
+/** Minimal response returned after an existing indexed position becomes a callout. */
+export const ApiCreatedCalloutSchema = z.object({
+  id: z.string().uuid(),
+  status: z.string().min(1),
+});
+export type ApiCreatedCallout = z.infer<typeof ApiCreatedCalloutSchema>;
 
 export const ApiPositionQuoteSchema = z
   .object({

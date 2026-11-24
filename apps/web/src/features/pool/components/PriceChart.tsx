@@ -150,7 +150,10 @@ export function PriceChart({
           const x = chart.timeScale().timeToCoordinate(time);
           const value = toUnit(callout.mcAtPostUsd, unit, pool);
           const y = candleSeries.priceToCoordinate(value);
-          return x === null || y === null ? [] : [{ callout, x, y }];
+          if (x === null || y === null) return [];
+          const height = containerRef.current?.clientHeight ?? 0;
+          const markerY = Math.min(Math.max(y - 26, 18), Math.max(18, height - 18));
+          return [{ callout, x, y: markerY }];
         }).sort((a, b) => a.x - b.x || a.y - b.y);
         const stacked: { callout: Callout; x: number; y: number }[] = [];
         projected.forEach(marker => {
@@ -158,7 +161,7 @@ export function PriceChart({
           for (let previous = stacked.length - 1; previous >= 0; previous -= 1) {
             const other = stacked[previous];
             if (!other || marker.x - other.x > 32) break;
-            if (Math.abs(y - other.y) < 30) y = other.y - 30;
+            if (Math.abs(y - other.y) < 26) y = Math.max(18, other.y - 26);
           }
           stacked.push({ ...marker, y });
         });
@@ -343,7 +346,7 @@ export function PriceChart({
       {hasCandles && showCallouts ? avatarMarkers.map(({ callout, x, y }) => (
         <span
           key={callout.id}
-          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2"
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-bg bg-bg/80 p-0.5 shadow-[0_2px_8px_rgb(0_0_0/0.55)]"
           style={{ left: x, top: y }}
         >
           <Avatar

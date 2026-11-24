@@ -1,18 +1,17 @@
 'use client';
 
-import { ApiCalloutSchema, type ApiIndexedPosition } from '@fomeora/types';
+import type { ApiIndexedPosition } from '@fomeora/types';
 import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { XLogo } from '@/components/ui/icons';
 import { TokenPair } from '@/components/ui/TokenPair';
+import { PostPositionCalloutButton } from '@/features/callouts/components/PostPositionCalloutButton';
 import { useSession } from '@/features/session/store';
 import { useWallet } from '@/features/wallet/store';
-import { browserApiRequest } from '@/lib/api/client';
 import { openApiEventStream } from '@/lib/api/realtime';
 
 import { usePositions } from '../usePositions';
@@ -55,11 +54,9 @@ function positionStatus(position: ApiIndexedPosition): string {
 /** Canonical owner portfolio. The indexer/API is the only position source of truth. */
 export function PortfolioScreen() {
   const { user, openSignIn, signOut } = useSession();
-  const { account, config, connect, status: walletStatus } = useWallet();
+  const { account, connect, status: walletStatus } = useWallet();
   const { data, error, isLoading, mutate } = usePositions();
-  const [postingId, setPostingId] = useState<string | null>(null);
   const [managingId, setManagingId] = useState<string | null>(null);
-  const showToast = useToast(state => state.show);
 
   useEffect(() => {
     if (!account) return undefined;
@@ -81,25 +78,6 @@ export function PortfolioScreen() {
     { label: 'Open positions', value: String(openPositions.length) },
     { label: 'Callouts', value: String(positions.filter(position => position.calloutId).length) },
   ];
-
-  const postCallout = async (position: ApiIndexedPosition) => {
-    if (!user) {
-      openSignIn();
-      return;
-    }
-    if (!config) throw new Error('CHAIN_CONFIG_UNAVAILABLE');
-    setPostingId(position.id);
-    try {
-      await browserApiRequest('/v1/callouts/from-position', ApiCalloutSchema, {
-        method: 'POST',
-        body: { chainId: config.chainId, positionId: position.id, caption: '', showSize: true },
-      });
-      await mutate();
-      showToast('Callout posted from canonical position');
-    } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : 'CALLOUT_POST_FAILED');
-    } finally { setPostingId(null); }
-  };
 
   return (
     <div className="mx-auto max-w-[72rem] px-gutter py-8">
@@ -141,7 +119,7 @@ export function PortfolioScreen() {
               <td className={cell}>{position.valueQuote ?? 'Unavailable'}</td><td className={cell}>{position.earnedQuote}</td>
               <td className={`${cell} capitalize`}>{positionStatus(position)}</td><td className={cell}>{position.calloutId ? 'Posted' : 'Not posted'}</td>
               <td className={cell}><div className="flex gap-2">
-                {!position.calloutId && position.status === 'open' ? <Button className="min-h-9" disabled={postingId === position.id} onClick={() => void postCallout(position)}>{postingId === position.id ? 'Posting…' : user ? 'Post callout' : 'Connect X to post'}</Button> : null}
+                {!position.calloutId && position.status === 'open' ? <PostPositionCalloutButton position={position} onPosted={mutate} /> : null}
                 {position.status === 'open' ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
               </div></td>
             </tr>

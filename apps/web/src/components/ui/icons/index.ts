@@ -16,6 +16,7 @@ export {
   LayoutList,
   LogOut,
   MessageCircle,
+  MessageSquareQuote,
   Repeat2,
   Share2,
   TriangleAlert,

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { prisma, type Prisma } from '@fomeora/database';
 import { classifyRangeSide } from '@fomeora/sdk';
@@ -65,12 +65,14 @@ async function createStatsEvent(
   chainId: number,
   action: string,
 ): Promise<void> {
-  const [callout, likes, reposts, replies, tails] = await Promise.all([
+  const [callout, likes, reposts, replies, quotes, tails, views] = await Promise.all([
     transaction.callout.findUnique({ where: { id: calloutId }, select: { pool: { select: { address: true } } } }),
     transaction.like.count({ where: { calloutId } }),
     transaction.repost.count({ where: { calloutId } }),
-    transaction.reply.count({ where: { calloutId, hidden: false } }),
+    transaction.reply.count({ where: { calloutId, hidden: false, kind: 'reply' } }),
+    transaction.reply.count({ where: { calloutId, hidden: false, kind: 'quote' } }),
     transaction.tail.count({ where: { calloutId } }),
+    transaction.viewDaily.count({ where: { calloutId } }),
   ]);
   await transaction.outboxEvent.create({
     data: {
@@ -78,7 +80,7 @@ async function createStatsEvent(
       topic: 'callout.stats',
       aggregateId: callout?.pool.address.toLowerCase() ?? calloutId,
       chainId,
-      payload: { id: calloutId, likes, reposts, replies, tails },
+      payload: { id: calloutId, likes, reposts, replies, quotes, tails, views },
     },
   });
 }
@@ -355,41 +357,70 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
     });
   }
 
-  app.post('/v1/callouts/:id/replies', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (request, reply) => {
-    const session = await requireSession(request, reply);
-    if (!session) return;
+  for (const kind of ['reply', 'quote'] as const) {
+    const route = kind === 'reply' ? 'replies' : 'quotes';
+    app.post(`/v1/callouts/:id/${route}`, { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (request, reply) => {
+      const session = await requireSession(request, reply);
+      if (!session) return;
+      const params = calloutParamsSchema.safeParse(request.params);
+      const body = replyBodySchema.safeParse(request.body);
+      if (!params.success || !body.success) return reply.status(400).send({ error: `INVALID_${kind.toUpperCase()}` });
+      let message: string;
+      try {
+        message = validatedCaption(body.data.body) ?? '';
+      } catch {
+        return reply.status(400).send({ error: `INVALID_${kind.toUpperCase()}` });
+      }
+      if (!message) return reply.status(400).send({ error: `INVALID_${kind.toUpperCase()}` });
+      const callout = await findVisibleCallout(params.data.id, chainId);
+      if (!callout) return reply.status(404).send({ error: 'CALLOUT_NOT_FOUND' });
+      if (body.data.parentId) {
+        const parent = await prisma.reply.findFirst({
+          where: { id: body.data.parentId, calloutId: callout.id, hidden: false, kind: 'reply' },
+          select: { id: true },
+        });
+        if (!parent) return reply.status(404).send({ error: 'PARENT_REPLY_NOT_FOUND' });
+      }
+      const created = await prisma.$transaction(async transaction => {
+        const row = await transaction.reply.create({
+          data: { calloutId: callout.id, userId: session.userId, parentId: body.data.parentId ?? null, kind, body: message },
+          include: { user: { select: { id: true, handle: true, name: true, avatarUrl: true, xVerified: true } } },
+        });
+        await createStatsEvent(transaction, callout.id, chainId, kind);
+        return row;
+      });
+      return reply.status(201).send({
+        id: created.id,
+        calloutId: created.calloutId,
+        parentId: created.parentId,
+        kind,
+        body: created.body,
+        createdAt: created.createdAt.toISOString(),
+        user: created.user,
+      });
+    });
+  }
+
+  app.post('/v1/callouts/:id/view', { config: { rateLimit: { max: 240, timeWindow: '1 hour' } } }, async (request, reply) => {
     const params = calloutParamsSchema.safeParse(request.params);
-    const body = replyBodySchema.safeParse(request.body);
-    if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_REPLY' });
-    let replyBody: string;
-    try {
-      replyBody = validatedCaption(body.data.body) ?? '';
-    } catch {
-      return reply.status(400).send({ error: 'INVALID_REPLY' });
-    }
-    if (!replyBody) return reply.status(400).send({ error: 'INVALID_REPLY' });
+    if (!params.success) return reply.status(400).send({ error: 'INVALID_CALLOUT_ID' });
     const callout = await findVisibleCallout(params.data.id, chainId);
     if (!callout) return reply.status(404).send({ error: 'CALLOUT_NOT_FOUND' });
-    if (body.data.parentId) {
-      const parent = await prisma.reply.findFirst({
-        where: { id: body.data.parentId, calloutId: callout.id, hidden: false },
-        select: { id: true },
+    const now = new Date();
+    const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const sessionToken = request.cookies[SESSION_COOKIE_NAME];
+    const fingerprint = sessionToken
+      ? `session:${sessionToken}`
+      : `visitor:${request.ip}:${request.headers['user-agent'] ?? ''}`;
+    const viewerHash = createHash('sha256').update(fingerprint).digest('hex');
+    const views = await prisma.$transaction(async transaction => {
+      const created = await transaction.viewDaily.createMany({
+        data: [{ calloutId: callout.id, day, viewerHash }],
+        skipDuplicates: true,
       });
-      if (!parent) return reply.status(404).send({ error: 'PARENT_REPLY_NOT_FOUND' });
-    }
-    const created = await prisma.$transaction(async transaction => {
-      const replyRow = await transaction.reply.create({
-        data: { calloutId: callout.id, userId: session.userId, parentId: body.data.parentId ?? null, body: replyBody },
-      });
-      await createStatsEvent(transaction, callout.id, chainId, 'reply');
-      return replyRow;
+      if (created.count === 1) await createStatsEvent(transaction, callout.id, chainId, 'view');
+      return transaction.viewDaily.count({ where: { calloutId: callout.id } });
     });
-    return reply.status(201).send({
-      id: created.id,
-      calloutId: created.calloutId,
-      parentId: created.parentId,
-      body: created.body,
-      createdAt: created.createdAt.toISOString(),
-    });
+    return { views };
   });
 }

@@ -689,6 +689,7 @@ model Reply {
   calloutId String   @map("callout_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   parentId  String?  @map("parent_id") @db.Uuid
+  kind      String   @default("reply") @db.VarChar(16)
   body      String   @db.VarChar(280)
   createdAt DateTime @default(now()) @map("created_at")
   hidden    Boolean  @default(false)
@@ -696,7 +697,7 @@ model Reply {
   user    User    @relation(fields: [userId], references: [id])
   callout Callout @relation(fields: [calloutId], references: [id], onDelete: Cascade)
 
-  @@index([calloutId, createdAt])
+  @@index([calloutId, kind, createdAt])
   @@map("replies")
 }
 

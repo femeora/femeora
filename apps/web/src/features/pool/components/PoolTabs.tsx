@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { TokenPair } from '@/components/ui/TokenPair';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
+import { PostPositionCalloutButton } from '@/features/callouts/components/PostPositionCalloutButton';
 import type { Callout } from '@/features/callouts/model/callout';
 import { useAllCallouts } from '@/features/callouts/useAllCallouts';
 import { PositionActionPanel } from '@/features/portfolio/components/PositionActionPanel';
@@ -91,7 +92,11 @@ function PoolPositions({ pool, positions, error, isLoading, refresh }: {
           <td className={cellClass}>{position.valueQuote ?? 'Unavailable'}</td>
           <td className={cn(cellClass, 'text-up')}>{position.earnedQuote}</td>
           <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
-          <td className={cellClass}>{manageable ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : <span className="text-faint">—</span>}</td>
+          <td className={cellClass}><div className="flex justify-end gap-2">
+            {owned && position.status === 'open' && !position.calloutId ? <PostPositionCalloutButton position={position} onPosted={refresh} /> : null}
+            {manageable ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
+            {!manageable && (!owned || Boolean(position.calloutId)) ? <span className="text-faint">—</span> : null}
+          </div></td>
         </tr>
         {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={refresh} /></td></tr> : null}
       </Fragment>;

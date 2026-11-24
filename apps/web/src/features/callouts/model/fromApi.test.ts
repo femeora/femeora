@@ -93,7 +93,7 @@ const apiCallout: ApiCallout = {
     inRangeSeconds: '5400',
     openSeconds: '7200',
   },
-  stats: { likes: 2, reposts: 1, replies: 3, tails: 4 },
+  stats: { likes: 2, reposts: 1, replies: 3, quotes: 1, views: 7, tails: 4 },
   viewer: { liked: true, reposted: false, following: true },
   updates: [{
     id: '00000000-0000-4000-8000-000000000003',
@@ -104,6 +104,7 @@ const apiCallout: ApiCallout = {
     timestamp: '2026-11-23T11:40:00.000Z',
     createdAt: '2026-11-23T11:40:00.000Z',
   }],
+  comments: [],
 };
 
 test('maps canonical API callouts without fabricating USD or unknown integrity signals', () => {
@@ -123,5 +124,8 @@ test('maps canonical API callouts without fabricating USD or unknown integrity s
   assert.equal(callout.isFreshWallet, null);
   assert.equal(callout.oppositeSide, true);
   assert.equal(callout.heldHours, 2);
+  assert.equal(callout.quotes, 1);
+  assert.equal(callout.views, 7);
+  assert.deepEqual(callout.comments, []);
   assert.deepEqual(callout.updates, [{ text: 'Added', ago: '20m' }]);
 });
