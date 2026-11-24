@@ -3,6 +3,8 @@
 import { CalloutCaptionSchema } from '@fomeora/types';
 import { useMemo, useReducer } from 'react';
 
+import type { BinShape } from '@/types/callout';
+
 import type { Pool } from '../model/pool';
 import {
   binCount,
@@ -12,8 +14,6 @@ import {
   type Preset,
   type RangeSide,
 } from '../model/range';
-
-import type { BinShape } from '@/types/callout';
 
 export const CAPTION_MAX = 280;
 /** Counter turns amber here (brief 5.4.1). */

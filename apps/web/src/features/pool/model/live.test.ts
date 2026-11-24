@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { activeBinPrice, apiPoolToPool } from './live';
-
 import type { ApiPoolDetail } from '@/lib/api/types';
+
+import { activeBinPrice, apiPoolToPool } from './live';
 
 const pool: ApiPoolDetail = {
   id: '0f4a21af-2ac6-4745-ade1-c8a2f1d1b041',

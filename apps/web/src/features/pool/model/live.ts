@@ -1,7 +1,5 @@
 import { PRICE_SCALE, priceFromBinX18, rawUnitsToDecimal } from '@fomeora/sdk';
 
-import type { Pool } from './pool';
-
 import type {
   ApiBin,
   ApiCandle,
@@ -11,6 +9,8 @@ import type {
   ApiTrade,
 } from '@/lib/api/types';
 import { tokenSymbol } from '@/lib/tokens';
+
+import type { Pool } from './pool';
 
 export interface LivePoolStats extends ApiPoolStats {
   counts: ApiPoolDetail['counts'];
