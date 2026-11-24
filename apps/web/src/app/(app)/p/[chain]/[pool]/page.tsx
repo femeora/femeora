@@ -28,7 +28,9 @@ export const metadata: Metadata = {
   description: 'Inspect a canonical pool, its candles, liquidity, trades and LP positions.',
 };
 
-const candleLimits = { '5m': 96, '15m': 80, '1h': 64, '4h': 48 } as const;
+// Keep enough reference-market history to show a meaningful shape without
+// squeezing hundreds of sub-pixel bars into every interval.
+const candleLimits = { '5m': 288, '15m': 240, '1h': 336, '4h': 180 } as const;
 
 interface PageProps { params: { chain: string; pool: string } }
 

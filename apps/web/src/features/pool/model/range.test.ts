@@ -10,6 +10,13 @@ test('defaults to a two-sided range around the active price', () => {
   assert.ok((preset?.maxPct ?? 0) > 0);
 });
 
+test('keeps the active price centered inside every preset range', () => {
+  for (const preset of PRESETS) {
+    assert.equal(preset.minPct, -20, `${preset.id} min`);
+    assert.equal(preset.maxPct, 20, `${preset.id} max`);
+  }
+});
+
 test('snaps chart bounds to the pool bin grid', () => {
   const range = { minPct: -35, maxPct: -1 };
   const snapped = snapRangeBound(range, 'minPct', -12.4, 100);
