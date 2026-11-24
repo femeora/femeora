@@ -8,6 +8,7 @@ import {
 } from '@fomeora/types';
 import { useState } from 'react';
 
+import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useSession } from '@/features/session/store';
@@ -93,7 +94,11 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       }));
     } catch (cause) {
       setQuote(null);
-      setQuoteError(cause instanceof Error ? cause.message : 'POSITION_QUOTE_FAILED');
+      const raw = cause instanceof Error ? cause.message : 'POSITION_QUOTE_FAILED';
+      const depositToken = needs.quote && !needs.base ? pool.quote : needs.base && !needs.quote ? pool.base : `${pool.base} and ${pool.quote}`;
+      setQuoteError(raw.toUpperCase().includes('DEPOSIT_TOO_SMALL')
+        ? `The ${depositToken} amount is too small to distribute across ${bins} bins. Narrow the range or increase the amount, then review again.`
+        : friendlyErrorMessage(raw));
     } finally {
       setQuoting(false);
     }

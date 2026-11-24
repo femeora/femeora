@@ -5,6 +5,9 @@ const includesAny = (value: string, patterns: readonly string[]) =>
 export function friendlyErrorMessage(error: string): string {
   const value = error.trim().toUpperCase();
 
+  if (value.includes('DEPOSIT_TOO_SMALL')) {
+    return 'The deposit is too small for the selected range. Narrow the range or increase the token amount, then review again.';
+  }
   if (includesAny(value, ['REJECT', 'DENIED', 'DECLINED', 'CANCELLED', 'CANCELED', 'USER_REFUSED'])) {
     return 'The request was cancelled in your wallet. No changes were made. You can try again when ready.';
   }

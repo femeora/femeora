@@ -1,14 +1,17 @@
 'use client';
 
 import { ApiIndexedPositionListSchema, type ApiIndexedPosition } from '@fomeora/types';
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { formatUnits } from 'viem';
 
+import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { TokenPair } from '@/components/ui/TokenPair';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
 import type { Callout } from '@/features/callouts/model/callout';
 import { useAllCallouts } from '@/features/callouts/useAllCallouts';
+import { PositionActionPanel } from '@/features/portfolio/components/PositionActionPanel';
+import { useWallet } from '@/features/wallet/store';
 import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 import { tokenSymbol } from '@/lib/tokens';
@@ -64,6 +67,8 @@ function tradeAmount(raw: string, address: string, pool: Pool): string {
 
 /** All canonical positions for this pool. Portfolio remains wallet-scoped. */
 function PoolPositions({ pool }: { pool: Pool }) {
+  const account = useWallet(state => state.account);
+  const [managingId, setManagingId] = useState<string | null>(null);
   const { data, error, isLoading, mutate } = useApiResource(
     `/v1/positions?pool=${encodeURIComponent(pool.address)}&limit=200`,
     ApiIndexedPositionListSchema,
@@ -72,16 +77,24 @@ function PoolPositions({ pool }: { pool: Pool }) {
   if (isLoading) return <p className="py-10 text-center text-muted">Loading canonical pool positions…</p>;
   if (error) return <div role="alert" className="py-10 text-center"><p className="text-down">Pool positions are temporarily unavailable.</p><button type="button" onClick={() => void mutate()} className="t-label mt-3 min-h-11 underline underline-offset-4">Retry</button></div>;
   if (positions.length === 0) return <p className="py-10 text-center text-muted">No indexed positions in this pool yet.</p>;
-  return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status']}>
-    {positions.map(position => <tr key={`${position.chainId}:${position.id}`}>
-      <td className={cn(cellClass, 'font-sans')}><TokenPair tokenX={pool.baseAddress} tokenY={pool.quoteAddress} compact /></td>
-      <td className={cellClass}>{shortAddress(position.owner)}</td>
-      <td className={cellClass}>{['Spot', 'Curve', 'Bid-Ask', 'Custom'][position.shape] ?? 'Custom'}</td>
-      <td className={cellClass}>{position.lowerBin}–{position.upperBin}<span className="block text-faint">{position.bins.length} bins</span></td>
-      <td className={cellClass}>{position.valueQuote ?? 'Unavailable'}</td>
-      <td className={cn(cellClass, 'text-up')}>{position.earnedQuote}</td>
-      <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
-    </tr>)}
+  return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Actions']}>
+    {positions.map(position => {
+      const owned = account?.toLowerCase() === position.owner.toLowerCase();
+      const manageable = owned && position.status === 'open';
+      return <Fragment key={`${position.chainId}:${position.id}`}>
+        <tr>
+          <td className={cn(cellClass, 'font-sans')}><TokenPair tokenX={pool.baseAddress} tokenY={pool.quoteAddress} compact /></td>
+          <td className={cellClass}>{shortAddress(position.owner)}{owned ? <span className="ml-2 text-signal">You</span> : null}</td>
+          <td className={cellClass}>{['Spot', 'Curve', 'Bid-Ask', 'Custom'][position.shape] ?? 'Custom'}</td>
+          <td className={cellClass}>{position.lowerBin}–{position.upperBin}<span className="block text-faint">{position.bins.length} bins</span></td>
+          <td className={cellClass}>{position.valueQuote ?? 'Unavailable'}</td>
+          <td className={cn(cellClass, 'text-up')}>{position.earnedQuote}</td>
+          <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
+          <td className={cellClass}>{manageable ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : <span className="text-faint">—</span>}</td>
+        </tr>
+        {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={mutate} /></td></tr> : null}
+      </Fragment>;
+    })}
   </Table>;
 }
 

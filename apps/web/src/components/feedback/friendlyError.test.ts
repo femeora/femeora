@@ -14,6 +14,12 @@ test('gives an actionable insufficient-funds message', () => {
   assert.match(friendlyErrorMessage('INSUFFICIENT_GAS_BALANCE'), /add funds/i);
 });
 
+test('explains a deposit that is too small for its selected range', () => {
+  const message = friendlyErrorMessage('DEPOSIT_TOO_SMALL');
+  assert.match(message, /narrow the range|increase the token amount/i);
+  assert.doesNotMatch(message, /DEPOSIT_TOO_SMALL/);
+});
+
 test('never returns an unknown technical error verbatim', () => {
   const raw = 'Internal JSON-RPC error: execution payload 0xdeadbeef';
   const message = friendlyErrorMessage(raw);
