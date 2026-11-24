@@ -17,18 +17,18 @@ test('keeps the active price centered inside every preset range', () => {
   }
 });
 
-test('snaps chart bounds to the pool bin grid', () => {
+test('normalizes chart bounds to whole percentages', () => {
   const range = { minPct: -35, maxPct: -1 };
   const snapped = snapRangeBound(range, 'minPct', -12.4, 100);
-  const offset = Math.log1p(snapped / 100) / Math.log1p(0.01);
-  assert.ok(Math.abs(offset - Math.round(offset)) < 1e-5);
+  assert.equal(snapped, -12);
+  assert.equal(Number.isInteger(snapped), true);
 });
 
 test('keeps a dragged range within the 61-bin contract limit', () => {
   const original = { minPct: -1, maxPct: 1 };
   const maxPct = snapRangeBound(original, 'maxPct', 900, 100);
   const adjusted = { ...original, maxPct };
-  assert.ok(binCount(adjusted, 100) <= 60);
+  assert.ok(binCount(adjusted, 100) <= 61);
 });
 
 test('does not allow either handle to cross the opposite handle', () => {

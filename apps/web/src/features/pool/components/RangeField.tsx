@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { formatPct } from '../model/format';
 
@@ -24,9 +24,18 @@ export function RangeField({
   onChange,
 }: RangeFieldProps) {
   const id = useId();
-  const update = (raw: string) => {
-    const next = Number.parseFloat(raw);
+  const [input, setInput] = useState(String(Math.round(pct)));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setInput(String(Math.round(pct)));
+  }, [editing, pct]);
+
+  const commit = () => {
+    const next = Number.parseInt(input, 10);
+    setEditing(false);
     if (Number.isFinite(next)) onChange(next);
+    else setInput(String(Math.round(pct)));
   };
 
   return (
@@ -41,10 +50,24 @@ export function RangeField({
         <input
           id={id}
           type="number"
-          inputMode="decimal"
+          inputMode="numeric"
           step={1}
-          value={pct}
-          onChange={event => update(event.target.value)}
+          value={input}
+          onFocus={event => {
+            setEditing(true);
+            event.currentTarget.select();
+          }}
+          onChange={event => {
+            if (/^-?\d*$/.test(event.target.value)) setInput(event.target.value);
+          }}
+          onBlur={commit}
+          onKeyDown={event => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+            if (event.key === 'Escape') {
+              setInput(String(Math.round(pct)));
+              event.currentTarget.blur();
+            }
+          }}
           className="glass-control w-20 rounded-[2px] px-2 py-2 font-mono text-sm tabular-nums"
         />
         <input
@@ -54,8 +77,8 @@ export function RangeField({
           min={sliderMin}
           max={sliderMax}
           step={1}
-          value={Math.min(sliderMax, Math.max(sliderMin, pct))}
-          onChange={event => update(event.target.value)}
+          value={Math.min(sliderMax, Math.max(sliderMin, Math.round(pct)))}
+          onChange={event => onChange(Number.parseInt(event.target.value, 10))}
           className="h-11 flex-1 accent-[rgb(var(--signal))]"
         />
       </div>
