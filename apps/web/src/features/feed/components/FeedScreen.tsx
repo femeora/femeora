@@ -4,6 +4,7 @@ import { ApiFeedSchema } from '@fomeora/types';
 import Link from 'next/link';
 import { useCallback, useId, useMemo, useState } from 'react';
 
+import { ArrowRight } from '@/components/ui/icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
 import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
@@ -46,7 +47,7 @@ function EmptyFeed({ filtered, onClear }: { filtered: boolean; onClear: () => vo
 
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <Link href="/pools" className="glass-control t-label inline-flex min-h-11 items-center rounded-[2px] px-4 hover:border-line-strong">
-            Browse pools →
+            Browse pools <ArrowRight aria-hidden="true" className="ml-2 size-4" />
           </Link>
           {filtered ? <button type="button" onClick={onClear} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-fg">Clear side filter</button> : null}
         </div>

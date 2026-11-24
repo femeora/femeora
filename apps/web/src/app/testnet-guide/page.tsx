@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Ambient } from '@/components/ui/Ambient';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { Grain } from '@/components/ui/Grain';
+import { ExternalLink } from '@/components/ui/icons';
 import { TokenIcon } from '@/components/ui/TokenPair';
 
 export const metadata: Metadata = {
@@ -149,7 +150,7 @@ export default function TestnetGuidePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open the official testnet faucet ↗
+                  Open the official testnet faucet <ExternalLink aria-hidden="true" className="ml-2 inline size-5" />
                 </a>
                 <a
                   className="text-h2 text-signal hover:underline"
@@ -157,7 +158,7 @@ export default function TestnetGuidePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Wallet setup documentation ↗
+                  Wallet setup documentation <ExternalLink aria-hidden="true" className="ml-2 inline size-5" />
                 </a>
                 <a
                   className="text-h2 text-signal hover:underline"
@@ -165,7 +166,7 @@ export default function TestnetGuidePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open the testnet explorer ↗
+                  Open the testnet explorer <ExternalLink aria-hidden="true" className="ml-2 inline size-5" />
                 </a>
               </div>
             </div>

@@ -2,7 +2,21 @@ import {
   ApiPreparedTransactionSchema,
   type ApiPreparedTransaction,
 } from '@fomeora/types';
-import { createPublicClient, custom, isAddress, type Hex } from 'viem';
+import {
+  createPublicClient,
+  custom,
+  decodeFunctionResult,
+  encodeFunctionData,
+  formatUnits,
+  isAddress,
+  parseAbi,
+  type Hex,
+} from 'viem';
+
+const erc20BalanceAbi = parseAbi([
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+]);
 
 export interface Eip1193Provider {
   request(args: { method: string; params?: readonly unknown[] }): Promise<unknown>;
@@ -57,6 +71,47 @@ export async function connectInjectedWallet(provider = injectedProvider()): Prom
     if (error instanceof WalletAdapterError) throw error;
     if (providerErrorCode(error) === 4001) throw new WalletAdapterError('WALLET_REQUEST_REJECTED');
     throw new WalletAdapterError('WALLET_CONNECTION_FAILED');
+  }
+}
+
+export async function disconnectInjectedWallet(provider = injectedProvider()): Promise<void> {
+  if (!provider) return;
+  try {
+    await provider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
+  } catch {
+    // Some EIP-1193 wallets do not implement permission revocation. Clearing
+    // Fomeora's local connection still disconnects the current UI session.
+  }
+}
+
+export async function readErc20Balance(
+  token: string,
+  account: `0x${string}`,
+  provider = injectedProvider(),
+): Promise<{ raw: bigint; decimals: number; formatted: string }> {
+  if (!provider || !isAddress(token)) throw new WalletAdapterError('TOKEN_BALANCE_UNAVAILABLE');
+  try {
+    const [balanceResult, decimalsResult] = await Promise.all([
+      provider.request({
+        method: 'eth_call',
+        params: [{
+          to: token,
+          data: encodeFunctionData({ abi: erc20BalanceAbi, functionName: 'balanceOf', args: [account] }),
+        }, 'latest'],
+      }),
+      provider.request({
+        method: 'eth_call',
+        params: [{ to: token, data: encodeFunctionData({ abi: erc20BalanceAbi, functionName: 'decimals' }) }, 'latest'],
+      }),
+    ]);
+    if (typeof balanceResult !== 'string' || typeof decimalsResult !== 'string') {
+      throw new Error('INVALID_TOKEN_BALANCE_RESPONSE');
+    }
+    const raw = decodeFunctionResult({ abi: erc20BalanceAbi, functionName: 'balanceOf', data: balanceResult as Hex });
+    const decimals = Number(decodeFunctionResult({ abi: erc20BalanceAbi, functionName: 'decimals', data: decimalsResult as Hex }));
+    return { raw, decimals, formatted: formatUnits(raw, decimals) };
+  } catch {
+    throw new WalletAdapterError('TOKEN_BALANCE_UNAVAILABLE');
   }
 }
 

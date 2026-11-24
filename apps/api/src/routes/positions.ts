@@ -2,9 +2,11 @@ import { prisma } from '@fomeora/database';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { serializePool } from './pools.js';
+
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase());
 
-function serializePosition(position: Awaited<ReturnType<typeof loadPosition>>) {
+export function serializePosition(position: Awaited<ReturnType<typeof loadPosition>>) {
   if (!position) return null;
   const { callouts, ...record } = position;
   return {
@@ -21,7 +23,7 @@ function serializePosition(position: Awaited<ReturnType<typeof loadPosition>>) {
     openedAt: position.openedAt.toISOString(),
     closedAt: position.closedAt?.toISOString() ?? null,
     bins: position.bins.map(bin => ({ binId: bin.binId, shares: bin.shares.toString() })),
-    pool: { ...position.pool, createdBlock: position.pool.createdBlock.toString() },
+    pool: serializePool(position.pool),
     calloutId: callouts[0]?.id ?? null,
   };
 }

@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { encodeAbiParameters } from 'viem';
+
 import {
   connectInjectedWallet,
+  disconnectInjectedWallet,
   type Eip1193Provider,
+  readErc20Balance,
   sendPreparedTransaction,
   subscribeWallet,
   switchInjectedChain,
@@ -112,4 +116,28 @@ test('subscribes and fully removes wallet lifecycle listeners', () => {
   assert.deepEqual({ refreshes, disconnects }, { refreshes: 2, disconnects: 1 });
   stop();
   assert.equal([...provider.listeners.values()].every(listeners => listeners.size === 0), true);
+});
+
+test('reads an ERC-20 balance and requests permission revocation on disconnect', async () => {
+  const provider = new Provider();
+  const original = provider.request.bind(provider);
+  let calls = 0;
+  provider.request = async args => {
+    if (args.method === 'eth_call') {
+      calls += 1;
+      return calls === 1
+        ? encodeAbiParameters([{ type: 'uint256' }], [546_163_093_591_259n])
+        : encodeAbiParameters([{ type: 'uint8' }], [18]);
+    }
+    if (args.method === 'wallet_revokePermissions') {
+      provider.sent.push(args);
+      return null;
+    }
+    return original(args);
+  };
+
+  const balance = await readErc20Balance('0x00000000000000000000000000000000000000bb', account, provider);
+  assert.deepEqual(balance, { raw: 546_163_093_591_259n, decimals: 18, formatted: '0.000546163093591259' });
+  await disconnectInjectedWallet(provider);
+  assert.equal(provider.sent.some(request => request.method === 'wallet_revokePermissions'), true);
 });

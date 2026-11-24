@@ -1,6 +1,6 @@
 'use client';
 
-import { Close } from '@/components/ui/icons';
+import { Close, ExternalLink } from '@/components/ui/icons';
 
 import { useToast } from './toast';
 
@@ -30,7 +30,7 @@ export function Toaster() {
             <p className="t-label text-faint">Transaction</p>
             {explorerUrl ? (
               <a href={`${explorerUrl.replace(/\/$/, '')}/tx/${transactionHash}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-11 items-center font-mono text-sm text-signal underline underline-offset-4">
-                {shortHash(transactionHash)} ↗
+                {shortHash(transactionHash)} <ExternalLink aria-hidden="true" className="ml-2 size-4" />
               </a>
             ) : <p className="mt-2 break-all font-mono text-sm">{transactionHash}</p>}
           </div>

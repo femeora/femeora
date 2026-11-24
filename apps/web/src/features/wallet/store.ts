@@ -7,6 +7,7 @@ import { browserApiRequest } from '@/lib/api/client';
 
 import {
   connectInjectedWallet,
+  disconnectInjectedWallet,
   injectedProvider,
   readWalletSnapshot,
   subscribeWallet,
@@ -15,6 +16,14 @@ import {
 } from './adapter';
 
 type WalletStatus = 'idle' | 'unavailable' | 'disconnected' | 'connecting' | 'connected';
+const DISCONNECTED_KEY = 'fomeora.wallet.disconnected';
+
+const isManuallyDisconnected = () => typeof window !== 'undefined' && window.sessionStorage.getItem(DISCONNECTED_KEY) === '1';
+const setManuallyDisconnected = (value: boolean) => {
+  if (typeof window === 'undefined') return;
+  if (value) window.sessionStorage.setItem(DISCONNECTED_KEY, '1');
+  else window.sessionStorage.removeItem(DISCONNECTED_KEY);
+};
 
 interface WalletState {
   config: ApiChainConfig | null;
@@ -24,6 +33,7 @@ interface WalletState {
   error: string | null;
   initialize: () => Promise<() => void>;
   connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
   switchNetwork: () => Promise<void>;
 }
 
@@ -43,6 +53,10 @@ export const useWallet = create<WalletState>((set, get) => ({
       return () => undefined;
     }
     const refresh = async () => {
+      if (isManuallyDisconnected()) {
+        set({ account: null, chainId: null, config, status: 'disconnected', error: null });
+        return;
+      }
       try {
         const snapshot = await readWalletSnapshot(provider);
         set({ ...snapshot, config, status: snapshot.account ? 'connected' : 'disconnected', error: null });
@@ -58,11 +72,17 @@ export const useWallet = create<WalletState>((set, get) => ({
   connect: async () => {
     set({ status: 'connecting', error: null });
     try {
+      setManuallyDisconnected(false);
       const snapshot = await connectInjectedWallet();
       set({ ...snapshot, status: 'connected', error: null });
     } catch (error) {
       set({ status: injectedProvider() ? 'disconnected' : 'unavailable', error: code(error) });
     }
+  },
+  disconnect: async () => {
+    await disconnectInjectedWallet();
+    setManuallyDisconnected(true);
+    set({ account: null, chainId: null, status: 'disconnected', error: null });
   },
   switchNetwork: async () => {
     const config = get().config;
