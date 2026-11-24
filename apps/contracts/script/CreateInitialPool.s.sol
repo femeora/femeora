@@ -68,22 +68,29 @@ contract CreateInitialPool {
         string memory root = vm.projectRoot();
         string memory deployment = vm.readFile(string.concat(root, "/deployments/", network, ".json"));
         string memory governance = vm.readFile(string.concat(root, "/deployments/", network, "-governance.json"));
-        string memory accounting =
-            vm.readFile(string.concat(root, "/deployments/", network, "-accounting-upgrade.json"));
         PoolFactory factory = PoolFactory(vm.parseJsonAddress(deployment, ".poolFactory"));
         PoolRegistry registry = PoolRegistry(vm.parseJsonAddress(deployment, ".poolRegistry"));
         address timelock = vm.parseJsonAddress(governance, ".protocolTimelock");
-        address upgradedDlmmDeployer = vm.parseJsonAddress(accounting, ".dlmmPoolV2Deployer");
+        address expectedDlmmDeployer;
+        if (isMainnet) {
+            // Mainnet was deployed from the accounting-complete frozen source, so the
+            // canonical deployer is already recorded in the primary deployment manifest.
+            expectedDlmmDeployer = vm.parseJsonAddress(deployment, ".dlmmPoolV2Deployer");
+        } else {
+            string memory accounting =
+                vm.readFile(string.concat(root, "/deployments/", network, "-accounting-upgrade.json"));
+            expectedDlmmDeployer = vm.parseJsonAddress(accounting, ".dlmmPoolV2Deployer");
+        }
         address oldAdmin = vm.parseJsonAddress(deployment, ".contractAdmin");
         address oldUpgrader = vm.parseJsonAddress(deployment, ".contractUpgrader");
         require(address(factory).code.length != 0 && address(registry).code.length != 0, "deployment missing");
-        require(timelock.code.length != 0 && upgradedDlmmDeployer.code.length != 0, "upgrade missing");
+        require(timelock.code.length != 0 && expectedDlmmDeployer.code.length != 0, "deployer missing");
         require(factory.poolAdministrator() == timelock, "pool governance not timelock");
         require(factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), timelock), "timelock missing admin");
         require(factory.hasRole(factory.UPGRADER_ROLE(), timelock), "timelock missing upgrader");
         require(!factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), oldAdmin), "old admin retained");
         require(!factory.hasRole(factory.UPGRADER_ROLE(), oldUpgrader), "old upgrader retained");
-        require(address(factory.dlmmDeployer()) == upgradedDlmmDeployer, "accounting deployer inactive");
+        require(address(factory.dlmmDeployer()) == expectedDlmmDeployer, "accounting deployer inactive");
         require(factory.tokenReserveCaps(baseToken) == baseReserveCap, "base reserve cap inactive");
         require(factory.tokenReserveCaps(quoteToken) == quoteReserveCap, "quote reserve cap inactive");
 

@@ -1,11 +1,39 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { binQuoteValues } from './pools.js';
+import { binQuoteValues, serializePool } from './pools.js';
 
 const tokenX = '0x0000000000000000000000000000000000000001';
 const tokenY = '0x0000000000000000000000000000000000000002';
 const unit = 10n ** 18n;
+
+test('pool serializer converts every database bigint and decimal to JSON-safe strings', () => {
+  const serialized = serializePool({
+    id: 'pool-id',
+    chainId: 4_663,
+    address: tokenX,
+    type: 'DLMM',
+    tokenX,
+    tokenY,
+    quoteToken: tokenY,
+    binStep: 100,
+    baseFeePips: 3_000,
+    reserveCapX: { toString: () => '2000000000000000000' },
+    reserveCapY: { toString: () => '5000000000' },
+    reserveX: { toString: () => '0' },
+    reserveY: { toString: () => '0' },
+    reserveUpdatedBlock: 121_919_500n,
+    createdBlock: 121_919_485n,
+  });
+
+  assert.equal(serialized.reserveCapX, '2000000000000000000');
+  assert.equal(serialized.reserveCapY, '5000000000');
+  assert.equal(serialized.reserveX, '0');
+  assert.equal(serialized.reserveY, '0');
+  assert.equal(serialized.reserveUpdatedBlock, '121919500');
+  assert.equal(serialized.createdBlock, '121919485');
+  assert.doesNotThrow(() => JSON.stringify(serialized));
+});
 
 test('bin quote depth values both sides when token Y is quote', () => {
   const pool = {

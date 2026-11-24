@@ -1,0 +1,13 @@
+{
+  "baseReserveCap": 2000000000000000000,
+  "baseToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  "binStepBps": 100,
+  "chainId": 4663,
+  "feePips": 3000,
+  "governanceTimelock": "0x0Db9C101586D4021983D0C8b356aBAF8C1a7AbFd",
+  "initialActiveBin": 746,
+  "network": "mainnet",
+  "pool": "0xbc826cCb7E644E017c1D21478B4e55D49d2b2dAD",
+  "quoteReserveCap": 5000000000,
+  "quoteToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+}

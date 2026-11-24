@@ -46,7 +46,7 @@ export function fillCandleGaps(input: readonly SerializedCandle[], interval: key
   return output;
 }
 
-function serializePool(pool: {
+export function serializePool(pool: {
   id: string;
   chainId: number;
   address: string;
@@ -58,6 +58,9 @@ function serializePool(pool: {
   baseFeePips: number;
   reserveCapX: { toString(): string } | null;
   reserveCapY: { toString(): string } | null;
+  reserveX: { toString(): string } | null;
+  reserveY: { toString(): string } | null;
+  reserveUpdatedBlock: bigint | null;
   createdBlock: bigint;
 }) {
   return {
@@ -67,6 +70,9 @@ function serializePool(pool: {
       : null,
     reserveCapX: pool.reserveCapX?.toString() ?? null,
     reserveCapY: pool.reserveCapY?.toString() ?? null,
+    reserveX: pool.reserveX?.toString() ?? null,
+    reserveY: pool.reserveY?.toString() ?? null,
+    reserveUpdatedBlock: pool.reserveUpdatedBlock?.toString() ?? null,
     createdBlock: pool.createdBlock.toString(),
   };
 }
