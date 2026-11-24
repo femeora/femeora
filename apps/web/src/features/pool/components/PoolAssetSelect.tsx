@@ -58,7 +58,7 @@ export function AssetLogo({ asset, className }: { asset: ApiPoolAsset; className
     ? `https://logoapi.sh/ticker/${encodeURIComponent(asset.symbol)}.png`
     : null;
   const candidates = useMemo(
-    () => [asset.logoUrl, companyLogo].filter((url): url is string => Boolean(url)),
+    () => [companyLogo, asset.logoUrl].filter((url): url is string => Boolean(url)),
     [asset.logoUrl, companyLogo],
   );
   const [candidate, setCandidate] = useState(0);

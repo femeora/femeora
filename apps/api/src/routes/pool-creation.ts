@@ -90,7 +90,10 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       const display = displayByAddress.get(asset.address.toLowerCase());
       return {
         ...asset,
-        logoUrl: display?.logoUrl ?? asset.logoUrl,
+        // Robinhood's NCW image is often the generic tokenized-asset mark,
+        // not the underlying company brand. Only expose a curated database
+        // override for Robinhood assets; the web's ticker provider is primary.
+        logoUrl: display?.logoUrl ?? (asset.source === 'robinhood' ? null : asset.logoUrl),
         candidateEnabled: display?.candidateEnabled ?? asset.source === 'robinhood',
         candidateRank: display?.candidateRank ?? null,
       };
