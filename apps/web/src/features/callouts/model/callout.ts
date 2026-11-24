@@ -7,6 +7,7 @@ export interface Caller {
   handle: string;
   name: string;
   initials: string;
+  avatarUrl: string | null;
   verified: boolean;
 }
 
@@ -22,6 +23,8 @@ export interface CalloutUpdate {
  */
 export interface Callout {
   id: string;
+  /** Canonical creation time used for exact chart placement on every interval. */
+  createdAt: string;
   caller: Caller;
   postedAgo: string;
   caption: string | null;

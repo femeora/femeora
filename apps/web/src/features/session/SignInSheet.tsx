@@ -15,6 +15,8 @@ const ERRORS: Record<string, string> = {
   WALLET_LIMIT_REACHED: 'This account already has the maximum of three linked wallets.',
   X_AUTH_INVALID: 'The X sign-in response was incomplete. Please start again.',
   X_AUTH_STATE_INVALID: 'The X sign-in request expired or was already used. Please start again.',
+  X_API_CREDITS_REQUIRED: 'X accepted the sign-in, but the Fomeora developer app needs API credits to read your profile. No wallet or transaction was affected.',
+  X_API_RATE_LIMITED: 'X is temporarily limiting profile requests. Please wait a few minutes and try again.',
   X_AUTH_UPSTREAM_FAILED: 'X could not complete sign-in. Please try again later.',
 };
 
@@ -70,7 +72,7 @@ export function SignInSheet() {
               Fomeora reads your X handle, name, avatar and verification status. It cannot post, like or send messages on X.
             </p>
             <p className="glass t-label rounded-[2px] p-3 text-muted">
-              Requested scope · <span className="text-fg">users.read</span> · No write access
+              Requested scopes · <span className="text-fg">tweet.read · users.read</span> · No write access
             </p>
             <Button type="button" variant="primary" block onClick={startXSignIn}>
               <XLogo className="size-3.5" /> Continue with X

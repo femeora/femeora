@@ -66,7 +66,7 @@ export function CalloutPost({ callout, own = false }: CalloutPostProps) {
       id={`callout-${callout.id}`}
       className="grid scroll-mt-28 grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-line px-gutter py-5"
     >
-      <Avatar seed={caller.handle} size="lg" self={own} />
+      <Avatar seed={caller.handle} src={caller.avatarUrl} alt={`${caller.name} X avatar`} size="lg" self={own} />
       <div className="min-w-0">
         <header className="flex flex-wrap items-center gap-x-1.5 text-[0.9375rem]">
           <span className="font-medium">{caller.name}</span>

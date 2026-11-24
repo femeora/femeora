@@ -4,14 +4,14 @@ import {
   LineStyle,
   type AutoscaleInfo,
   type IPriceLine,
-  type SeriesMarker,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { useEffect, useMemo, useState } from 'react';
 
 import { CandlestickChart } from '@/components/ui/icons';
+import { Avatar } from '@/components/ui/Avatar';
 import { TokenPair } from '@/components/ui/TokenPair';
-import { calloutStatus, rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
+import { rangeLabel, sideLabel, type Callout } from '@/features/callouts/model/callout';
 import { cn } from '@/lib/cn';
 import { tokenColor } from '@/lib/theme';
 import type { BinShape } from '@/types/callout';
@@ -42,10 +42,20 @@ interface PriceChartProps {
 
 type Ohlc = Pick<Candle, 'open' | 'high' | 'low' | 'close'>;
 
-/** Vertical reach above a candle's high that counts as hovering its callout marker. */
-const MARKER_HIT_PX = 36;
-
-const MARKER_TONE = { 'in-range': 'up', 'out-of-range': 'faint', closed: 'faint' } as const;
+function calloutCandleIndex(callout: Callout, times: readonly UTCTimestamp[]): number {
+  if (times.length === 0) return -1;
+  const target = Math.floor(new Date(callout.createdAt).getTime() / 1_000);
+  let closest = 0;
+  let distance = Number.POSITIVE_INFINITY;
+  times.forEach((time, index) => {
+    const candidate = Math.abs(Number(time) - target);
+    if (candidate < distance) {
+      closest = index;
+      distance = candidate;
+    }
+  });
+  return closest;
+}
 
 /**
  * Pool chart on TradingView lightweight-charts (brief 8.1, 8.2): candles and
@@ -67,6 +77,7 @@ export function PriceChart({
   const { containerRef, handles } = useLightweightChart();
   const [hovered, setHovered] = useState<Ohlc | null>(null);
   const [popover, setPopover] = useState<{ callout: Callout; x: number; y: number } | null>(null);
+  const [avatarMarkers, setAvatarMarkers] = useState<readonly { callout: Callout; x: number; y: number }[]>([]);
   const hasCandles = candles.length > 0;
 
   const convert = (priceUsd: number) => toUnit(priceUsd, unit, pool);
@@ -120,28 +131,50 @@ export function PriceChart({
     handles?.chart.timeScale().fitContent();
   }, [handles, times]);
 
-  // Callout avatar markers at (time posted, value at post).
+  // Lightweight Charts markers cannot render images, so canonical X avatars are
+  // projected into a DOM overlay and kept aligned while the user pans or zooms.
   useEffect(() => {
-    if (!handles) return;
-    const markers: SeriesMarker<UTCTimestamp>[] = showCallouts
-      ? callouts
-          .map(callout => ({ callout, index: candles.length - 1 - callout.candlesAgo }))
-          .filter(({ index }) => index >= 0)
-          .sort((a, b) => a.index - b.index)
-          .map(({ callout, index }) => ({
-            time: times[index] as UTCTimestamp,
-            position: 'aboveBar',
-            shape: 'circle',
-            size: 1.4,
-            id: callout.id,
-            text: callout.caller.initials,
-            color: tokenColor(
-              callout.quickExitMinutes !== null ? 'down' : MARKER_TONE[calloutStatus(callout)]
-            ),
-          }))
-      : [];
-    handles.candles.setMarkers(markers);
-  }, [handles, callouts, showCallouts, candles.length, times]);
+    if (!handles || !showCallouts) {
+      setAvatarMarkers([]);
+      return;
+    }
+    const { chart, candles: candleSeries } = handles;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const projected = callouts.flatMap(callout => {
+          const index = calloutCandleIndex(callout, times);
+          const time = times[index];
+          if (index < 0 || time === undefined) return [];
+          const x = chart.timeScale().timeToCoordinate(time);
+          const value = toUnit(callout.mcAtPostUsd, unit, pool);
+          const y = candleSeries.priceToCoordinate(value);
+          return x === null || y === null ? [] : [{ callout, x, y }];
+        }).sort((a, b) => a.x - b.x || a.y - b.y);
+        const stacked: { callout: Callout; x: number; y: number }[] = [];
+        projected.forEach(marker => {
+          let y: number = marker.y;
+          for (let previous = stacked.length - 1; previous >= 0; previous -= 1) {
+            const other = stacked[previous];
+            if (!other || marker.x - other.x > 32) break;
+            if (Math.abs(y - other.y) < 30) y = other.y - 30;
+          }
+          stacked.push({ ...marker, y });
+        });
+        setAvatarMarkers(stacked);
+      });
+    };
+    update();
+    chart.timeScale().subscribeVisibleLogicalRangeChange(update);
+    const resize = new ResizeObserver(update);
+    if (containerRef.current) resize.observe(containerRef.current);
+    return () => {
+      cancelAnimationFrame(frame);
+      resize.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(update);
+    };
+  }, [handles, showCallouts, callouts, candles.length, times, unit, pool, containerRef]);
 
   // MIN / MAX lines for the draft range.
   useEffect(() => {
@@ -195,23 +228,14 @@ export function PriceChart({
       const bar = data && 'open' in data ? data : null;
       setHovered(bar);
 
-      // A marker sits just above its candle's high; treat the pointer as on it when
-      // it is over that candle and within the marker's band (brief 8.2 popover).
-      const index = times.findIndex(time => time === param.time);
-      const callout = callouts.find(item => candles.length - 1 - item.candlesAgo === index);
-      const highY = bar ? candleSeries.priceToCoordinate(bar.high) : null;
-      const onMarker =
-        showCallouts &&
-        callout &&
-        param.point &&
-        highY !== null &&
-        param.point.y > highY - MARKER_HIT_PX &&
-        param.point.y < highY + 4;
-      setPopover(onMarker && param.point ? { callout, x: param.point.x, y: param.point.y } : null);
+      const marker = showCallouts && param.point
+        ? avatarMarkers.find(item => Math.hypot(item.x - param.point!.x, item.y - param.point!.y) <= 18)
+        : null;
+      setPopover(marker ? { callout: marker.callout, x: marker.x, y: marker.y } : null);
     };
     chart.subscribeCrosshairMove(onMove);
     return () => chart.unsubscribeCrosshairMove(onMove);
-  }, [handles, callouts, times, candles.length, showCallouts]);
+  }, [handles, avatarMarkers, showCallouts]);
 
   const band = range
     ? ([
@@ -315,6 +339,21 @@ export function PriceChart({
           {...(onRangeChange ? { onRangeDrag: dragRange } : {})}
         />
       ) : null}
+
+      {hasCandles && showCallouts ? avatarMarkers.map(({ callout, x, y }) => (
+        <span
+          key={callout.id}
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: x, top: y }}
+        >
+          <Avatar
+            seed={callout.caller.handle}
+            src={callout.caller.avatarUrl}
+            alt=""
+            size="sm"
+          />
+        </span>
+      )) : null}
 
       {hasCandles && popover ? <CalloutPopover {...popover} /> : null}
 

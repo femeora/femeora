@@ -42,6 +42,7 @@ const xUserSchema = z.object({
     name: z.string().nullable().optional(),
     profile_image_url: z.string().url().nullable().optional(),
     verified: z.boolean().optional(),
+    public_metrics: z.object({ followers_count: z.number().int().nonnegative() }).optional(),
   }),
 });
 
@@ -78,6 +79,18 @@ class WalletLinkError extends Error {
   ) {
     super(code);
   }
+}
+
+class XAuthUpstreamError extends Error {
+  constructor(readonly publicCode: string) {
+    super(publicCode);
+  }
+}
+
+function xReadFailure(status: number): XAuthUpstreamError {
+  if (status === 402) return new XAuthUpstreamError('X_API_CREDITS_REQUIRED');
+  if (status === 429) return new XAuthUpstreamError('X_API_RATE_LIMITED');
+  return new XAuthUpstreamError('X_AUTH_UPSTREAM_FAILED');
 }
 
 export async function registerAuthRoutes(
@@ -154,7 +167,8 @@ export async function registerAuthRoutes(
         signal: AbortSignal.timeout(10_000),
       });
       const token = xTokenSchema.safeParse(await tokenResponse.json());
-      if (!tokenResponse.ok || !token.success) throw new Error('X_TOKEN_FAILED');
+      if (!tokenResponse.ok) throw xReadFailure(tokenResponse.status);
+      if (!token.success) throw new XAuthUpstreamError('X_AUTH_UPSTREAM_FAILED');
 
       const userResponse = await fetch(
         'https://api.x.com/2/users/me?user.fields=profile_image_url,public_metrics,verified',
@@ -164,7 +178,8 @@ export async function registerAuthRoutes(
         },
       );
       const profile = xUserSchema.safeParse(await userResponse.json());
-      if (!userResponse.ok || !profile.success) throw new Error('X_PROFILE_FAILED');
+      if (!userResponse.ok) throw xReadFailure(userResponse.status);
+      if (!profile.success) throw new XAuthUpstreamError('X_AUTH_UPSTREAM_FAILED');
       const xUser = profile.data.data;
       const user = await prisma.user.upsert({
         where: { xId: xUser.id },
@@ -174,12 +189,16 @@ export async function registerAuthRoutes(
           name: xUser.name ?? null,
           avatarUrl: xUser.profile_image_url ?? null,
           xVerified: xUser.verified ?? false,
+          xFollowers: xUser.public_metrics?.followers_count ?? 0,
+          xProfileRefreshedAt: now,
         },
         update: {
           handle: xUser.username,
           name: xUser.name ?? null,
           avatarUrl: xUser.profile_image_url ?? null,
           xVerified: xUser.verified ?? false,
+          xFollowers: xUser.public_metrics?.followers_count ?? 0,
+          xProfileRefreshedAt: now,
         },
       });
       const sessionToken = await createSession(user.id);
@@ -187,8 +206,12 @@ export async function registerAuthRoutes(
       return reply.redirect(
         new URL(oauthState.redirectPath ?? '/portfolio', environment.webBaseUrl).toString(),
       );
-    } catch {
-      return redirectWithError(reply, environment.webBaseUrl, 'X_AUTH_UPSTREAM_FAILED');
+    } catch (error) {
+      return redirectWithError(
+        reply,
+        environment.webBaseUrl,
+        error instanceof XAuthUpstreamError ? error.publicCode : 'X_AUTH_UPSTREAM_FAILED',
+      );
     }
   });
 

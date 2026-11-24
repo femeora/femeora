@@ -59,6 +59,25 @@ function errorCode(error: unknown): string {
   return 'SESSION_REQUEST_FAILED';
 }
 
+function consumePendingXAuth(): boolean {
+  try {
+    if (window.sessionStorage?.getItem('fomeora:x-auth-pending') !== '1') return false;
+    window.sessionStorage.removeItem('fomeora:x-auth-pending');
+    return true;
+  } catch {
+    // A valid server session must not be discarded when browser storage is unavailable.
+    return false;
+  }
+}
+
+function rememberPendingXAuth(): void {
+  try {
+    window.sessionStorage?.setItem('fomeora:x-auth-pending', '1');
+  } catch {
+    // This marker only controls the success toast; OAuth state is held server-side.
+  }
+}
+
 export const useSession = create<SessionState>((set, get) => ({
   user: null,
   status: 'loading',
@@ -75,8 +94,7 @@ export const useSession = create<SessionState>((set, get) => ({
         error: null,
         signInOpen: user.wallets.length === 0,
       });
-      if (window.sessionStorage.getItem('fomeora:x-auth-pending') === '1') {
-        window.sessionStorage.removeItem('fomeora:x-auth-pending');
+      if (consumePendingXAuth()) {
         useToast.getState().show(`Signed in as @${user.handle}.`, { title: 'X connected' });
       }
     } catch (error) {
@@ -94,7 +112,7 @@ export const useSession = create<SessionState>((set, get) => ({
     }
   },
   startXSignIn: () => {
-    window.sessionStorage.setItem('fomeora:x-auth-pending', '1');
+    rememberPendingXAuth();
     window.location.assign('/api/v1/auth/x/start?redirect=/portfolio');
   },
   linkWallet: async () => {

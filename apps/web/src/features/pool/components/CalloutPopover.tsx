@@ -32,7 +32,7 @@ export function CalloutPopover({ callout, x, y }: CalloutPopoverProps) {
       }}
     >
       <div className="flex items-center gap-2">
-        <Avatar seed={callout.caller.handle} size="sm" />
+        <Avatar seed={callout.caller.handle} src={callout.caller.avatarUrl} alt={`${callout.caller.name} X avatar`} size="sm" />
         <span className="text-[0.9375rem] font-medium">@{callout.caller.handle}</span>
         {callout.caller.verified ? (
           <BadgeCheck aria-label="X verified" className="size-3.5 text-signal" />

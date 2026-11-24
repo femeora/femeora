@@ -65,7 +65,8 @@ const initialDraft: PositionDraft = {
 export function positionDraftReducer(draft: PositionDraft, action: Action): PositionDraft {
   switch (action.type) {
     case 'shape':
-      return { ...draft, shape: action.shape, presetId: null };
+      // A preset owns the range/strategy anchor; shape remains independently editable.
+      return { ...draft, shape: action.shape };
     case 'range':
       // MIN/MAX customize the selected strategy; they do not deselect it.
       return { ...draft, [action.bound]: action.value };

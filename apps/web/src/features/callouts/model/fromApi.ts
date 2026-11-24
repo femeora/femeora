@@ -75,10 +75,12 @@ export function apiCalloutToCallout(
     .toUpperCase();
   return {
     id: callout.id,
+    createdAt: callout.createdAt,
     caller: {
       handle,
       name: callout.user.name ?? handle,
       initials,
+      avatarUrl: callout.user.avatarUrl,
       verified: callout.user.xVerified,
     },
     postedAgo: elapsedLabel(callout.createdAt, now),

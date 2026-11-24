@@ -14,6 +14,9 @@ const sizes: Record<Size, string> = {
 interface AvatarProps {
   /** Stable identity to draw from, usually the X handle. */
   seed: string;
+  /** Canonical X profile image. The generated avatar remains the fallback. */
+  src?: string | null | undefined;
+  alt?: string;
   size?: Size;
   /** Metal ring for the signed-in user. */
   self?: boolean;
@@ -28,22 +31,32 @@ const FLOOR = 24;
 const MAX_BAR = 15;
 
 /**
- * Generative avatar: a seven-bar histogram in black, white and metal, derived from
- * the handle (see `lib/avatar.ts`). Stands in until X profile images are served.
+ * X profile image with a deterministic seven-bar fallback when X has no image.
  */
-export function Avatar({ seed, size = 'md', self = false, className }: AvatarProps) {
+export function Avatar({ seed, src = null, alt = '', size = 'md', self = false, className }: AvatarProps) {
   const { bars, accent, background, barTone } = avatarSpec(seed);
+  const frame = cn(
+    'shrink-0 overflow-hidden rounded-full bg-panel-2',
+    self ? 'ring-2 ring-signal ring-offset-2 ring-offset-bg' : 'ring-1 ring-fg/15',
+    sizes[size],
+    className
+  );
+
+  if (src) {
+    return (
+      <span className={frame}>
+        {/* X profile media is remote and intentionally rendered without optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} referrerPolicy="no-referrer" className="size-full object-cover" />
+      </span>
+    );
+  }
 
   return (
     <svg
       viewBox={`0 0 ${VIEW} ${VIEW}`}
       aria-hidden="true"
-      className={cn(
-        'shrink-0 rounded-full',
-        self ? 'ring-2 ring-signal ring-offset-2 ring-offset-bg' : 'ring-1 ring-fg/15',
-        sizes[size],
-        className
-      )}
+      className={frame}
     >
       <circle cx={VIEW / 2} cy={VIEW / 2} r={VIEW / 2} fill={`rgb(${background})`} />
       {bars.map((height, index) => {

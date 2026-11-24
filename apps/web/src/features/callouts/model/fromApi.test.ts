@@ -70,7 +70,7 @@ const apiCallout: ApiCallout = {
     id: '00000000-0000-4000-8000-000000000002',
     handle: 'canonical_lp',
     name: 'Canonical LP',
-    avatarUrl: null,
+    avatarUrl: 'https://pbs.twimg.com/profile_images/canonical.jpg',
     xVerified: true,
   },
   pool: {
@@ -114,6 +114,7 @@ test('maps canonical API callouts without fabricating USD or unknown integrity s
     new Date('2026-11-23T12:00:00.000Z'),
   );
   assert.equal(callout.valuation, 'quote');
+  assert.equal(callout.caller.avatarUrl, 'https://pbs.twimg.com/profile_images/canonical.jpg');
   assert.deepEqual(callout.rangeBins, { lower: -1, upper: 1, active: 0 });
   assert.deepEqual(rangeLabel(callout), ['Bin -1', 'Bin 1']);
   assert.equal(calloutStatus(callout), 'in-range');

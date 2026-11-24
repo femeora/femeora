@@ -28,6 +28,7 @@ globalThis.fetch = async (input, init) => {
         name: 'Acceptance User',
         profile_image_url: 'https://pbs.twimg.com/profile_images/acceptance.jpg',
         verified: true,
+        public_metrics: { followers_count: 42 },
       },
     });
   }
@@ -84,7 +85,7 @@ try {
 
   const result = {
     redirectsToOfficialX: start.statusCode === 302 && authorize.origin === 'https://x.com',
-    readOnlyScope: authorize.searchParams.get('scope') === 'users.read',
+    readOnlyScope: authorize.searchParams.get('scope') === 'tweet.read users.read',
     pkceS256: authorize.searchParams.get('code_challenge_method') === 'S256',
     stateStoredOnlyAsHash: Boolean(storedState) && storedState?.stateHash !== state,
     verifierBoundToTokenExchange: tokenVerifier === verifier,
@@ -92,6 +93,8 @@ try {
     callbackReturnsToSafePath: callback.statusCode === 302 && callback.headers.location === `${environment.WEB_BASE_URL}/feed`,
     httpOnlySessionIssued: cookies(callback).some(cookie => cookie.startsWith(`${SESSION_COOKIE_NAME}=`) && cookie.includes('HttpOnly')),
     meUsesServerSession: me.statusCode === 200 && me.json().handle === handle && me.json().wallets.length === 0,
+    profileSnapshotStored:
+      (await prisma.user.findUnique({ where: { xId }, select: { xFollowers: true } }))?.xFollowers === 42,
     stateReplayDenied: replay.statusCode === 302 && replay.headers.location?.includes('X_AUTH_STATE_INVALID') === true,
   };
   console.log(JSON.stringify(result));

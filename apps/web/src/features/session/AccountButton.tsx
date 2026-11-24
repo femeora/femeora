@@ -13,9 +13,10 @@ import { useSession } from './store';
 
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
-function ConnectedWalletButton({ account, seed, title, subtitle }: {
+function ConnectedWalletButton({ account, seed, avatarUrl, title, subtitle }: {
   account: `0x${string}`;
   seed: string;
+  avatarUrl?: string | null;
   title: string;
   subtitle: string;
 }) {
@@ -38,7 +39,7 @@ function ConnectedWalletButton({ account, seed, title, subtitle }: {
       className="glass-control flex min-h-9 items-center gap-2 rounded-[2px] py-1 pl-1 pr-3 text-left"
       aria-label={`Manage connected wallet ${account}`}
     >
-      <Avatar seed={seed} size="sm" self />
+      <Avatar seed={seed} src={avatarUrl} alt={`${title} avatar`} size="sm" self />
       <span className="flex flex-col leading-tight">
         <span className="font-mono text-[0.8125rem]">{title}</span>
         <span className="t-label text-[0.625rem] text-muted">{subtitle}</span>
@@ -105,5 +106,5 @@ export function AccountButton() {
     return <Button variant="primary" onClick={() => void connectWallet()} className="min-h-9 px-3.5">Select linked wallet</Button>;
   }
 
-  return <ConnectedWalletButton account={account} seed={user.handle} title={`@${user.handle}`} subtitle={short(user.wallet)} />;
+  return <ConnectedWalletButton account={account} seed={user.handle} avatarUrl={user.avatarUrl} title={`@${user.handle}`} subtitle={short(user.wallet)} />;
 }

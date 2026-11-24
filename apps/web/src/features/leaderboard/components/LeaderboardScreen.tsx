@@ -78,7 +78,7 @@ export function LeaderboardScreen() {
                 </td>
                 <td className={cell}>
                   <span className="flex items-center gap-2 font-sans text-[0.9375rem]">
-                    <Avatar seed={row.handle} size="sm" />
+                    <Avatar seed={row.handle} src={row.avatarUrl} alt={`${row.name ?? row.handle} X avatar`} size="sm" />
                     @{row.handle.replace(/^@/, '')}
                     {row.xVerified ? (
                       <BadgeCheck aria-label="X verified" className="size-4 text-signal" />

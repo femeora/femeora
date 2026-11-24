@@ -25,8 +25,8 @@ test('retains the selected preset when a range handle changes', () => {
   assert.equal(changed.presetId, 'fee-farm');
 });
 
-test('clears the selected preset when its shape is replaced manually', () => {
+test('retains the selected preset when its shape is replaced manually', () => {
   const changed = positionDraftReducer(feeFarmDraft, { type: 'shape', shape: 'spot' });
   assert.equal(changed.shape, 'spot');
-  assert.equal(changed.presetId, null);
+  assert.equal(changed.presetId, 'fee-farm');
 });

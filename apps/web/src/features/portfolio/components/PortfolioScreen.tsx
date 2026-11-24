@@ -104,7 +104,7 @@ export function PortfolioScreen() {
   return (
     <div className="mx-auto max-w-[72rem] px-gutter py-8">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
-        <div className="flex items-center gap-4"><Avatar seed={user?.handle ?? account} size="xl" self /><div>
+        <div className="flex items-center gap-4"><Avatar seed={user?.handle ?? account} src={user?.avatarUrl} alt={user ? `${user.name} X avatar` : 'Connected wallet avatar'} size="xl" self /><div>
           <h1 className="text-2xl font-medium">{user ? `@${user.handle}` : short(account)}</h1>
           <p className="t-label mt-1 break-all text-muted">Wallet {account} · indexed on-chain positions</p>
         </div></div>
