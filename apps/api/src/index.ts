@@ -69,8 +69,11 @@ export async function createServer(environment = loadApiEnvironment()) {
   await app.register(cookie);
 
   await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
+    // Public reads are intentionally not covered by one global IP bucket.
+    // Browser traffic reaches this service through the web BFF, so an IP
+    // bucket here would make unrelated visitors consume the same allowance.
+    // Sensitive and write-heavy routes opt in with their own route limits.
+    global: false,
     keyGenerator: request => {
       const token = request.cookies[SESSION_COOKIE_NAME];
       return token

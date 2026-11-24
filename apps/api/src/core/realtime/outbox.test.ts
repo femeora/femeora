@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ConnectionLimiter, formatSseEvent, parseLastEventId, SSE_CONNECTIONS_PER_IP } from './outbox.js';
+import { ConnectionLimiter, formatSseEvent, parseLastEventId, SSE_CONNECTIONS_PER_KEY } from './outbox.js';
 
 test('validates Last-Event-ID without accepting signs or non-decimal values', () => {
   assert.equal(parseLastEventId(undefined), null);
@@ -27,11 +27,11 @@ test('formats a durable outbox row as a resumable SSE event', () => {
   );
 });
 
-test('caps concurrent SSE connections per IP and releases capacity', () => {
+test('caps concurrent SSE connections per limiter key and releases capacity', () => {
   const limiter = new ConnectionLimiter();
-  for (let index = 0; index < SSE_CONNECTIONS_PER_IP; index += 1) assert.equal(limiter.acquire('127.0.0.1'), true);
-  assert.equal(limiter.acquire('127.0.0.1'), false);
-  assert.equal(limiter.acquire('127.0.0.2'), true);
-  limiter.release('127.0.0.1');
-  assert.equal(limiter.acquire('127.0.0.1'), true);
+  for (let index = 0; index < SSE_CONNECTIONS_PER_KEY; index += 1) assert.equal(limiter.acquire('ip:127.0.0.1'), true);
+  assert.equal(limiter.acquire('ip:127.0.0.1'), false);
+  assert.equal(limiter.acquire('session:other'), true);
+  limiter.release('ip:127.0.0.1');
+  assert.equal(limiter.acquire('ip:127.0.0.1'), true);
 });

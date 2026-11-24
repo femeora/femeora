@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
+
 import { prisma } from '@fomeora/database';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import {
   ConnectionLimiter,
   formatSseEvent,
@@ -14,6 +17,13 @@ import {
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase());
 const limiter = new ConnectionLimiter();
+
+function connectionKey(request: FastifyRequest): string {
+  const session = request.cookies[SESSION_COOKIE_NAME];
+  return session
+    ? `session:${createHash('sha256').update(session).digest('hex')}`
+    : `ip:${request.ip}`;
+}
 
 async function streamEvents(
   request: FastifyRequest,
@@ -28,7 +38,9 @@ async function streamEvents(
     await reply.status(400).send({ error: 'INVALID_LAST_EVENT_ID' });
     return;
   }
-  if (!limiter.acquire(request.ip)) {
+  const limiterKey = connectionKey(request);
+  if (!limiter.acquire(limiterKey)) {
+    reply.header('retry-after', '15');
     await reply.status(429).send({ error: 'SSE_CONNECTION_LIMIT' });
     return;
   }
@@ -72,7 +84,7 @@ async function streamEvents(
     }
   } finally {
     request.raw.off('close', close);
-    limiter.release(request.ip);
+    limiter.release(limiterKey);
     if (!reply.raw.destroyed) reply.raw.end();
   }
 }

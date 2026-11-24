@@ -7,7 +7,10 @@ const RECONNECT_MAX_MS = 30_000;
 export const OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1_000;
 export const SSE_HEARTBEAT_MS = 15_000;
 export const SSE_POLL_FALLBACK_MS = 2_000;
-export const SSE_CONNECTIONS_PER_IP = 5;
+// Same-origin browser streams are proxied by the web service and therefore
+// share its upstream IP. Keep an aggregate safety ceiling without limiting the
+// whole application to five concurrent visitors.
+export const SSE_CONNECTIONS_PER_KEY = 100;
 export const SSE_BATCH_SIZE = 200;
 
 export type RealtimeEvent = {
@@ -42,17 +45,17 @@ export function formatSseEvent(event: RealtimeEvent): string {
 export class ConnectionLimiter {
   readonly #counts = new Map<string, number>();
 
-  acquire(ip: string): boolean {
-    const current = this.#counts.get(ip) ?? 0;
-    if (current >= SSE_CONNECTIONS_PER_IP) return false;
-    this.#counts.set(ip, current + 1);
+  acquire(key: string): boolean {
+    const current = this.#counts.get(key) ?? 0;
+    if (current >= SSE_CONNECTIONS_PER_KEY) return false;
+    this.#counts.set(key, current + 1);
     return true;
   }
 
-  release(ip: string): void {
-    const current = this.#counts.get(ip) ?? 0;
-    if (current <= 1) this.#counts.delete(ip);
-    else this.#counts.set(ip, current - 1);
+  release(key: string): void {
+    const current = this.#counts.get(key) ?? 0;
+    if (current <= 1) this.#counts.delete(key);
+    else this.#counts.set(key, current - 1);
   }
 }
 
