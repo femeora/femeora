@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { binCount, snapRangeBound } from './range';
+import { binCount, DEFAULT_POSITION_PRESET_ID, PRESETS, snapRangeBound } from './range';
+
+test('defaults to a two-sided range around the active price', () => {
+  const preset = PRESETS.find(item => item.id === DEFAULT_POSITION_PRESET_ID);
+  assert.equal(preset?.id, 'fee-farm');
+  assert.ok((preset?.minPct ?? 0) < 0);
+  assert.ok((preset?.maxPct ?? 0) > 0);
+});
 
 test('snaps chart bounds to the pool bin grid', () => {
   const range = { minPct: -35, maxPct: -1 };

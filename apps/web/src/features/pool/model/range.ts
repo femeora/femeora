@@ -17,6 +17,8 @@ export interface Preset extends RangeInput {
   hint: string;
 }
 
+export const DEFAULT_POSITION_PRESET_ID: Preset['id'] = 'fee-farm';
+
 // PositionManagerV2 rejects batches larger than 61 bins.
 export const RANGE_LIMITS = { minPct: -99, maxPct: 900, maxBins: 61 } as const;
 

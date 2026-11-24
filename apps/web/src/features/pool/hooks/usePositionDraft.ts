@@ -8,6 +8,7 @@ import type { BinShape } from '@/types/callout';
 import type { Pool } from '../model/pool';
 import {
   binCount,
+  DEFAULT_POSITION_PRESET_ID,
   PRESETS,
   rangeError,
   rangeSide,
@@ -47,12 +48,12 @@ type Action =
   | { type: 'showSize'; value: boolean }
   | { type: 'submitted' };
 
-const [defaultPreset] = PRESETS;
+const defaultPreset = PRESETS.find(preset => preset.id === DEFAULT_POSITION_PRESET_ID);
 
 const initialDraft: PositionDraft = {
   shape: defaultPreset?.shape ?? 'bid-ask',
-  minPct: defaultPreset?.minPct ?? -35,
-  maxPct: defaultPreset?.maxPct ?? -1,
+  minPct: defaultPreset?.minPct ?? -20,
+  maxPct: defaultPreset?.maxPct ?? 20,
   presetId: defaultPreset?.id ?? null,
   quoteAmount: '',
   baseAmount: '',
