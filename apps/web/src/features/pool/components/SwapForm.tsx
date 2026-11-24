@@ -4,13 +4,6 @@ import { ApiSwapPreparationSchema, ApiSwapQuoteSchema, type ApiSwapQuote } from 
 import { useState } from 'react';
 import { formatUnits } from 'viem';
 
-import { executePreparedSwap } from '../model/executeSwap';
-import type { Pool } from '../model/pool';
-import type { SwapDirection } from '../model/swap';
-
-import { AmountField } from './AmountField';
-import { TxButton } from './TxButton';
-
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { Button } from '@/components/ui/Button';
 import { ArrowUpDown } from '@/components/ui/icons';
@@ -18,7 +11,12 @@ import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
 import { cn } from '@/lib/cn';
 
+import { executePreparedSwap } from '../model/executeSwap';
+import type { Pool } from '../model/pool';
+import type { SwapDirection } from '../model/swap';
 
+import { AmountField } from './AmountField';
+import { TxButton } from './TxButton';
 
 const SLIPPAGE_BPS = 50;
 const MAXIMUM_BIN_CROSSINGS = 32;

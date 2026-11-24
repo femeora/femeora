@@ -4,9 +4,6 @@ import { ApiIndexedPositionListSchema, type ApiIndexedPosition } from '@fomeora/
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { formatUnits } from 'viem';
 
-import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
-import type { Pool } from '../model/pool';
-
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { TokenPair } from '@/components/ui/TokenPair';
@@ -19,6 +16,8 @@ import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
 import { tokenSymbol } from '@/lib/tokens';
 
+import { shortAddress, type LiveLp, type LiveTrade } from '../model/live';
+import type { Pool } from '../model/pool';
 
 type PoolTab = 'callouts' | 'positions' | 'top-lps' | 'trades';
 

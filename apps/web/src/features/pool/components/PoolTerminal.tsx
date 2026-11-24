@@ -3,6 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { useToast } from '@/components/feedback/toast';
+import type { Callout } from '@/features/callouts/model/callout';
+import { useAllCallouts } from '@/features/callouts/useAllCallouts';
+import { openApiEventStream } from '@/lib/api/realtime';
 
 import { usePositionDraft } from '../hooks/usePositionDraft';
 import type { ValueUnit } from '../model/format';
@@ -15,11 +19,6 @@ import { PoolHeader } from './PoolHeader';
 import { PoolTabs } from './PoolTabs';
 import { PriceChart } from './PriceChart';
 import { TradePanel, type PanelTab } from './TradePanel';
-
-import { useToast } from '@/components/feedback/toast';
-import type { Callout } from '@/features/callouts/model/callout';
-import { useAllCallouts } from '@/features/callouts/useAllCallouts';
-import { openApiEventStream } from '@/lib/api/realtime';
 
 interface PoolTerminalProps {
   pool: Pool;
