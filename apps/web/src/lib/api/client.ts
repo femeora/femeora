@@ -23,7 +23,7 @@ export async function browserApiRequest<T>(
       accept: 'application/json',
       ...(mutation ? { 'content-type': 'application/json' } : {}),
     },
-    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    ...(mutation ? { body: JSON.stringify(options.body ?? {}) } : {}),
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: string } | null;

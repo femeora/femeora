@@ -68,6 +68,7 @@ test('browser API client marks bodyless mutations as JSON requests', async () =>
   try {
     await browserApiRequest('/v1/callouts/id/like', ApiSocialToggleSchema, { method: 'POST' });
     assert.equal(new Headers(request?.headers).get('content-type'), 'application/json');
+    assert.equal(request?.body, '{}');
   } finally {
     globalThis.fetch = originalFetch;
   }
