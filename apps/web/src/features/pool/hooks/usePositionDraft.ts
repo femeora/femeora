@@ -62,12 +62,13 @@ const initialDraft: PositionDraft = {
   showSize: true,
 };
 
-function reducer(draft: PositionDraft, action: Action): PositionDraft {
+export function positionDraftReducer(draft: PositionDraft, action: Action): PositionDraft {
   switch (action.type) {
     case 'shape':
       return { ...draft, shape: action.shape, presetId: null };
     case 'range':
-      return { ...draft, [action.bound]: action.value, presetId: null };
+      // MIN/MAX customize the selected strategy; they do not deselect it.
+      return { ...draft, [action.bound]: action.value };
     case 'apply': {
       // Presets and tails both replace the whole range in one step.
       const { shape, minPct, maxPct, presetId } = action;
@@ -102,7 +103,7 @@ function requiredTokens(side: RangeSide): { quote: boolean; base: boolean } {
  * deposit value and the first blocking error. Pure derivations live in `model/`.
  */
 export function usePositionDraft(pool: Pool) {
-  const [draft, dispatch] = useReducer(reducer, initialDraft);
+  const [draft, dispatch] = useReducer(positionDraftReducer, initialDraft);
 
   const derived = useMemo(() => {
     const side = rangeSide(draft);

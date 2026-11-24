@@ -47,7 +47,7 @@ export function PoolTerminal({
 }: PoolTerminalProps) {
   const router = useRouter();
   const showToast = useToast(state => state.show);
-  const [interval, setChartInterval] = useState<ChartInterval>('15m');
+  const [interval, setChartInterval] = useState<ChartInterval>('1h');
   const [unit, setUnit] = useState<ValueUnit>(pool.marketCapAvailable ? 'mcap' : 'price');
   const [showCallouts, setShowCallouts] = useState(true);
   const [showBins, setShowBins] = useState(true);
