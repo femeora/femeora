@@ -13,6 +13,7 @@ test('position serializer converts nested pool bigint values to JSON-safe string
     valueQuoteBlock: null, inRangeSeconds: 0n, openSeconds: 60n,
     openedAt: new Date('2026-11-24T06:50:00.000Z'), closedAt: null, canonical: true,
     bins: [{ binId: 703, shares: { toString: () => '13997' } }], callouts: [],
+    events: [{ payload: { amountsX: ['0'], amountsY: ['300000'] } }],
     pool: {
       id: '0f4a21af-2ac6-4745-ade1-c8a2f1d1b041', chainId: 4_663,
       address: '0xbc826ccb7e644e017c1d21478b4e55d49d2b2dad', type: 'DLMM',
@@ -33,5 +34,6 @@ test('position serializer converts nested pool bigint values to JSON-safe string
   assert.equal(serialized?.poolCanonical, true);
   assert.equal(serialized?.replacementPoolAddress, null);
   assert.equal(serialized?.earnedQuote, '0.000000004779992258');
+  assert.equal(serialized?.strategy, 'buy-the-dip');
   assert.doesNotThrow(() => JSON.stringify(serialized));
 });

@@ -15,6 +15,7 @@ type PoolIdentity = {
 };
 
 type DecimalValue = { toString(): string; toFixed?(): string };
+type PositionStrategy = 'buy-the-dip' | 'sell-into-strength' | 'fee-farm' | 'custom';
 
 function decimalString(value: DecimalValue): string {
   return value.toFixed ? value.toFixed() : value.toString();
@@ -29,15 +30,55 @@ function replacementAddress(pool: PoolIdentity, canonicalPools: readonly PoolIde
   return canonicalPools.find(candidate => candidate.canonical && marketKey(candidate) === marketKey(pool))?.address ?? null;
 }
 
+function positiveTotal(value: unknown): bigint {
+  if (!Array.isArray(value)) return 0n;
+  return value.reduce<bigint>((total, item) => {
+    try {
+      const amount = typeof item === 'string' || typeof item === 'number' || typeof item === 'bigint'
+        ? BigInt(item)
+        : 0n;
+      return amount > 0n ? total + amount : total;
+    } catch {
+      return total;
+    }
+  }, 0n);
+}
+
+function positionStrategy(position: NonNullable<Awaited<ReturnType<typeof loadPosition>>>): PositionStrategy {
+  const payload = position.events[0]?.payload;
+  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : null;
+  const amountX = positiveTotal(record?.amountsX);
+  const amountY = positiveTotal(record?.amountsY);
+
+  if (amountX > 0n && amountY > 0n) return 'fee-farm';
+  const quote = position.pool.quoteToken?.toLowerCase();
+  if (quote && (amountX > 0n || amountY > 0n)) {
+    const quoteOnly = quote === position.pool.tokenX.toLowerCase() ? amountX > 0n : amountY > 0n;
+    return quoteOnly ? 'buy-the-dip' : 'sell-into-strength';
+  }
+
+  const referenceBin = position.pool.initialActiveBin ?? position.pool.activeBin;
+  if (referenceBin !== null) {
+    if (position.lowerBin <= referenceBin && position.upperBin >= referenceBin) return 'fee-farm';
+    const quoteIsX = quote === position.pool.tokenX.toLowerCase();
+    const rangeAbove = position.lowerBin > referenceBin;
+    return rangeAbove === quoteIsX ? 'buy-the-dip' : 'sell-into-strength';
+  }
+  return 'custom';
+}
+
 export function serializePosition(
   position: Awaited<ReturnType<typeof loadPosition>>,
   replacementPoolAddress: string | null = null,
 ) {
   if (!position) return null;
-  const { callouts, ...record } = position;
+  const { callouts, events: _events, ...record } = position;
   return {
     ...record,
     id: position.id.toString(),
+    strategy: positionStrategy(position),
     depositedQuote: decimalString(position.depositedQuote),
     withdrawnQuote: decimalString(position.withdrawnQuote),
     earnedQuote: decimalString(position.earnedQuote),
@@ -63,6 +104,12 @@ function loadPosition(chainId: number, id: bigint) {
       bins: { orderBy: { binId: 'asc' } },
       pool: true,
       callouts: { where: { canonical: true, deletedAt: null }, select: { id: true }, take: 1 },
+      events: {
+        where: { canonical: true, eventType: 'created' },
+        orderBy: [{ blockNumber: 'asc' as const }, { logIndex: 'asc' as const }],
+        select: { payload: true },
+        take: 1,
+      },
     },
   });
 }
@@ -89,6 +136,12 @@ export async function registerPositionRoutes(app: FastifyInstance, chainId: numb
         bins: { orderBy: { binId: 'asc' } },
         pool: true,
         callouts: { where: { canonical: true, deletedAt: null }, select: { id: true }, take: 1 },
+        events: {
+          where: { canonical: true, eventType: 'created' },
+          orderBy: [{ blockNumber: 'asc' }, { logIndex: 'asc' }],
+          select: { payload: true },
+          take: 1,
+        },
       },
       orderBy: { openedAt: 'desc' },
       take: query.data.limit,

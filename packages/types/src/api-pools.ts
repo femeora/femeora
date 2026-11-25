@@ -490,6 +490,7 @@ export const ApiIndexedPositionSchema = z.object({
   lowerBin: z.number().int().min(-10_000).max(10_000),
   upperBin: z.number().int().min(-10_000).max(10_000),
   shape: z.number().int().min(0).max(3),
+  strategy: z.enum(['buy-the-dip', 'sell-into-strength', 'fee-farm', 'custom']),
   tag: z
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
