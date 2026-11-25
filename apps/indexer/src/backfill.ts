@@ -33,7 +33,6 @@ import {
   type RangeClockSwap,
 } from './processors/range-clock.js';
 import { ensureCanonicalCursor } from './reorg.js';
-import { collectLaunchEvents, persistLaunchEvents } from './launch-events.js';
 
 interface BackfillResult {
   readonly batches: number;
@@ -318,21 +317,10 @@ export async function backfillPoolRegistry(
         });
       })
     );
-    const existingLaunches = await prisma.launch.findMany({
-      where: { chainId: chain.chainId, canonical: true },
-      select: { curve: true },
-    });
-    const [poolEvents, positionEvents, positionShareEvents, launchEvents] = await Promise.all([
+    const [poolEvents, positionEvents, positionShareEvents] = await Promise.all([
       collectPoolEvents(client, [...descriptorByAddress.values()], nextBlock, endBlock),
       collectPositionEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
       collectPositionShareEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
-      collectLaunchEvents(
-        client,
-        environment,
-        existingLaunches.map(launch => launch.curve as Address),
-        nextBlock,
-        endBlock,
-      ),
     ]);
     const calloutUpdateTypes = classifyCalloutUpdates(positionEvents);
 
@@ -1080,10 +1068,6 @@ export async function backfillPoolRegistry(
             data: { inRangeSeconds: clock.inRangeSeconds, openSeconds: clock.openSeconds },
           });
         }
-
-        // Launch persistence runs after pool and position projection so a
-        // graduation can atomically attach its permanently locked LP callout.
-        await persistLaunchEvents(transaction, chain.chainId, launchEvents);
 
         await transaction.canonicalBlock.upsert({
           where: {
