@@ -94,7 +94,7 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
       <section className="glass rounded-[2px] p-5 sm:p-6">
         <h2 className="text-xl font-medium">Pool configuration</h2>
-        <p className="mt-2 text-sm text-muted">Choose two contracts available on the active network. Fomeora verifies metadata, duplicates, and simulation before your wallet opens.</p>
+        <p className="mt-2 text-sm text-muted">Choose two contracts available on the active network. Femeora verifies metadata, duplicates, and simulation before your wallet opens.</p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <PoolAssetSelect label="Token A" value={tokenA} exclude={tokenB} assets={options} onChange={value => update(() => setTokenA(value))} />
           <PoolAssetSelect label="Token B" value={tokenB} exclude={tokenA} assets={options} onChange={value => update(() => setTokenB(value))} />
@@ -118,11 +118,11 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
             {prepared.representedPrice ? <div className="flex justify-between"><dt>Represented price</dt><dd className="text-fg">{prepared.representedPrice}</dd></div> : null}
             <div><dt>Predicted pool</dt><dd className="mt-1 break-all font-mono text-fg">{prepared.predictedPool}</dd></div>
           </dl>
-          {prepared.existingPool ? <div className="text-sm text-down"><p>This exact pool already exists. Create a different fee/model or add liquidity to the existing pool.</p><Link className="t-label mt-3 inline-flex min-h-11 items-center text-signal underline underline-offset-4" href={`/p/${prepared.chainId}/${prepared.existingPool}`}>Open existing pool</Link></div> : <p className="text-sm text-muted">Creation is permissionless. Protocol administration remains with Fomeora governance. Initial liquidity is added after creation.</p>}
+          {prepared.existingPool ? <div className="text-sm text-down"><p>This exact pool already exists. Create a different fee/model or add liquidity to the existing pool.</p><Link className="t-label mt-3 inline-flex min-h-11 items-center text-signal underline underline-offset-4" href={`/p/${prepared.chainId}/${prepared.existingPool}`}>Open existing pool</Link></div> : <p className="text-sm text-muted">Creation is permissionless. Protocol administration remains with Femeora governance. Initial liquidity is added after creation.</p>}
           {createdPool ? (
             <div className="border border-line bg-panel-2 p-4 text-sm">
               <p className="font-medium">{indexedPool.data ? 'Pool indexed and ready' : 'Pool created · indexing'}</p>
-              <p className="mt-2 text-muted">{indexedPool.data ? 'The canonical pool is now available. Add initial liquidity before the first swap.' : 'The transaction is confirmed. Fomeora is waiting for the safe block; no manual registration is required.'}</p>
+              <p className="mt-2 text-muted">{indexedPool.data ? 'The canonical pool is now available. Add initial liquidity before the first swap.' : 'The transaction is confirmed. Femeora is waiting for the safe block; no manual registration is required.'}</p>
               {indexedPool.data ? <Link className="t-label mt-4 inline-flex min-h-11 items-center text-signal underline underline-offset-4" href={`/p/${indexedPool.data.chainId}/${indexedPool.data.address}`}>Open pool and add liquidity</Link> : <p className="t-label mt-4 break-all text-faint">Predicted address · {createdPool}</p>}
             </div>
           ) : <TxButton label={`Create ${prepared.model} pool`} error={prepared.existingPool ? 'POOL_ALREADY_EXISTS' : null} {...(prepared.existingPool ? {} : { onExecute: execute })} pendingLabel="Creating pool…" />}

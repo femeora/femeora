@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { FeedScreen } from '@/features/feed/components/FeedScreen';
 
 export const metadata: Metadata = {
-  title: 'Feed · Fomeora',
+  title: 'Feed · Femeora',
   description: 'Live LP callouts, proof-backed and ready to tail.',
 };
 

@@ -18,10 +18,10 @@ export function friendlyErrorMessage(error: string): string {
     return 'Your wallet does not have enough funds for this amount and the network fee. Reduce the amount or add funds, then try again.';
   }
   if (includesAny(value, ['WRONG_NETWORK', 'CHAIN_MISMATCH', 'UNSUPPORTED_CHAIN', 'SWITCH_NETWORK'])) {
-    return 'Your wallet is connected to a different network. Switch to the network shown in Fomeora and try again.';
+    return 'Your wallet is connected to a different network. Switch to the network shown in Femeora and try again.';
   }
   if (includesAny(value, ['WALLET_PROVIDER_NOT_FOUND', 'WALLET_UNAVAILABLE', 'NO_PROVIDER'])) {
-    return 'Fomeora could not find a compatible wallet. Open the site in a wallet browser or enable your wallet extension.';
+    return 'Femeora could not find a compatible wallet. Open the site in a wallet browser or enable your wallet extension.';
   }
   if (includesAny(value, ['SESSION', 'AUTHENTICATION_REQUIRED', 'UNAUTHORIZED', 'AUTH_EXPIRED', 'TOKEN_EXPIRED', '401'])) {
     return 'Your session has expired. Sign in again, then repeat the action.';
@@ -36,7 +36,7 @@ export function friendlyErrorMessage(error: string): string {
     return 'This asset is not enabled for new liquidity pools yet. Choose another pair or wait for the governance cap to become active.';
   }
   if (includesAny(value, ['TIMEOUT', 'NETWORK_ERROR', 'FETCH_FAILED', 'FAILED TO FETCH', 'RPC', 'UNAVAILABLE', '502', '503', '504'])) {
-    return 'Fomeora could not reach the network service. Check your connection and try again in a moment.';
+    return 'Femeora could not reach the network service. Check your connection and try again in a moment.';
   }
   if (includesAny(value, ['GAS_ESTIMATE', 'ESTIMATE GAS'])) {
     return 'The transaction could not be prepared. Check the amount, token balance, and selected range before trying again.';

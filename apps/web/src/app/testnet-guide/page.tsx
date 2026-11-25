@@ -8,8 +8,8 @@ import { ExternalLink } from '@/components/ui/icons';
 import { TokenIcon } from '@/components/ui/TokenPair';
 
 export const metadata: Metadata = {
-  title: 'Testnet guide · Fomeora',
-  description: 'Connect to Robinhood Chain Testnet and prepare a wallet for Fomeora testing.',
+  title: 'Testnet guide · Femeora',
+  description: 'Connect to Robinhood Chain Testnet and prepare a wallet for Femeora testing.',
 };
 
 const network = [
@@ -34,7 +34,7 @@ const steps = [
     'The canonical quote-token distribution is not live yet. It will be public and available to every tester without a wallet allowlist.',
   ],
   [
-    'Open Fomeora',
+    'Open Femeora',
     'After the public domain and first pool are live, sign in with X, link your wallet and start with a small test amount.',
   ],
 ] as const;
@@ -45,7 +45,7 @@ export default function TestnetGuidePage() {
       <Ambient />
       <header className="relative z-10 border-b border-line">
         <div className="wrap flex min-h-header items-center justify-between gap-6">
-          <Link href="/" className="inline-flex items-center gap-3" aria-label="Fomeora home">
+          <Link href="/" className="inline-flex items-center gap-3" aria-label="Femeora home">
             <BrandMark />
             <Wordmark />
           </Link>
@@ -66,14 +66,14 @@ export default function TestnetGuidePage() {
             <div className="col-span-12 lg:col-span-8">
               <p className="t-label text-signal">Robinhood Chain · Chain 46630</p>
               <h1 className="mt-5 max-w-[12ch] text-display font-semibold tracking-tight">
-                Prepare for Fomeora testnet.
+                Prepare for Femeora testnet.
               </h1>
               <p className="mt-7 max-w-2xl text-lg text-muted">
                 Testnet ETH and test tokens have no monetary value. Never send mainnet assets, a
                 seed phrase or a private key to a faucet or tester.
               </p>
               <p className="mt-4 max-w-2xl text-muted">
-                Fomeora uses the same protocol contracts and user transaction flow intended for
+                Femeora uses the same protocol contracts and user transaction flow intended for
                 mainnet. Token distribution is not implemented as testnet-only application logic.
               </p>
             </div>
@@ -85,7 +85,7 @@ export default function TestnetGuidePage() {
                   <dd className="text-up">Ready</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt>Fomeora quote token</dt>
+                  <dt>Femeora quote token</dt>
                   <dd className="text-signal">Pending</dd>
                 </div>
                 <div className="flex justify-between gap-4">

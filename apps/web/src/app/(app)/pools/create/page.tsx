@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { CreatePoolForm } from '@/features/pool/components/CreatePoolForm';
 
-export const metadata: Metadata = { title: 'Create pool · Fomeora' };
+export const metadata: Metadata = { title: 'Create pool · Femeora' };
 
 const addressPattern = /^0x[a-fA-F0-9]{40}$/;
 

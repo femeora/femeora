@@ -24,7 +24,7 @@ export function Wordmark({ className }: { className?: string }) {
         className
       )}
     >
-      Fomeora
+      Femeora
     </span>
   );
 }

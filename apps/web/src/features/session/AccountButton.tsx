@@ -61,7 +61,7 @@ function ConnectedWalletButton({ account, seed, avatarUrl, title, subtitle }: {
           <Link href="/portfolio" onClick={() => setOpen(false)} className="glass-control t-label inline-flex min-h-11 items-center justify-center gap-3 rounded-[2px] px-4"><Wallet aria-hidden="true" className="size-4" />Open portfolio</Link>
           <Button variant="ghost" block onClick={() => void disconnect().then(() => setOpen(false))}><LogOut aria-hidden="true" className="size-4" />Disconnect wallet</Button>
         </div>
-        <p className="t-label mt-4 text-faint">Disconnecting removes this wallet from the current Fomeora session. It does not move funds or revoke on-chain approvals.</p>
+        <p className="t-label mt-4 text-faint">Disconnecting removes this wallet from the current Femeora session. It does not move funds or revoke on-chain approvals.</p>
       </div>
     </dialog>
   </>;

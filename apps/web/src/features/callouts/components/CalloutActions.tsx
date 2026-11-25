@@ -60,7 +60,7 @@ export function CalloutActions({ callout, own, onChanged, onCalloutDeleted }: { 
     const url = `${window.location.origin}/p/${callout.pool.chainId}/${callout.pool.address}#callout-${callout.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: `@${callout.caller.handle} on Fomeora`, text: callout.caption ?? 'View this Fomeora callout', url });
+        await navigator.share({ title: `@${callout.caller.handle} on Femeora`, text: callout.caption ?? 'View this Femeora callout', url });
         showToast('Callout shared.');
       } else {
         await navigator.clipboard.writeText(url);

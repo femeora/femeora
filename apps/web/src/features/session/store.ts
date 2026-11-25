@@ -144,7 +144,7 @@ export const useSession = create<SessionState>((set, get) => ({
       await browserApiRequest('/v1/auth/logout', z.undefined(), { method: 'POST' });
     } finally {
       set({ user: null, status: 'anonymous', signInOpen: false, error: null });
-      useToast.getState().show('You have signed out of Fomeora.', { title: 'Signed out' });
+      useToast.getState().show('You have signed out of Femeora.', { title: 'Signed out' });
     }
   },
 }));

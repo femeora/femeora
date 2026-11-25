@@ -8,14 +8,14 @@ import { Close, XLogo } from '@/components/ui/icons';
 import { useSession } from './store';
 
 const ERRORS: Record<string, string> = {
-  WALLET_PROVIDER_NOT_FOUND: 'No injected wallet was found. Open Fomeora in a wallet browser or install a wallet extension.',
+  WALLET_PROVIDER_NOT_FOUND: 'No injected wallet was found. Open Femeora in a wallet browser or install a wallet extension.',
   WALLET_ACCOUNT_REQUIRED: 'The wallet did not provide an account.',
   AUTHENTICATION_REQUIRED: 'Your session expired. Sign in with X again.',
-  WALLET_ALREADY_LINKED: 'That wallet is already linked to another Fomeora account.',
+  WALLET_ALREADY_LINKED: 'That wallet is already linked to another Femeora account.',
   WALLET_LIMIT_REACHED: 'This account already has the maximum of three linked wallets.',
   X_AUTH_INVALID: 'The X sign-in response was incomplete. Please start again.',
   X_AUTH_STATE_INVALID: 'The X sign-in request expired or was already used. Please start again.',
-  X_API_CREDITS_REQUIRED: 'X accepted the sign-in, but the Fomeora developer app needs API credits to read your profile. No wallet or transaction was affected.',
+  X_API_CREDITS_REQUIRED: 'X accepted the sign-in, but the Femeora developer app needs API credits to read your profile. No wallet or transaction was affected.',
   X_API_RATE_LIMITED: 'X is temporarily limiting profile requests. Please wait a few minutes and try again.',
   X_AUTH_UPSTREAM_FAILED: 'X could not complete sign-in. Please try again later.',
 };
@@ -69,7 +69,7 @@ export function SignInSheet() {
         ) : (
           <>
             <p className="text-muted">
-              Fomeora reads your X handle, name, avatar and verification status. It cannot post, like or send messages on X.
+              Femeora reads your X handle, name, avatar and verification status. It cannot post, like or send messages on X.
             </p>
             <p className="glass t-label rounded-[2px] p-3 text-muted">
               Requested scopes · <span className="text-fg">tweet.read · users.read</span> · No write access

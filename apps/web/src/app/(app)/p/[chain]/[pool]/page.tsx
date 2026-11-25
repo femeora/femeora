@@ -20,11 +20,12 @@ import {
   getPoolStats,
   getPoolTrades,
 } from '@/lib/api/server';
+import type { ApiPoolDetail } from '@/lib/api/types';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Pool terminal · Fomeora',
+  title: 'Pool terminal · Femeora',
   description: 'Inspect a canonical pool, its candles, liquidity, trades and LP positions.',
 };
 
@@ -48,7 +49,7 @@ function Unavailable() {
       <p className="t-label text-signal">Pool data unavailable</p>
       <h1 className="mt-3 text-3xl font-medium tracking-tight">The terminal could not be loaded.</h1>
       <p className="mt-3 max-w-xl text-muted">
-        Fomeora does not substitute simulated prices or trades. Retry after the API and indexer are healthy.
+        Femeora does not substitute simulated prices or trades. Retry after the API and indexer are healthy.
       </p>
       <Link href="/pools" className="t-label mt-5 min-h-11 w-fit text-signal underline underline-offset-4">Back to pools</Link>
     </section>
@@ -56,7 +57,7 @@ function Unavailable() {
 }
 
 export default async function PoolPage({ params }: PageProps) {
-  let detail;
+  let detail: ApiPoolDetail;
   try {
     detail = await getPool(params.pool);
   } catch (error) {

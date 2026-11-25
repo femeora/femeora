@@ -12,8 +12,8 @@ import { tokenMeta } from '@/lib/tokens';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Pools · Fomeora',
-  description: 'Browse live canonical pools and verified mainnet candidate markets on Fomeora.',
+  title: 'Pools · Femeora',
+  description: 'Browse live canonical pools and verified mainnet candidate markets on Femeora.',
 };
 
 const compactNumber = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 });

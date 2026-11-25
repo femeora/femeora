@@ -47,7 +47,7 @@ export interface FooterColumn {
 }
 
 export const site = {
-  name: 'Fomeora',
+  name: 'Femeora',
   tagline: 'Every LP is a callout.',
   description:
     'DLMM and DAMM liquidity with a social feed where every LP position is a public, proof-backed callout.',
@@ -79,7 +79,7 @@ export const hero = {
 
 export const statement = {
   title: 'LP strategies spread as screenshots. Here the strategy is the post.',
-  body: 'Today ranges travel with no proof and no one-tap copy. In Fomeora a callout is attached to one real on-chain position owned by the poster, every number on the card is read from chain, and anyone can tail it instantly.',
+  body: 'Today ranges travel with no proof and no one-tap copy. In Femeora a callout is attached to one real on-chain position owned by the poster, every number on the card is read from chain, and anyone can tail it instantly.',
 } as const;
 
 export const appPreview = {
@@ -302,6 +302,6 @@ const footerColumns: readonly FooterColumn[] = [
 
 export const footer = {
   columns: footerColumns,
-  legal: ['Fomeora', 'Built on Robinhood Chain', '2026'],
+  legal: ['Femeora', 'Built on Robinhood Chain', '2026'],
   disclaimer: 'No guaranteed yield. LP positions can lose value.',
 } as const;
