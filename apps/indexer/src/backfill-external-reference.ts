@@ -4,17 +4,27 @@ import { backfillExternalReferenceCandles } from './external-reference.js';
 
 const rawDays = process.argv.find(value => value.startsWith('--days='))?.slice(7) ?? '30';
 const days = Number(rawDays);
+const tokenAddress = process.argv
+  .find(value => value.startsWith('--token='))
+  ?.slice(8)
+  .toLowerCase();
 
 try {
-  if (!Number.isSafeInteger(days) || days < 1 || days > 365) throw new Error('INVALID_BACKFILL_DAYS');
-  const result = await backfillExternalReferenceCandles(days);
+  if (!Number.isSafeInteger(days) || days < 1 || days > 365)
+    throw new Error('INVALID_BACKFILL_DAYS');
+  if (tokenAddress && !/^0x[a-f0-9]{40}$/.test(tokenAddress))
+    throw new Error('INVALID_BACKFILL_TOKEN');
+  const result = await backfillExternalReferenceCandles(days, tokenAddress);
   // Public progress deliberately excludes database and provider credentials.
   // eslint-disable-next-line no-console
-  console.info(`External reference history complete days=${days} pools=${result.pools} candles=${result.candles}`);
+  console.info(
+    `External reference history complete days=${days} pools=${result.pools} candles=${result.candles}`
+  );
 } catch (error) {
-  const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,79}$/.test(error.message)
-    ? error.message
-    : 'EXTERNAL_REFERENCE_BACKFILL_FAILED';
+  const code =
+    error instanceof Error && /^[A-Z][A-Z0-9_]{2,79}$/.test(error.message)
+      ? error.message
+      : 'EXTERNAL_REFERENCE_BACKFILL_FAILED';
   // eslint-disable-next-line no-console
   console.error(`External reference history failed code=${code}`);
   process.exitCode = 1;

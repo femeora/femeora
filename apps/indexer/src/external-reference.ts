@@ -271,11 +271,17 @@ export async function refreshExternalReferenceCandles(
 }
 
 export async function backfillExternalReferenceCandles(
-  days = 30
+  days = 30,
+  tokenAddress?: string
 ): Promise<{ pools: number; candles: number }> {
   const from = Date.now() - days * 86_400_000;
   const sources = await prisma.assetPriceSource.findMany({
-    where: { enabled: true, sourceType: 'GECKOTERMINAL', feedAddress: { not: null } },
+    where: {
+      enabled: true,
+      sourceType: 'GECKOTERMINAL',
+      feedAddress: { not: null },
+      ...(tokenAddress ? { tokenAddress: tokenAddress.toLowerCase() } : {}),
+    },
     orderBy: { priority: 'asc' },
   });
   let poolCount = 0;
