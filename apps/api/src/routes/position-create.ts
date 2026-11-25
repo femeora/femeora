@@ -41,6 +41,7 @@ const prepareSchema = requestBaseSchema.extend({
 const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
 ]);
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
 const ZERO_TAG = `0x${'0'.repeat(64)}` as Hex;
@@ -78,14 +79,33 @@ async function buildQuote(
   input: z.infer<typeof requestSchema>,
   blockProvider: (chainId: number) => Promise<bigint>,
 ) {
-  if (pool.tokenXDecimals === null || pool.tokenYDecimals === null) {
-    throw new PositionCreateError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
+  let tokenXDecimals = pool.tokenXDecimals;
+  let tokenYDecimals = pool.tokenYDecimals;
+  if (tokenXDecimals === null || tokenYDecimals === null) {
+    try {
+      const [resolvedX, resolvedY] = await Promise.all([
+        tokenXDecimals === null
+          ? client.readContract({ address: pool.tokenX as Address, abi: erc20Abi, functionName: 'decimals' })
+          : tokenXDecimals,
+        tokenYDecimals === null
+          ? client.readContract({ address: pool.tokenY as Address, abi: erc20Abi, functionName: 'decimals' })
+          : tokenYDecimals,
+      ]);
+      tokenXDecimals = Number(resolvedX);
+      tokenYDecimals = Number(resolvedY);
+      await prisma.pool.update({
+        where: { id: pool.id },
+        data: { tokenXDecimals, tokenYDecimals },
+      });
+    } catch {
+      throw new PositionCreateError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
+    }
   }
   let amount0: bigint;
   let amount1: bigint;
   try {
-    amount0 = parseUnits(input.amountX, pool.tokenXDecimals);
-    amount1 = parseUnits(input.amountY, pool.tokenYDecimals);
+    amount0 = parseUnits(input.amountX, tokenXDecimals);
+    amount1 = parseUnits(input.amountY, tokenYDecimals);
   } catch {
     throw new PositionCreateError(400, 'INVALID_TOKEN_AMOUNT');
   }
@@ -95,7 +115,7 @@ async function buildQuote(
     if (amount0 === 0n || amount1 === 0n) throw new PositionCreateError(400, 'DAMM_REQUIRES_BOTH_TOKENS');
     return {
       pool: pool.address, tokenX: pool.tokenX, tokenY: pool.tokenY,
-      amountX: formatUnits(amount0, pool.tokenXDecimals), amountY: formatUnits(amount1, pool.tokenYDecimals),
+      amountX: formatUnits(amount0, tokenXDecimals), amountY: formatUnits(amount1, tokenYDecimals),
       amountXRaw: amount0.toString(), amountYRaw: amount1.toString(), shape: input.shape,
       activeBin: 0, bins: [0], amountsXRaw: [amount0.toString()], amountsYRaw: [amount1.toString()],
       minimumSharesRaw: ['0'], slippageBps: input.slippageBps, blockNumber: blockNumber.toString(),
@@ -127,12 +147,12 @@ async function buildQuote(
   const minShares = states.map((state, index) => minimumShares({
     bin: { binId: bins[index]!, reserve0: state[0], reserve1: state[1], totalShares: state[2] },
     amount0: allocation.amounts0[index]!, amount1: allocation.amounts1[index]!,
-    binStepBps: pool.binStep, decimals0: pool.tokenXDecimals!, decimals1: pool.tokenYDecimals!,
+    binStepBps: pool.binStep, decimals0: tokenXDecimals, decimals1: tokenYDecimals,
     slippageBps: input.slippageBps,
   }));
   return {
     pool: pool.address, tokenX: pool.tokenX, tokenY: pool.tokenY,
-    amountX: formatUnits(amount0, pool.tokenXDecimals), amountY: formatUnits(amount1, pool.tokenYDecimals),
+    amountX: formatUnits(amount0, tokenXDecimals), amountY: formatUnits(amount1, tokenYDecimals),
     amountXRaw: amount0.toString(), amountYRaw: amount1.toString(), shape: input.shape,
     activeBin, bins, amountsXRaw: allocation.amounts0.map(String), amountsYRaw: allocation.amounts1.map(String),
     minimumSharesRaw: minShares.map(String), slippageBps: input.slippageBps, blockNumber: blockNumber.toString(),
