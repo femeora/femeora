@@ -149,7 +149,7 @@ async function matchingPools(source: { chainId: number; tokenAddress: string }) 
   if (!expectedQuote) return [];
   const candidates = await prisma.pool.findMany({
     where: {
-      chainId: source.chainId, canonical: true,
+      chainId: source.chainId, canonical: true, visible: true,
       OR: [{ tokenX: source.tokenAddress }, { tokenY: source.tokenAddress }],
     },
     select: { id: true, tokenX: true, tokenY: true, quoteToken: true },
@@ -181,6 +181,7 @@ export async function refreshExternalReferenceCandles(chainId: number, now = new
         sourceType: 'GECKOTERMINAL',
         pool: {
           chainId: source.chainId,
+          visible: true,
           OR: [{ tokenX: source.tokenAddress }, { tokenY: source.tokenAddress }],
         },
       },
