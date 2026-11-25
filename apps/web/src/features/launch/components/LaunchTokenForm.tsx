@@ -19,6 +19,7 @@ import { TransactionExecutionError } from '@/features/wallet/transactionError';
 import { browserApiRequest } from '@/lib/api/client';
 
 const control = 'glass-control mt-2 min-h-11 w-full rounded-[2px] px-3 text-fg';
+const shortAddress = (address: string) => `${address.slice(0, 8)}…${address.slice(-6)}`;
 const tokenLaunchedEvent = parseAbiItem(
   'event TokenLaunched(uint256 indexed launchId, uint256 indexed launchpadId, address indexed creator, address token, address curve, string name, string symbol, string metadataURI, uint256 totalSupply)'
 );
@@ -284,12 +285,67 @@ export function LaunchTokenForm({
           ) : null}
           <div className="mt-5">
             {prepared ? (
-              <TxButton
-                label="Launch token"
-                error={null}
-                onExecute={execute}
-                pendingLabel="Launching token…"
-              />
+              <section className="border border-line-strong bg-panel-2 p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line-strong bg-panel-1 font-mono">
+                      <img
+                        src={imageUrl}
+                        alt={`${name} token logo`}
+                        referrerPolicy="no-referrer"
+                        className="size-full object-cover"
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="t-label text-signal">Token launch review</p>
+                      <h3 className="mt-1 truncate text-xl font-medium">
+                        {name} <span className="text-muted">/ {symbol}</span>
+                      </h3>
+                      <p className="mt-1 truncate text-sm text-muted">
+                        {website || 'No website attached'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="t-label border border-up/40 px-2.5 py-1.5 text-up">
+                    Ready to launch
+                  </span>
+                </div>
+
+                <dl className="grid gap-x-8 gap-y-4 py-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <ReviewRow label="Curve supply" value={formatUnits(curveTokenSupply, 18)} />
+                  <ReviewRow label="Creator allocation" value={creatorAllocation || '0'} />
+                  <ReviewRow label="Total supply" value={totalSupply} />
+                  <ReviewRow
+                    label="Creator identity"
+                    value={identityLinked ? `@${user?.handle ?? xHandle}` : 'Wallet only'}
+                  />
+                  <ReviewRow label="Creator wallet" value={shortAddress(wallet.account ?? '')} />
+                  <ReviewRow label="Launchpad" value={`#${launchpadId} · /${launchpadSlug}`} />
+                  <ReviewRow
+                    label="Identity proof"
+                    value={prepared.identityRequired ? 'Required · one use' : 'Not required'}
+                  />
+                  <ReviewRow label="Launch factory" value={shortAddress(prepared.launchFactory)} />
+                  <ReviewRow
+                    label="Review expires"
+                    value={new Date(prepared.expiresAt).toLocaleTimeString()}
+                  />
+                </dl>
+
+                <p className="border-y border-line py-3 text-sm text-muted">
+                  Confirming creates the fixed-supply token and opens its bonding curve. Review the
+                  name, ticker and supply carefully; these values cannot be edited after launch.
+                </p>
+                <div className="mt-5 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+                  <Button onClick={() => setPrepared(null)}>Edit details</Button>
+                  <TxButton
+                    label="Confirm token launch"
+                    error={null}
+                    onExecute={execute}
+                    pendingLabel="Launching token…"
+                  />
+                </div>
+              </section>
             ) : (
               <Button
                 variant="primary"
@@ -309,6 +365,17 @@ export function LaunchTokenForm({
         </>
       )}
     </section>
+  );
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="t-label text-faint">{label}</dt>
+      <dd className="mt-1 truncate font-mono text-sm text-fg" title={value}>
+        {value}
+      </dd>
+    </div>
   );
 }
 
