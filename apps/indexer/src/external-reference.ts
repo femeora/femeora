@@ -117,6 +117,56 @@ async function writeCandles(
   return written;
 }
 
+async function writeHistoricalCandles(
+  poolIds: readonly string[],
+  candles: ReturnType<typeof aggregateExternalCandles>,
+  sourceUpdatedAt: Date,
+) {
+  let written = 0;
+  for (const poolId of poolIds) {
+    for (let offset = 0; offset < candles.length; offset += 500) {
+      const batch = candles.slice(offset, offset + 500);
+      const result = await prisma.referenceCandle.createMany({
+        data: batch.map(candle => ({
+          poolId, interval: candle.interval, bucketStart: new Date(candle.timestamp),
+          open: candle.open, high: candle.high, low: candle.low, close: candle.close,
+          sourceType: 'GECKOTERMINAL', sourceUpdatedAt, stale: false,
+        })),
+        skipDuplicates: true,
+      });
+      written += result.count;
+    }
+  }
+  return written;
+}
+
+async function matchingPools(source: { chainId: number; tokenAddress: string }) {
+  const display = await prisma.assetDisplayConfig.findUnique({
+    where: { chainId_address: { chainId: source.chainId, address: source.tokenAddress } },
+    select: { candidateQuoteAddress: true },
+  });
+  const expectedQuote = display?.candidateQuoteAddress?.toLowerCase();
+  if (!expectedQuote) return [];
+  const candidates = await prisma.pool.findMany({
+    where: {
+      chainId: source.chainId, canonical: true,
+      OR: [{ tokenX: source.tokenAddress }, { tokenY: source.tokenAddress }],
+    },
+    select: { id: true, tokenX: true, tokenY: true, quoteToken: true },
+  });
+  const pools = candidates.filter(pool => {
+    const other = pool.tokenX.toLowerCase() === source.tokenAddress.toLowerCase()
+      ? pool.tokenY.toLowerCase()
+      : pool.tokenX.toLowerCase();
+    return other === expectedQuote;
+  });
+  await prisma.pool.updateMany({
+    where: { id: { in: pools.map(pool => pool.id) }, quoteToken: null },
+    data: { quoteToken: expectedQuote },
+  });
+  return pools;
+}
+
 export async function refreshExternalReferenceCandles(chainId: number, now = new Date()): Promise<{ pools: number; candles: number }> {
   const sources = await prisma.assetPriceSource.findMany({
     where: { chainId, enabled: true, sourceType: 'GECKOTERMINAL', feedAddress: { not: null } },
@@ -138,18 +188,7 @@ export async function refreshExternalReferenceCandles(chainId: number, now = new
       select: { updatedAt: true },
     });
     if (latest && now.getTime() - latest.updatedAt.getTime() < 60_000) continue;
-    const candidates = await prisma.pool.findMany({
-      where: {
-        chainId: source.chainId, canonical: true, quoteToken: { not: null },
-        OR: [{ tokenX: source.tokenAddress }, { tokenY: source.tokenAddress }],
-      },
-      select: { id: true, tokenX: true, tokenY: true, quoteToken: true },
-    });
-    const matching = candidates.filter(pool => {
-      const quote = pool.quoteToken?.toLowerCase();
-      const base = quote === pool.tokenY.toLowerCase() ? pool.tokenX : pool.tokenY;
-      return base.toLowerCase() === source.tokenAddress.toLowerCase();
-    });
+    const matching = await matchingPools(source);
     if (matching.length === 0) continue;
     const values = await fetchGeckoCandles(source.feedAddress, source.tokenAddress, 64);
     if (values.length === 0) continue;
@@ -182,24 +221,12 @@ export async function backfillExternalReferenceCandles(days = 30): Promise<{ poo
       before = Math.floor(oldest / 1_000) - 1;
       await new Promise(resolve => setTimeout(resolve, 6_100));
     }
-    const candidates = await prisma.pool.findMany({
-      where: {
-        chainId: source.chainId, canonical: true, quoteToken: { not: null },
-        OR: [{ tokenX: source.tokenAddress }, { tokenY: source.tokenAddress }],
-      },
-      select: { id: true, tokenX: true, tokenY: true, quoteToken: true },
-    });
-    const matching = candidates.filter(pool => {
-      const quote = pool.quoteToken?.toLowerCase();
-      const base = quote === pool.tokenY.toLowerCase() ? pool.tokenX : pool.tokenY;
-      return base.toLowerCase() === source.tokenAddress.toLowerCase();
-    });
+    const matching = await matchingPools(source);
     if (all.length === 0 || matching.length === 0) continue;
-    written += await writeCandles(
+    written += await writeHistoricalCandles(
       matching.map(pool => pool.id),
       aggregateExternalCandles(all),
       new Date(all.at(-1)!.timestamp + FIVE_MINUTES_MS),
-      false,
     );
     poolCount += matching.length;
   }
