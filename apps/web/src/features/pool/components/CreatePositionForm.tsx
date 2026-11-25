@@ -221,6 +221,8 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         <AmountField
           token={pool.quote}
           tokenAddress={pool.quoteAddress}
+          tokenName={pool.quoteName}
+          tokenLogoUrl={pool.quoteLogoUrl}
           value={draft.quoteAmount}
           usdPerToken={1}
           enabled={damm || needs.quote}
@@ -229,6 +231,8 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
         <AmountField
           token={pool.base}
           tokenAddress={pool.baseAddress}
+          tokenName={pool.baseName}
+          tokenLogoUrl={pool.baseLogoUrl}
           value={draft.baseAmount}
           usdPerToken={pool.priceUsd}
           enabled={damm || needs.base}

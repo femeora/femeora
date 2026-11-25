@@ -15,6 +15,8 @@ const pool: ApiPoolDetail = {
   tokenY: '0x0000000000000000000000000000000000000002',
   tokenXDecimals: 18,
   tokenYDecimals: 6,
+  tokenXAsset: null,
+  tokenYAsset: null,
   quoteToken: '0x0000000000000000000000000000000000000002',
   binStep: 100,
   baseFeePips: 3_000,

@@ -14,6 +14,8 @@ const pool: ApiPoolDetail = {
   tokenY: '0x5fc5360d0400a0fd4f2af552add042d716f1d168',
   tokenXDecimals: 18,
   tokenYDecimals: 6,
+  tokenXAsset: null,
+  tokenYAsset: null,
   quoteToken: '0x5fc5360d0400a0fd4f2af552add042d716f1d168',
   binStep: 100,
   baseFeePips: 3_000,
@@ -59,6 +61,26 @@ test('orients a token-Y base pool as WETH / USDG', () => {
   assert.equal(reversed.quote, 'USDG');
   assert.equal(reversed.baseAddress, pool.tokenX);
   assert.equal(reversed.quoteAddress, pool.tokenY);
+});
+
+test('uses verified catalog identity instead of the generic token fallback', () => {
+  const mapped = apiPoolToPool({
+    ...pool,
+    tokenY: '0xe8ffd7e24187f72afb08d75b1bb13088a989a791',
+    tokenYDecimals: 18,
+    tokenYAsset: {
+      address: '0xe8ffd7e24187f72afb08d75b1bb13088a989a791',
+      symbol: 'DELTA',
+      name: 'Delta',
+      logoUrl: 'https://cdn.dexscreener.com/delta.png',
+    },
+    quoteToken: pool.tokenX,
+    baseIsTokenX: false,
+  }, undefined);
+  assert.equal(mapped.base, 'DELTA');
+  assert.equal(mapped.baseName, 'Delta');
+  assert.equal(mapped.baseLogoUrl, 'https://cdn.dexscreener.com/delta.png');
+  assert.equal(mapped.quote, 'WETH');
 });
 
 test('maps canonical windowed stats into pool header metrics', () => {

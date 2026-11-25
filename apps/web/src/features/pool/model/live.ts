@@ -67,6 +67,8 @@ export function apiPoolToPool(
     ?? pool.quoteToken?.toLowerCase() === pool.tokenY.toLowerCase();
   const baseAddress = baseIsTokenX ? pool.tokenX : pool.tokenY;
   const quoteAddress = baseIsTokenX ? pool.tokenY : pool.tokenX;
+  const baseAsset = baseIsTokenX ? pool.tokenXAsset : pool.tokenYAsset;
+  const quoteAsset = baseIsTokenX ? pool.tokenYAsset : pool.tokenXAsset;
   return {
     address: pool.address,
     tokenX: pool.tokenX,
@@ -76,8 +78,12 @@ export function apiPoolToPool(
     baseAddress,
     quoteAddress,
     baseIsTokenX,
-    base: tokenSymbol(baseAddress),
-    quote: tokenSymbol(quoteAddress),
+    base: baseAsset?.symbol ?? tokenSymbol(baseAddress),
+    quote: quoteAsset?.symbol ?? tokenSymbol(quoteAddress),
+    baseName: baseAsset?.name,
+    quoteName: quoteAsset?.name,
+    baseLogoUrl: baseAsset?.logoUrl,
+    quoteLogoUrl: quoteAsset?.logoUrl,
     chain: String(pool.chainId),
     type: pool.type,
     binStepBps: pool.binStep,

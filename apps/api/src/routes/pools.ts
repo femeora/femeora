@@ -214,7 +214,28 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
-    return { ...serializePool(pool), counts: pool._count };
+    const addresses = [pool.tokenX.toLowerCase(), pool.tokenY.toLowerCase()];
+    const [catalog, displayConfigs] = await Promise.all([
+      prisma.assetCatalog.findMany({ where: { chainId, address: { in: addresses } } }),
+      prisma.assetDisplayConfig.findMany({ where: { chainId, address: { in: addresses } } }),
+    ]);
+    const displayByAddress = new Map(displayConfigs.map(asset => [asset.address.toLowerCase(), asset]));
+    const identity = (address: string) => {
+      const asset = catalog.find(item => item.address.toLowerCase() === address.toLowerCase());
+      if (!asset) return null;
+      return {
+        address: asset.address,
+        symbol: asset.symbol,
+        name: asset.name,
+        logoUrl: displayByAddress.get(address.toLowerCase())?.logoUrl ?? asset.logoUrl,
+      };
+    };
+    return {
+      ...serializePool(pool),
+      tokenXAsset: identity(pool.tokenX),
+      tokenYAsset: identity(pool.tokenY),
+      counts: pool._count,
+    };
   });
 
   app.get('/v1/pools/:pool/stats', async (request, reply) => {

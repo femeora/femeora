@@ -85,7 +85,15 @@ function PoolPositions({ pool, positions, error, isLoading, refresh }: {
       const manageable = owned && position.status === 'open';
       return <Fragment key={`${position.chainId}:${position.id}`}>
         <tr>
-          <td className={cn(cellClass, 'font-sans')}><TokenPair tokenX={pool.baseAddress} tokenY={pool.quoteAddress} compact /></td>
+          <td className={cn(cellClass, 'font-sans')}>
+            <TokenPair
+              tokenX={pool.baseAddress}
+              tokenY={pool.quoteAddress}
+              tokenXIdentity={{ symbol: pool.base, name: pool.baseName, logoUrl: pool.baseLogoUrl }}
+              tokenYIdentity={{ symbol: pool.quote, name: pool.quoteName, logoUrl: pool.quoteLogoUrl }}
+              compact
+            />
+          </td>
           <td className={cellClass}>{shortAddress(position.owner)}{owned ? <span className="ml-2 text-signal">You</span> : null}</td>
           <td className={cellClass}>{['Spot', 'Curve', 'Bid-Ask', 'Custom'][position.shape] ?? 'Custom'}</td>
           <td className={cellClass}>{position.lowerBin}–{position.upperBin}<span className="block text-faint">{position.bins.length} bins</span></td>

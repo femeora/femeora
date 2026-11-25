@@ -14,6 +14,10 @@ export interface Pool {
   baseIsTokenX: boolean;
   base: string;
   quote: string;
+  baseName?: string | undefined;
+  quoteName?: string | undefined;
+  baseLogoUrl?: string | null | undefined;
+  quoteLogoUrl?: string | null | undefined;
   chain: string;
   type: 'DLMM' | 'DAMM';
   /** Price step between bins, in basis points. */

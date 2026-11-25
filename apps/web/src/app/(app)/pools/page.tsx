@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { formatUnits } from 'viem';
 
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { TokenPair } from '@/components/ui/TokenPair';
+import { TokenIcon } from '@/components/ui/TokenPair';
 import { AssetLogo } from '@/features/pool/components/PoolAssetSelect';
 import { getPoolAssets, getPools } from '@/lib/api/server';
 import { tokenMeta } from '@/lib/tokens';
@@ -32,6 +32,16 @@ function marketStatus(asset: ApiPoolAsset) {
   const status = asset.tradingStatus?.market;
   if (!status) return 'Mainnet asset';
   return status.replace('TRADING_STATUS_', '').replaceAll('_', ' ').toLowerCase();
+}
+
+function PoolTokenLogo({ address, asset, className = '' }: {
+  address: string;
+  asset: ApiPoolAsset | undefined;
+  className?: string;
+}) {
+  return asset
+    ? <AssetLogo asset={asset} className={className} />
+    : <TokenIcon token={address} className={className} />;
 }
 
 export default async function PoolsPage() {
@@ -87,7 +97,13 @@ export default async function PoolsPage() {
 
       {result.data.length > 0 ? (
         <ul className="mt-4 grid gap-3 lg:grid-cols-2">
-          {result.data.map(pool => (
+          {result.data.map(pool => {
+            const tokenXAsset = assetsByAddress.get(pool.tokenX.toLowerCase());
+            const tokenYAsset = assetsByAddress.get(pool.tokenY.toLowerCase());
+            const tokenX = tokenXAsset ?? tokenMeta(pool.tokenX);
+            const tokenY = tokenYAsset ?? tokenMeta(pool.tokenY);
+
+            return (
             <li key={pool.id} className="lg:only:col-span-2">
               <Link
                 href={`/p/${pool.chainId}/${pool.address}`}
@@ -95,7 +111,16 @@ export default async function PoolsPage() {
               >
                 <div className="flex flex-wrap items-start justify-between gap-5">
                   <div className="min-w-0">
-                  <TokenPair tokenX={pool.tokenX} tokenY={pool.tokenY} />
+                    <span className="inline-flex min-w-0 items-center gap-3">
+                      <span className="flex shrink-0 items-center pl-1">
+                        <PoolTokenLogo address={pool.tokenX} asset={tokenXAsset} className="z-10" />
+                        <PoolTokenLogo address={pool.tokenY} asset={tokenYAsset} className="-ml-3" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium">{tokenX.symbol} / {tokenY.symbol}</span>
+                        <span className="mt-0.5 block truncate text-sm text-muted">{tokenX.name} · {tokenY.name}</span>
+                      </span>
+                    </span>
                     <p className="t-label mt-3 text-up">Active · canonical</p>
                   </div>
                   <div className="text-right"><p className="font-mono text-sm">{pool.type}</p><p className="t-label mt-1 text-muted">{pool.baseFeePips / 10_000}% fee</p></div>
@@ -103,13 +128,14 @@ export default async function PoolsPage() {
                 <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-line py-4 font-mono text-xs tabular-nums sm:grid-cols-4">
                   <div><dt className="text-faint">Active bin</dt><dd className="mt-1">{pool.activeBin ?? '—'}</dd></div>
                   <div><dt className="text-faint">Bin step</dt><dd className="mt-1">{pool.binStep ? `${pool.binStep / 100}%` : '—'}</dd></div>
-                  <div><dt className="text-faint">{tokenMeta(pool.tokenX).symbol} reserve / cap</dt><dd className="mt-1">{tokenAmount(pool.reserveX, pool.tokenXDecimals)} / {tokenAmount(pool.reserveCapX, pool.tokenXDecimals)}</dd></div>
-                  <div><dt className="text-faint">{tokenMeta(pool.tokenY).symbol} reserve / cap</dt><dd className="mt-1">{tokenAmount(pool.reserveY, pool.tokenYDecimals)} / {tokenAmount(pool.reserveCapY, pool.tokenYDecimals)}</dd></div>
+                  <div><dt className="text-faint">{tokenX.symbol} reserve / cap</dt><dd className="mt-1">{tokenAmount(pool.reserveX, pool.tokenXDecimals)} / {tokenAmount(pool.reserveCapX, pool.tokenXDecimals)}</dd></div>
+                  <div><dt className="text-faint">{tokenY.symbol} reserve / cap</dt><dd className="mt-1">{tokenAmount(pool.reserveY, pool.tokenYDecimals)} / {tokenAmount(pool.reserveCapY, pool.tokenYDecimals)}</dd></div>
                 </dl>
                 <div className="t-label mt-4 flex flex-wrap justify-between gap-2 text-faint"><span>Pool {pool.address.slice(0, 8)}…{pool.address.slice(-6)}</span><span>Cap usage {Math.max(utilizationBps(pool.reserveX, pool.reserveCapX) ?? 0, utilizationBps(pool.reserveY, pool.reserveCapY) ?? 0) / 100}% · block {pool.createdBlock}</span></div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : (
         <div className="glass mt-4 rounded-[2px] p-8 text-center"><h3 className="text-lg font-medium">No canonical pools indexed yet</h3><p className="mx-auto mt-2 max-w-xl text-muted">Choose an available market below to launch the first pool. It will move here automatically after confirmation and indexing.</p></div>

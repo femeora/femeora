@@ -85,7 +85,16 @@ export const ApiPoolSchema = z.object({
 });
 export type ApiPool = z.infer<typeof ApiPoolSchema>;
 
+export const ApiPoolTokenIdentitySchema = z.object({
+  address: AddressSchema,
+  symbol: z.string().min(1).max(64),
+  name: z.string().min(1).max(160),
+  logoUrl: z.string().url().nullable(),
+});
+
 export const ApiPoolDetailSchema = ApiPoolSchema.extend({
+  tokenXAsset: ApiPoolTokenIdentitySchema.nullable(),
+  tokenYAsset: ApiPoolTokenIdentitySchema.nullable(),
   counts: z.object({
     positions: z.number().int().nonnegative(),
     swaps: z.number().int().nonnegative(),

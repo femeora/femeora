@@ -115,6 +115,8 @@ export function SwapForm({ pool }: { pool: Pool }) {
       <AmountField
         token={`You pay · ${tokenIn}`}
         tokenAddress={tokenInAddress}
+        tokenName={direction === 'buy' ? pool.quoteName : pool.baseName}
+        tokenLogoUrl={direction === 'buy' ? pool.quoteLogoUrl : pool.baseLogoUrl}
         value={amount}
         usdPerToken={direction === 'buy' ? 1 : pool.priceUsd}
         enabled

@@ -1,105 +1,104 @@
-# Fomeora Monorepo
+# Femeora
 
-> **Meteora-style DLMM + DAMM Liquidity Engine with a FOMO-style Proof-Backed Social Feed.**
-> _"Every LP is a callout."_
+**Every LP is a callout.**
 
----
+Femeora is a permissionless liquidity and social trading protocol built on
+Robinhood Chain. It combines DAMM and DLMM liquidity pools with on-chain
+positions, swaps, callouts, and a realtime market feed.
 
-## 🏛️ High-Level Architecture
+- Mainnet: [femeora.tech](https://femeora.tech)
+- Mainnet API: [api.femeora.tech](https://api.femeora.tech)
+- Testnet: [testnet.femeora.tech](https://testnet.femeora.tech)
+- X: [@femeoraApp](https://x.com/femeoraApp)
+- Explorer: [Robinhood Chain on Etherscan](https://robin.etherscan.io)
 
-Fomeora is structured as a **Turborepo Monorepo** managed with **pnpm workspaces**. It enforces **Clean Architecture**, **Strict TypeScript Typing**, **Zero Code Smell**, and **Defense-in-Depth Security**.
+## Product
 
-```
-fomeora/
-├── .github/workflows/          # CI/CD: Automated linting, typechecking, fuzzing & audits
+Femeora lets users:
+
+- create canonical DAMM or DLMM pools directly from a connected wallet;
+- open single-sided or two-sided liquidity positions;
+- increase, decrease, collect fees from, and close positions;
+- swap through canonical pools;
+- publish proof-backed callouts linked to on-chain positions;
+- follow pool activity through candles, liquidity bins, trades, positions, and
+  realtime social activity;
+- connect an X account for public identity while keeping wallet connection as
+  the primary requirement for on-chain actions.
+
+## Markets and asset metadata
+
+Canonical pools are sourced from on-chain events. Token identity is resolved
+from Femeora's verified asset catalog by chain ID and contract address, rather
+than being embedded in individual UI pages. The catalog supplies the token
+symbol, name, decimals, logo, category, and candidate-market configuration.
+
+Current catalog coverage includes:
+
+- WETH and USDG;
+- FEM, the Femeora token;
+- PONS;
+- DELTA (`0xe8ffd7e24187F72afB08d75B1bb13088A989a791`);
+- supported Robinhood Chain stock tokens and tokenized ETFs.
+
+If an indexed pool contains a catalogued asset, every pool card should display
+its real symbol, name, and logo. A generic token identity is used only when the
+contract address has not yet been verified in the catalog.
+
+## Architecture
+
+This repository is a pnpm and Turborepo monorepo:
+
+```text
+femeora/
 ├── apps/
-│   ├── contracts/              # Foundry-based EVM Smart Contracts (DLMM v2, PositionManagerV2, Lens)
-│   ├── indexer/                # Event Ingestion: projections for swaps, fee attribution, positions
-│   ├── api/                    # Fastify REST & SSE Server (X OAuth 2.0 PKCE, EIP-191 wallet link, Feed, Ranking)
-│   └── web/                    # Next.js 14 App Router: Mobile-first Social Feed & Delta-grade Pool Terminal
+│   ├── contracts/       EVM contracts for pools, positions, swaps, and governance
+│   ├── indexer/         On-chain event ingestion and read-model projection
+│   ├── api/             REST and SSE services for market and social data
+│   └── web/             Next.js web application
 ├── packages/
-│   ├── sdk/                    # Core math: DLMM bin formulas, PnL, formatters, ranking algorithms
-│   ├── database/               # Prisma schema & PostgreSQL connection management (Chain + Social tables)
-│   ├── types/                  # Single Source of Truth: Zod schemas & TypeScript types/DTOs
-│   ├── contracts-sdk/          # Generated contract ABIs & Viem/Wagmi bindings
-│   ├── config-eslint/          # Strict ESLint configuration (zero `any`, cyclomatic limits)
-│   ├── config-typescript/      # Strict tsconfig base (`strict: true`, `noUncheckedIndexedAccess`)
-│   └── config-prettier/        # Consistent opinionated code formatting
-└── tools/
-    └── docker/                 # Local development infrastructure (PostgreSQL 16, Anvil)
+│   ├── contracts-sdk/   Contract ABIs and typed integrations
+│   ├── database/        Prisma schema and migrations
+│   ├── sdk/             Shared protocol and market calculations
+│   └── types/           Shared runtime schemas and TypeScript types
+└── docs/                Public product briefs, guides, and protocol references
 ```
 
----
+The contracts remain the source of truth for pools and positions. The indexer
+projects on-chain activity, the API exposes normalized read models and realtime
+updates, and the web application renders those models without substituting demo
+transactions or simulated pool state.
 
-## 💎 Clean Code & Zero Smell Principles
+## Networks
 
-This repository strictly abides by software engineering standards to eliminate technical debt:
+| Environment | Chain ID | Web |
+| --- | ---: | --- |
+| Robinhood Chain Mainnet | `4663` | [femeora.tech](https://femeora.tech) |
+| Robinhood Chain Testnet | `46630` | [testnet.femeora.tech](https://testnet.femeora.tech) |
 
-1. **Explicit Boundaries (Clean & Hexagonal Architecture)**:
-   - Business calculations (PnL, fee yields, ranking score, anti-shill verification) are pure functions isolated in `@fomeora/sdk`, without coupling to any web or database frameworks.
-   - Applications (`api`, `web`, `indexer`) depend only on abstractions defined in `@fomeora/types` and `@fomeora/sdk`.
-2. **Zero `any` Policy & Runtime Schema Validation**:
-   - Every network input (HTTP payloads, SSE messages, smart contract events, URL parameters) must pass runtime validation using **Zod schemas**.
-   - TypeScript is configured with `"noImplicitAny": true`, `"strict": true`, and `"noUncheckedIndexedAccess": true`.
-3. **DRY & Single Source of Truth**:
-   - DTOs and models are defined once in `@fomeora/types` and consumed everywhere across client, backend, and indexer.
-4. **Anti-Shill & Phishing Defense-in-Depth**:
-   - Captions are sanitized against hyperlinks, raw contract addresses, and phishing phrases (`validateCalloutCaption`).
-   - Anti-shill signals (quick-exit within 30 min, opposing side positions, dev wallet identifiers) are computed deterministically from on-chain transactions.
+Testnet assets have no real-world value.
 
----
+## Development
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js >= 20.0.0
-- pnpm >= 9.0.0
-- Docker & Docker Compose
-- Foundry (`forge`)
-
-### 1. Clone & Install
+The project requires Node.js 20 or newer and pnpm 9 or newer.
 
 ```bash
 pnpm install
+pnpm typecheck
+pnpm lint
 ```
 
-### 2. Configure Environment Variables
+Runtime configuration is supplied through environment-specific files during
+development and through the deployment platform's secret manager in hosted
+environments. Environment files and private keys must never be committed.
 
-Fill `.env.testnet` for testnet or `.env.mainnet` for mainnet. These files are
-intentionally ignored and must be supplied through the deployment platform's
-secret manager outside local development. Select the active configuration with
-`APP_NETWORK=testnet` or `APP_NETWORK=mainnet`.
+## Security notice
 
-### 3. Spin up Local Infrastructure (Postgres and Anvil)
+Liquidity positions can lose value, token prices can move rapidly, and smart
+contract transactions are irreversible. Verify the active network, token
+contracts, amounts, price range, and transaction details before signing.
 
-```bash
-pnpm docker:up
-```
+## License
 
-### 4. Generate Database Client & Migrations
-
-```bash
-pnpm db:generate
-pnpm db:migrate
-```
-
-### 5. Start Development Servers
-
-```bash
-pnpm dev
-```
-
----
-
-## 🧪 Testing & Verification
-
-- **Run all tests & typechecks**:
-  ```bash
-  pnpm typecheck
-  pnpm lint
-  ```
-- **Smart Contract Unit, Fuzzing & Invariant Tests**:
-  ```bash
-  pnpm test:contracts
-  ```
+No license is granted unless a license file in this repository explicitly says
+otherwise.

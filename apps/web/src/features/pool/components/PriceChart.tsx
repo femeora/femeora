@@ -317,7 +317,13 @@ export function PriceChart({
               <CandlestickChart aria-hidden="true" className="size-5" strokeWidth={1.5} />
             </span>
             <div className="mt-4">
-              <TokenPair tokenX={pool.baseAddress} tokenY={pool.quoteAddress} compact />
+              <TokenPair
+                tokenX={pool.baseAddress}
+                tokenY={pool.quoteAddress}
+                tokenXIdentity={{ symbol: pool.base, name: pool.baseName, logoUrl: pool.baseLogoUrl }}
+                tokenYIdentity={{ symbol: pool.quote, name: pool.quoteName, logoUrl: pool.quoteLogoUrl }}
+                compact
+              />
             </div>
             <h2 className="mt-4 text-lg font-medium">No price history yet</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">

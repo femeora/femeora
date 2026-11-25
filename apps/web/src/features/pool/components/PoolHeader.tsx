@@ -46,18 +46,20 @@ function poolStats(pool: Pool): Stat[] {
 export function PoolHeader({ pool }: { pool: Pool }) {
   const base = tokenMeta(pool.baseAddress);
   const quote = tokenMeta(pool.quoteAddress);
+  const baseName = pool.baseName ?? base.name;
+  const quoteName = pool.quoteName ?? quote.name;
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="flex items-center gap-3">
         <span className="flex shrink-0 items-center pl-1">
-          <TokenIcon token={pool.baseAddress} className="z-10 size-11" />
-          <TokenIcon token={pool.quoteAddress} className="-ml-3 size-11" />
+          <TokenIcon token={pool.baseAddress} logoUrl={pool.baseLogoUrl} name={baseName} className="z-10 size-11" />
+          <TokenIcon token={pool.quoteAddress} logoUrl={pool.quoteLogoUrl} name={quoteName} className="-ml-3 size-11" />
         </span>
         <div>
           <h1 className="text-2xl font-medium tracking-tight">
             {pool.base} <span className="text-muted">/ {pool.quote}</span>
           </h1>
-          <p className="mt-0.5 text-sm text-muted">{base.name} · {quote.name}</p>
+          <p className="mt-0.5 text-sm text-muted">{baseName} · {quoteName}</p>
           <p className="t-label mt-0.5 flex flex-wrap items-center gap-x-2 text-muted">
             <span className="rounded-[2px] border border-line-strong px-1.5 text-fg">
               {pool.type}
