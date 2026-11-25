@@ -109,6 +109,7 @@ const webSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
     API_BASE_URL: configuredUrl,
     WEB_BASE_URL: publicOrigin,
+    HERO_CA_ADDRESS: optionalAddress,
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === 'production' && new URL(value.WEB_BASE_URL).protocol !== 'https:') {

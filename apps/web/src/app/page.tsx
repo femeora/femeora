@@ -15,7 +15,7 @@ import { Grain } from '@/components/ui/Grain';
 import { marquee } from '@/content/landing';
 
 export default function LandingPage() {
-  const { APP_NETWORK: network } = loadWebEnvironment();
+  const { APP_NETWORK: network, HERO_CA_ADDRESS: contractAddress } = loadWebEnvironment();
 
   return (
     <>
@@ -28,7 +28,7 @@ export default function LandingPage() {
       <Ambient />
       <SiteHeader network={network} />
       <main id="main" className="pt-header">
-        <Hero network={network} />
+        <Hero network={network} contractAddress={contractAddress} />
         <Statement />
         <AppSection />
         <CalloutsSection />

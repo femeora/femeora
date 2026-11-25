@@ -9,6 +9,8 @@ export {
   ArrowUpDown,
   BadgeCheck,
   CandlestickChart,
+  Check,
+  Copy,
   Ellipsis,
   ExternalLink,
   Eye,

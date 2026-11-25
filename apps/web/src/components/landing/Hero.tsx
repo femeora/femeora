@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { RobinhoodLogo } from '@/components/ui/icons';
+import { Check, Copy, RobinhoodLogo } from '@/components/ui/icons';
 import { hero } from '@/content/landing';
 import { useActiveBinWalk } from '@/hooks/useActiveBinWalk';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -28,11 +28,25 @@ function ReadoutCell({ label, children }: { label: ReactNode; children: ReactNod
   );
 }
 
-export function Hero({ network }: { network: 'testnet' | 'mainnet' }) {
+export function Hero({
+  network,
+  contractAddress,
+}: {
+  network: 'testnet' | 'mainnet';
+  contractAddress?: string | undefined;
+}) {
   const { index } = useActiveBinWalk({ count: BIN_COUNT, intervalMs: 920 });
   const reducedMotion = usePrefersReducedMotion();
   const [shapeIndex, setShapeIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
   const shape = SHAPES[shapeIndex] ?? 'spot';
+
+  const copyContractAddress = async () => {
+    if (!contractAddress) return;
+    await navigator.clipboard.writeText(contractAddress);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1_800);
+  };
 
   useEffect(() => {
     if (reducedMotion) {
@@ -77,6 +91,28 @@ export function Hero({ network }: { network: 'testnet' | 'mainnet' }) {
             </ReadoutCell>
           ))}
         </dl>
+
+        {contractAddress ? (
+          <div className="col-span-12 animate-fade-up [animation-delay:260ms]">
+            <button
+              type="button"
+              onClick={() => void copyContractAddress()}
+              className="metal t-label inline-flex max-w-full select-text flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[2px] border border-transparent px-4 py-3 text-left leading-none transition-[filter] duration-fast hover:brightness-110"
+              aria-label={`Copy contract address ${contractAddress}`}
+            >
+              <span className="font-semibold tracking-[0.12em]">CA</span>
+              <span className="break-all font-mono text-[0.6875rem] normal-case tracking-normal sm:text-xs">
+                {contractAddress}
+              </span>
+              {copied ? (
+                <Check aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.8} />
+              ) : (
+                <Copy aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.8} />
+              )}
+              <span className="sr-only" aria-live="polite">{copied ? 'Contract address copied' : ''}</span>
+            </button>
+          </div>
+        ) : null}
 
         <h1 id="hero-title" className="col-span-12 text-hero font-medium md:col-span-9">
           {hero.titleLines.map((line, lineIndex) => (
