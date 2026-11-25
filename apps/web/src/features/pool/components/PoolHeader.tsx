@@ -39,7 +39,7 @@ function PoolPriceNotice({
       >
         <TriangleAlert aria-hidden="true" className="size-4" strokeWidth={1.8} />
       </summary>
-      <div className="invisible absolute left-0 top-[calc(100%+0.5rem)] z-50 w-80 max-w-[calc(100vw-3rem)] translate-y-1 border border-down/60 bg-panel-1 p-3 opacity-0 shadow-2xl transition-[opacity,transform,visibility] group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100">
+      <div className="invisible absolute left-0 top-[calc(100%+0.5rem)] z-50 w-80 max-w-[calc(100vw-3rem)] translate-y-1 border border-down/60 bg-[#101216] p-3 opacity-0 shadow-2xl transition-[opacity,transform,visibility] group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100">
         <p className="t-label text-down">Initial pool price warning</p>
         <p className="mt-1 text-xs normal-case tracking-normal text-fg">{summary}.</p>
         <p className="mt-2 text-[0.625rem] leading-relaxed text-muted">

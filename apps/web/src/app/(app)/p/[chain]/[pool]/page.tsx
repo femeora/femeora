@@ -143,7 +143,10 @@ export default async function PoolPage({ params }: PageProps) {
   const latestReference = reference15m.data.at(-1) ?? reference1h.data.at(-1);
   const indexedPoolPrice = pool15m.data.at(-1)?.close ?? pool1h.data.at(-1)?.close;
   const poolPrice = activeBinPrice(detail) || Number(indexedPoolPrice ?? 0);
-  const referencePrice = latestReference && latestReference.stale !== true ? Number(latestReference.close) : 0;
+  // A delayed external candle is still the independent reference used to
+  // assess the pool's immutable initial price. Its timestamp is shown in the
+  // notice, so do not hide the warning merely because the market is delayed.
+  const referencePrice = latestReference ? Number(latestReference.close) : 0;
   const priceDeviationPct = poolPrice > 0 && referencePrice > 0
     ? Math.abs(poolPrice / referencePrice - 1) * 100
     : 0;
