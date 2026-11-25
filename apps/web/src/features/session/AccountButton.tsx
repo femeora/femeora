@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { useToast } from '@/components/feedback/toast';
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
+import { useToast } from '@/components/feedback/toast';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Close, LogOut, Wallet } from '@/components/ui/icons';
