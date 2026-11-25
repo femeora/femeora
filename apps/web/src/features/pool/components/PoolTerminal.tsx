@@ -17,7 +17,7 @@ import { snapRangeBound } from '../model/range';
 
 import { ChartToolbar, INTERVAL_SECONDS, type ChartInterval } from './ChartToolbar';
 import { MarketStrips } from './MarketStrips';
-import { PoolHeader } from './PoolHeader';
+import { PoolHeader, type PoolPriceWarning } from './PoolHeader';
 import { PoolTabs } from './PoolTabs';
 import { PriceChart } from './PriceChart';
 import { TradePanel, type PanelTab } from './TradePanel';
@@ -32,13 +32,7 @@ interface PoolTerminalProps {
   trades: readonly LiveTrade[];
   lps: readonly LiveLp[];
   callouts: readonly Callout[];
-  priceWarning: {
-    poolPrice: number;
-    referencePrice: number;
-    deviationPct: number;
-    source: string;
-    updatedAt: string;
-  } | null;
+  priceWarning: PoolPriceWarning | null;
 }
 
 /**
@@ -109,11 +103,13 @@ export function PoolTerminal({
       if (Date.now() >= reconciliationDeadline) stopReconciliation();
     };
     const onPositionConfirmed = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        pool?: string;
-        transactionHash?: string;
-        expectsCallout?: boolean;
-      }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          pool?: string;
+          transactionHash?: string;
+          expectsCallout?: boolean;
+        }>
+      ).detail;
       if (detail?.pool?.toLowerCase() !== pool.address.toLowerCase()) return;
       stopReconciliation();
       pendingTransactionHash = detail.transactionHash?.toLowerCase() ?? null;
@@ -132,7 +128,9 @@ export function PoolTerminal({
     const stop = openApiEventStream(`/v1/pools/${pool.address}/stream`, {
       onMessage: message => {
         const payload =
-          typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)
+          typeof message.payload === 'object' &&
+          message.payload !== null &&
+          !Array.isArray(message.payload)
             ? (message.payload as Record<string, unknown>)
             : null;
         const eventTransactionHash =
@@ -142,8 +140,7 @@ export function PoolTerminal({
         const matchesPendingTransaction =
           pendingTransactionHash === null || eventTransactionHash === pendingTransactionHash;
         if (message.topic === 'pool.cap') {
-          const record =
-            payload;
+          const record = payload;
           const status =
             record && typeof record.status === 'string' ? record.status : 'unavailable';
           const utilizationBps =
@@ -208,38 +205,16 @@ export function PoolTerminal({
 
   return (
     <div className="flex flex-col gap-4 px-gutter py-5">
-      <PoolHeader pool={pool} />
-      {priceWarning ? (
-        <section
-          className="flex flex-col gap-3 border border-down/60 bg-down/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
-        >
-          <div>
-            <p className="t-label text-down">Initial pool price warning</p>
-            <p className="mt-1 text-sm text-fg">
-              The on-chain pool price is {priceWarning.deviationPct.toFixed(2)}% away from the
-              independent market reference.
-            </p>
-            <p className="t-label mt-2 text-muted">
-              Pool {priceWarning.poolPrice.toPrecision(8)} · Reference{' '}
-              {priceWarning.referencePrice.toPrecision(8)} · {priceWarning.source} ·{' '}
-              {new Date(priceWarning.updatedAt).toLocaleString()}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="t-label min-h-11 shrink-0 border border-line-strong bg-panel-2 px-4 text-fg hover:border-fg"
-            onClick={() => {
-              setChartSource('reference');
-              document
-                .getElementById('pool-price-chart')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-          >
-            View reference chart
-          </button>
-        </section>
-      ) : null}
+      <PoolHeader
+        pool={pool}
+        priceWarning={priceWarning}
+        onViewReference={() => {
+          setChartSource('reference');
+          document
+            .getElementById('pool-price-chart')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }}
+      />
       <MarketStrips stats={stats} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
