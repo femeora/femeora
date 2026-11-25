@@ -12,7 +12,12 @@ export function toUnit(priceUsd: number, unit: ValueUnit, pool: Pool): number {
 }
 
 export function formatPrice(value: number): string {
-  return formatSubscriptPrice(value);
+  // Lightweight Charts may ask the formatter to render a temporary tick just
+  // below zero while calculating autoscale for very small token prices. The
+  // public SDK correctly rejects negative prices, but a display formatter must
+  // never be allowed to crash the chart (or the whole pool page).
+  if (!Number.isFinite(value)) return '$0';
+  return value < 0 ? `-${formatSubscriptPrice(Math.abs(value))}` : formatSubscriptPrice(value);
 }
 
 export function formatUnit(value: number, unit: ValueUnit): string {
