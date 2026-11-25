@@ -38,6 +38,10 @@ const curveIntervals = [
   { value: '1h', label: '1h' },
   { value: '4h', label: '4h' },
 ] as const;
+const curveUnits = [
+  { value: 'mcap', label: 'MCap' },
+  { value: 'price', label: 'Price' },
+] as const;
 const curveIntervalSeconds: Record<CurveInterval, number> = {
   '5m': 300,
   '15m': 900,
@@ -78,7 +82,6 @@ export function CurveTerminal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wallet = useWallet();
-  const progress = Math.min(100, launch.progressPips / 10_000);
   const graduated = launch.status === 'graduated';
   const graduationThreshold = formatUnits(
     BigInt(launch.launchpad.graduationThresholdRaw),
@@ -86,6 +89,12 @@ export function CurveTerminal({
   );
   const quoteReserve = formatUnits(BigInt(launch.quoteReserveRaw), quoteDecimals);
   const tokenInventory = formatUnits(BigInt(launch.tokenInventoryRaw), 18);
+  const thresholdRaw = BigInt(launch.launchpad.graduationThresholdRaw);
+  const reserveRaw = BigInt(launch.quoteReserveRaw);
+  const progress = thresholdRaw === 0n
+    ? 0
+    : Math.min(100, (Number(reserveRaw) / Number(thresholdRaw)) * 100);
+  const progressLabel = formatProgress(progress);
 
   useEffect(
     () =>
@@ -265,7 +274,7 @@ export function CurveTerminal({
         <dl className="grid grid-cols-3 gap-x-6 gap-y-3 sm:grid-cols-6">
           <HeaderMetric label="MCap" value={marketCap === null ? '—' : formatCompact(marketCap, quoteSymbol)} />
           <HeaderMetric label="Price" value={latestPrice === null ? '—' : formatPrice(latestPrice, quoteSymbol)} />
-          <HeaderMetric label="Progress" value={`${progress.toFixed(2)}%`} />
+          <HeaderMetric label="Progress" value={progressLabel} />
           <HeaderMetric label="Reserve" value={`${quoteReserve} ${quoteSymbol}`} />
           <HeaderMetric label="Trades" value={String(launch.trades.length)} />
           <HeaderMetric
@@ -318,7 +327,7 @@ export function CurveTerminal({
           >
             <div
               className="graduation-progress__fill"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress > 0 ? Math.max(progress, 0.35) : 0}%` }}
             >
               <span className="graduation-progress__shimmer" aria-hidden="true" />
               {progress > 0 ? (
@@ -328,7 +337,7 @@ export function CurveTerminal({
           </div>
           <div className="t-label mt-3 flex flex-wrap justify-between gap-2 text-muted">
             <span>
-              <span className="text-fg">{progress.toFixed(2)}%</span> toward {graduationThreshold}{' '}
+              <span className="text-fg">{progressLabel}</span> toward {graduationThreshold}{' '}
               {quoteSymbol} graduation
             </span>
             <span>
@@ -347,6 +356,7 @@ export function CurveTerminal({
           quoteDecimals={quoteDecimals}
           quoteSymbol={quoteSymbol}
           tokenSymbol={launch.symbol}
+          totalSupply={totalSupply}
         />
         <div className="mt-9 border-t border-line pt-5">
           <div className="flex items-end justify-between">
@@ -392,7 +402,9 @@ export function CurveTerminal({
                         {formatUnits(BigInt(trade.tokenAmountRaw), 18)} {launch.symbol}
                       </td>
                       <td className="px-3 py-3 font-mono">
-                        {(trade.progressPips / 10_000).toFixed(2)}%
+                        {trade.progressPips === 0 && BigInt(trade.quoteAmountRaw) > 0n
+                          ? '<0.0001%'
+                          : formatProgress(trade.progressPips / 10_000)}
                       </td>
                       <td className="px-3 py-3 text-muted">
                         {new Date(trade.timestamp).toLocaleString()}
@@ -546,13 +558,16 @@ function CurvePriceChart({
   quoteDecimals,
   quoteSymbol,
   tokenSymbol,
+  totalSupply,
 }: {
   trades: ApiLaunchDetail['trades'];
   quoteDecimals: number;
   quoteSymbol: string;
   tokenSymbol: string;
+  totalSupply: number;
 }) {
   const [interval, setInterval] = useState<CurveInterval>('1h');
+  const [unit, setUnit] = useState<'mcap' | 'price'>('mcap');
   const { containerRef, handles } = useLightweightChart();
   const candles = useMemo(() => {
     const seconds = curveIntervalSeconds[interval];
@@ -579,19 +594,28 @@ function CurvePriceChart({
 
   useEffect(() => {
     if (!handles) return;
+    const scale = unit === 'mcap' ? totalSupply : 1;
     handles.chart.applyOptions({
-      localization: { priceFormatter: (value: number) => formatCurvePrice(value) },
+      localization: {
+        priceFormatter: (value: number) =>
+          unit === 'mcap' ? formatCompactValue(value) : formatCurvePrice(value),
+      },
     });
     handles.candles.applyOptions({
-      priceFormat: { type: 'custom', formatter: formatCurvePrice, minMove: 1e-12 },
+      priceFormat: {
+        type: 'custom',
+        formatter: (value: number) =>
+          unit === 'mcap' ? formatCompactValue(value) : formatCurvePrice(value),
+        minMove: unit === 'mcap' ? 0.01 : 1e-12,
+      },
     });
     handles.candles.setData(
       candles.map(candle => ({
         time: candle.time as UTCTimestamp,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
+        open: candle.open * scale,
+        high: candle.high * scale,
+        low: candle.low * scale,
+        close: candle.close * scale,
       }))
     );
     handles.volume.setData(
@@ -602,12 +626,18 @@ function CurvePriceChart({
       }))
     );
     handles.chart.timeScale().fitContent();
-  }, [candles, handles]);
+  }, [candles, handles, totalSupply, unit]);
 
   const latest = candles.at(-1);
   return (
     <section className="mt-8 min-w-0">
       <div className="flex flex-wrap items-center gap-2 py-3">
+        <SegmentedControl
+          label="Chart unit"
+          options={curveUnits}
+          value={unit}
+          onChange={setUnit}
+        />
         <SegmentedControl
           label="Chart interval"
           options={curveIntervals}
@@ -620,15 +650,16 @@ function CurvePriceChart({
       </div>
       <div className="mb-2 flex items-center gap-2 text-[0.6875rem] uppercase tracking-[0.12em] text-faint">
         <span className="inline-block size-1.5 rounded-full bg-signal" />
-        Bonding curve trades · on-chain only · {quoteSymbol} per {tokenSymbol}
+        Bonding curve trades · on-chain only ·{' '}
+        {unit === 'mcap' ? `market cap in ${quoteSymbol}` : `${quoteSymbol} per ${tokenSymbol}`}
       </div>
       <div className="glass relative h-[320px] overflow-hidden rounded-[2px] sm:h-[440px]">
         {latest ? (
           <p className="t-label pointer-events-none absolute left-2 top-1 z-10 flex flex-wrap gap-x-3 text-muted">
-            <span>O <span className="text-fg">{formatCurvePrice(latest.open)}</span></span>
-            <span>H <span className="text-fg">{formatCurvePrice(latest.high)}</span></span>
-            <span>L <span className="text-fg">{formatCurvePrice(latest.low)}</span></span>
-            <span>C <span className="text-fg">{formatCurvePrice(latest.close)}</span></span>
+            <span>O <span className="text-fg">{formatChartValue(latest.open, unit, totalSupply)}</span></span>
+            <span>H <span className="text-fg">{formatChartValue(latest.high, unit, totalSupply)}</span></span>
+            <span>L <span className="text-fg">{formatChartValue(latest.low, unit, totalSupply)}</span></span>
+            <span>C <span className="text-fg">{formatChartValue(latest.close, unit, totalSupply)}</span></span>
           </p>
         ) : null}
         <div ref={containerRef} className="h-full w-full font-mono" />
@@ -659,6 +690,24 @@ function formatCurvePrice(value: number): string {
   if (value === 0) return '0';
   if (Math.abs(value) < 0.0001) return value.toExponential(4);
   return value.toLocaleString(undefined, { maximumSignificantDigits: 8 });
+}
+
+function formatCompactValue(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatChartValue(value: number, unit: 'mcap' | 'price', totalSupply: number): string {
+  return unit === 'mcap' ? formatCompactValue(value * totalSupply) : formatCurvePrice(value);
+}
+
+function formatProgress(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0.00%';
+  if (value < 0.0001) return '<0.0001%';
+  if (value < 0.01) return `${value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}%`;
+  return `${value.toFixed(2)}%`;
 }
 
 function formatPrice(value: number, symbol: string): string {
