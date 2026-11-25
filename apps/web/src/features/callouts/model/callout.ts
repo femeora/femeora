@@ -46,6 +46,10 @@ export interface Callout {
     quote: string;
     baseAddress: string;
     quoteAddress: string;
+    baseName: string;
+    quoteName: string;
+    baseLogoUrl: string | null;
+    quoteLogoUrl: string | null;
     tokenX: string;
     tokenY: string;
     type: 'DLMM' | 'DAMM';
@@ -136,7 +140,10 @@ export function calloutBins(callout: Callout): number {
 
 export function formatCalloutValue(callout: Callout, value: number): string {
   if (callout.valuation !== 'quote') return formatCompactUsd(value);
-  const formatted = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  const formatted = value.toLocaleString('en-US', {
+    maximumSignificantDigits: 7,
+    useGrouping: false,
+  });
   return `${formatted} ${callout.pool.quote}`;
 }
 

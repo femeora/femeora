@@ -84,6 +84,7 @@ const apiCallout: ApiCallout = {
     binStep: pool.binStep,
     initialActiveBin: pool.initialActiveBin,
     activeBin: pool.activeBin,
+    currentPrice: '1',
   },
   position: {
     owner: '0x0000000000000000000000000000000000000003',

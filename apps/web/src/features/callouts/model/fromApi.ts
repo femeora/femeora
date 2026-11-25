@@ -1,7 +1,7 @@
 import { priceFromBinX18 } from '@fomeora/sdk';
 
-import type { ApiCallout, ApiCandle, ApiPoolDetail } from '@/lib/api/types';
-import { tokenSymbol } from '@/lib/tokens';
+import type { ApiCallout, ApiCandle, ApiPoolAsset, ApiPoolDetail } from '@/lib/api/types';
+import { tokenMeta, tokenSymbol } from '@/lib/tokens';
 import type { BinShape } from '@/types/callout';
 
 import type { Callout } from './callout';
@@ -56,9 +56,10 @@ export function apiCalloutToCallout(
   pool: Pick<ApiPoolDetail, 'activeBin' | 'binStep' | 'quoteToken' | 'tokenX' | 'tokenY' | 'type'>,
   candles: readonly ApiCandle[],
   now = new Date(),
+  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map(),
 ): Callout {
   const active = pool.activeBin ?? 0;
-  const currentPrice = number(candles.at(-1)?.close ?? null, number(callout.priceAtPost, 0));
+  const currentPrice = number(candles.at(-1)?.close ?? null, number(callout.pool.currentPrice, number(callout.priceAtPost, 0)));
   const priceAtPost = number(callout.priceAtPost, currentPrice);
   const lowerPct = pool.type === 'DAMM' ? -100 : percentFromActive(callout.lowerBin, active, pool.binStep);
   const upperPct = pool.type === 'DAMM' ? 100 : percentFromActive(callout.upperBin, active, pool.binStep);
@@ -67,6 +68,10 @@ export function apiCalloutToCallout(
   const baseAddress = quoteAddress.toLowerCase() === pool.tokenX.toLowerCase()
     ? pool.tokenY
     : pool.tokenX;
+  const baseAsset = assetsByAddress.get(baseAddress.toLowerCase());
+  const quoteAsset = assetsByAddress.get(quoteAddress.toLowerCase());
+  const baseMeta = tokenMeta(baseAddress);
+  const quoteMeta = tokenMeta(quoteAddress);
   const initials = (callout.user.name ?? handle)
     .split(/\s+/)
     .map(part => part[0] ?? '')
@@ -90,10 +95,14 @@ export function apiCalloutToCallout(
     pool: {
       chainId: callout.chainId,
       address: callout.pool.address,
-      base: tokenSymbol(baseAddress),
-      quote: tokenSymbol(quoteAddress),
+      base: baseAsset?.symbol ?? tokenSymbol(baseAddress),
+      quote: quoteAsset?.symbol ?? tokenSymbol(quoteAddress),
       baseAddress,
       quoteAddress,
+      baseName: baseAsset?.name ?? baseMeta.name,
+      quoteName: quoteAsset?.name ?? quoteMeta.name,
+      baseLogoUrl: baseAsset?.logoUrl ?? baseMeta.logo,
+      quoteLogoUrl: quoteAsset?.logoUrl ?? quoteMeta.logo,
       tokenX: pool.tokenX,
       tokenY: pool.tokenY,
       type: pool.type,
@@ -147,7 +156,11 @@ export function apiCalloutToCallout(
   };
 }
 
-export function apiFeedCalloutToCallout(callout: ApiCallout, now = new Date()): Callout {
+export function apiFeedCalloutToCallout(
+  callout: ApiCallout,
+  now = new Date(),
+  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map(),
+): Callout {
   return apiCalloutToCallout(callout, {
     activeBin: callout.pool.activeBin,
     binStep: callout.pool.binStep,
@@ -155,5 +168,5 @@ export function apiFeedCalloutToCallout(callout: ApiCallout, now = new Date()): 
     tokenX: callout.pool.tokenX,
     tokenY: callout.pool.tokenY,
     type: callout.pool.type,
-  }, [], now);
+  }, [], now, assetsByAddress);
 }

@@ -173,6 +173,12 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
               type: true,
               tokenX: true,
               tokenY: true,
+              referenceCandles: {
+                where: { interval: '1h' },
+                orderBy: { bucketStart: 'desc' },
+                take: 1,
+                select: { close: true },
+              },
             },
           },
           events: {
@@ -222,6 +228,7 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
             caption,
             showSize: parsed.data.showSize,
             sizeAtPost: position.valueQuote,
+            priceAtPost: position.pool.referenceCandles[0]?.close ?? null,
             side: position.pool.activeBin === null
               ? null
               : classifyRangeSide(position.lowerBin, position.upperBin, position.pool.activeBin),

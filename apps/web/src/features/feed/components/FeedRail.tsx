@@ -1,7 +1,8 @@
 'use client';
 
-import { ApiFeedRailSchema } from '@fomeora/types';
+import { ApiFeedRailSchema, ApiPoolAssetListSchema } from '@fomeora/types';
 import Link from 'next/link';
+import { useMemo } from 'react';
 
 import { TokenPair } from '@/components/ui/TokenPair';
 import { useApiResource } from '@/lib/api/useApiResource';
@@ -15,6 +16,11 @@ const decimal = (value: string, digits = 2) => {
 /** Desktop right rail: pools by callout count and the day's top callers. */
 export function FeedRail() {
   const { data, error, isLoading, mutate } = useApiResource('/v1/feed/rail', ApiFeedRailSchema);
+  const assets = useApiResource('/v1/pool-assets', ApiPoolAssetListSchema);
+  const assetsByAddress = useMemo(
+    () => new Map((assets.data?.data ?? []).map(asset => [asset.address.toLowerCase(), asset])),
+    [assets.data],
+  );
   const trendingPools = data?.trendingPools ?? [];
   const topCallers = data?.topCallers ?? [];
   return (
@@ -24,14 +30,24 @@ export function FeedRail() {
         <ol className="glass rounded-[2px] px-4">
           {isLoading ? <li className="py-4 text-sm text-muted">Loading pools…</li> : null}
           {!isLoading && !error && trendingPools.length === 0 ? <li className="py-5"><p className="text-sm">No trending pools yet</p><p className="mt-1 text-xs leading-relaxed text-muted">The first confirmed callout starts this 24h ranking.</p></li> : null}
-          {trendingPools.map((pool, index) => (
+          {trendingPools.map((pool, index) => {
+            const tokenX = assetsByAddress.get(pool.tokenX.toLowerCase());
+            const tokenYAddress = pool.quoteToken ?? pool.tokenY;
+            const tokenY = assetsByAddress.get(tokenYAddress.toLowerCase());
+            return (
             <li key={pool.address} className="border-b border-line last:border-b-0">
               <Link
                 href={`/p/${pool.chainId}/${pool.address}`}
                 className="flex min-h-12 items-center gap-3 transition-colors hover:text-signal"
               >
                 <span className="t-label w-5 text-faint">{index + 1}</span>
-                <span className="min-w-0 flex-1"><TokenPair tokenX={pool.tokenX} tokenY={pool.quoteToken ?? pool.tokenY} compact /></span>
+                <span className="min-w-0 flex-1"><TokenPair
+                  tokenX={pool.tokenX}
+                  tokenY={tokenYAddress}
+                  tokenXIdentity={tokenX ? { symbol: tokenX.symbol, name: tokenX.name, logoUrl: tokenX.logoUrl } : undefined}
+                  tokenYIdentity={tokenY ? { symbol: tokenY.symbol, name: tokenY.name, logoUrl: tokenY.logoUrl } : undefined}
+                  compact
+                /></span>
                 <span className="t-label text-muted">{pool.callouts24h}</span>
                 <span
                   className={cn(
@@ -43,7 +59,7 @@ export function FeedRail() {
                 </span>
               </Link>
             </li>
-          ))}
+          );})}
         </ol>
       </section>
 

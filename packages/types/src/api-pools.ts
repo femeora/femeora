@@ -223,6 +223,7 @@ export const ApiCalloutSchema = z.object({
     binStep: z.number().int().nonnegative(),
     initialActiveBin: z.number().int().nullable(),
     activeBin: z.number().int().nullable(),
+    currentPrice: DecimalStringSchema.nullable(),
   }),
   position: z.object({
     owner: AddressSchema,

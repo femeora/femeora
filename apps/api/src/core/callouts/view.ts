@@ -27,6 +27,12 @@ export const calloutInclude = {
       binStep: true,
       initialActiveBin: true,
       activeBin: true,
+      referenceCandles: {
+        where: { interval: '1h' },
+        orderBy: { bucketStart: 'desc' },
+        take: 1,
+        select: { close: true },
+      },
     },
   },
   position: {
@@ -122,6 +128,7 @@ export function serializeCallout(
   const inRangePercentage = openSeconds === 0
     ? 0
     : Math.min(100, Number(callout.position.inRangeSeconds) / openSeconds * 100);
+  const { referenceCandles, ...pool } = callout.pool;
   return {
     id: callout.id,
     chainId: callout.chainId,
@@ -148,7 +155,10 @@ export function serializeCallout(
       heldDurationSeconds: callout.position.openSeconds.toString(),
     },
     user: callout.user,
-    pool: callout.pool,
+    pool: {
+      ...pool,
+      currentPrice: referenceCandles[0]?.close ? decimalString(referenceCandles[0].close) : null,
+    },
     position: {
       owner: callout.position.owner,
       status: callout.position.status,

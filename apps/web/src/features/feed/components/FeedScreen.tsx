@@ -1,6 +1,6 @@
 'use client';
 
-import { ApiFeedSchema } from '@fomeora/types';
+import { ApiFeedSchema, ApiPoolAssetListSchema } from '@fomeora/types';
 import Link from 'next/link';
 import { useCallback, useId, useMemo, useState } from 'react';
 
@@ -66,11 +66,16 @@ export function FeedScreen() {
   const openSignIn = useSession(state => state.openSignIn);
   const path = tab === 'following' && !user ? null : `/v1/feed?tab=${tab}&limit=50&window=24h`;
   const { data, error, isLoading, mutate } = useApiResource(path, ApiFeedSchema);
+  const assets = useApiResource('/v1/pool-assets', ApiPoolAssetListSchema);
+  const assetsByAddress = useMemo(
+    () => new Map((assets.data?.data ?? []).map(asset => [asset.address.toLowerCase(), asset])),
+    [assets.data],
+  );
   const refresh = useCallback(() => mutate(), [mutate]);
   const { pendingCount, streamError, release } = useFeedRealtime(refresh);
   const visible = useMemo(
-    () => filterBySide((data?.data ?? []).map(callout => apiFeedCalloutToCallout(callout)), side),
-    [data, side],
+    () => filterBySide((data?.data ?? []).map(callout => apiFeedCalloutToCallout(callout, new Date(), assetsByAddress)), side),
+    [assetsByAddress, data, side],
   );
   const feedItems = useMemo(() => visible.flatMap(callout => [
     { kind: 'callout' as const, id: callout.id, createdAt: callout.createdAt, callout },
