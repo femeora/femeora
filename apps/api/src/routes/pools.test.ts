@@ -35,6 +35,29 @@ test('pool serializer converts every database bigint and decimal to JSON-safe st
   assert.doesNotThrow(() => JSON.stringify(serialized));
 });
 
+test('pool serializer expands large Prisma decimals instead of returning scientific notation', () => {
+  const serialized = serializePool({
+    id: 'large-cap-pool',
+    chainId: 4_663,
+    address: tokenX,
+    type: 'DLMM',
+    tokenX,
+    tokenY,
+    quoteToken: tokenY,
+    binStep: 25,
+    baseFeePips: 3_000,
+    reserveCapX: { toString: () => '1e+24', toFixed: () => '1000000000000000000000000' },
+    reserveCapY: { toString: () => '5000000000', toFixed: () => '5000000000' },
+    reserveX: null,
+    reserveY: null,
+    reserveUpdatedBlock: null,
+    createdBlock: 122_700_000n,
+  });
+
+  assert.equal(serialized.reserveCapX, '1000000000000000000000000');
+  assert.match(serialized.reserveCapX!, /^\d+$/);
+});
+
 test('bin quote depth values both sides when token Y is quote', () => {
   const pool = {
     tokenX, tokenY, quoteToken: tokenY,

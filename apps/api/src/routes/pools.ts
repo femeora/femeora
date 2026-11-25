@@ -54,6 +54,13 @@ export function fillCandleGaps(input: readonly SerializedCandle[], interval: key
   return output;
 }
 
+type IntegerDecimal = { toString(): string; toFixed?(decimalPlaces?: number): string };
+
+function integerDecimalString(value: IntegerDecimal | null): string | null {
+  if (!value) return null;
+  return value.toFixed ? value.toFixed(0) : value.toString();
+}
+
 export function serializePool(pool: {
   id: string;
   chainId: number;
@@ -64,10 +71,10 @@ export function serializePool(pool: {
   quoteToken: string | null;
   binStep: number;
   baseFeePips: number;
-  reserveCapX: { toString(): string } | null;
-  reserveCapY: { toString(): string } | null;
-  reserveX: { toString(): string } | null;
-  reserveY: { toString(): string } | null;
+  reserveCapX: IntegerDecimal | null;
+  reserveCapY: IntegerDecimal | null;
+  reserveX: IntegerDecimal | null;
+  reserveY: IntegerDecimal | null;
   reserveUpdatedBlock: bigint | null;
   createdBlock: bigint;
 }) {
@@ -76,10 +83,10 @@ export function serializePool(pool: {
     baseIsTokenX: pool.quoteToken
       ? pool.quoteToken.toLowerCase() === pool.tokenY.toLowerCase()
       : null,
-    reserveCapX: pool.reserveCapX?.toString() ?? null,
-    reserveCapY: pool.reserveCapY?.toString() ?? null,
-    reserveX: pool.reserveX?.toString() ?? null,
-    reserveY: pool.reserveY?.toString() ?? null,
+    reserveCapX: integerDecimalString(pool.reserveCapX),
+    reserveCapY: integerDecimalString(pool.reserveCapY),
+    reserveX: integerDecimalString(pool.reserveX),
+    reserveY: integerDecimalString(pool.reserveY),
     reserveUpdatedBlock: pool.reserveUpdatedBlock?.toString() ?? null,
     createdBlock: pool.createdBlock.toString(),
   };
@@ -124,8 +131,8 @@ export function binQuoteValues(pool: {
 function reserveCapStatus(pool: {
   reserveX: { toString(): string } | null;
   reserveY: { toString(): string } | null;
-  reserveCapX: { toString(): string } | null;
-  reserveCapY: { toString(): string } | null;
+  reserveCapX: IntegerDecimal | null;
+  reserveCapY: IntegerDecimal | null;
   reserveUpdatedBlock: bigint | null;
 }) {
   if (!pool.reserveX || !pool.reserveY || !pool.reserveCapX || !pool.reserveCapY) {
@@ -139,8 +146,8 @@ function reserveCapStatus(pool: {
   }
   const reserveX = BigInt(pool.reserveX.toString());
   const reserveY = BigInt(pool.reserveY.toString());
-  const capX = BigInt(pool.reserveCapX.toString());
-  const capY = BigInt(pool.reserveCapY.toString());
+  const capX = BigInt(integerDecimalString(pool.reserveCapX)!);
+  const capY = BigInt(integerDecimalString(pool.reserveCapY)!);
   const utilizationX = capX === 0n ? null : reserveX * 10_000n / capX;
   const utilizationY = capY === 0n ? null : reserveY * 10_000n / capY;
   const utilization = utilizationX === null || utilizationY === null
