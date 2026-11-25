@@ -158,7 +158,17 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
       const position = await prisma.position.findFirst({
         where: { chainId, id: parsed.data.positionId, canonical: true },
         include: {
-          pool: { select: { id: true, address: true, canonical: true, activeBin: true } },
+          pool: {
+            select: {
+              id: true,
+              address: true,
+              canonical: true,
+              activeBin: true,
+              type: true,
+              tokenX: true,
+              tokenY: true,
+            },
+          },
           events: {
             where: { canonical: true },
             orderBy: [{ blockNumber: 'desc' }, { logIndex: 'desc' }],
@@ -167,7 +177,26 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
           },
         },
       });
-      if (!position || !position.pool.canonical) return reply.status(404).send({ error: 'POSITION_NOT_FOUND' });
+      if (!position) return reply.status(404).send({ error: 'POSITION_NOT_FOUND' });
+      if (!position.pool.canonical) {
+        const replacement = await prisma.pool.findFirst({
+          where: {
+            chainId,
+            canonical: true,
+            type: position.pool.type,
+            OR: [
+              { tokenX: position.pool.tokenX, tokenY: position.pool.tokenY },
+              { tokenX: position.pool.tokenY, tokenY: position.pool.tokenX },
+            ],
+          },
+          orderBy: { createdBlock: 'desc' },
+          select: { address: true },
+        });
+        return reply.status(409).send({
+          error: 'POSITION_POOL_NOT_CANONICAL',
+          replacementPoolAddress: replacement?.address ?? null,
+        });
+      }
       if (!session.user.wallets.some(wallet => wallet.address === position.owner.toLowerCase())) {
         return reply.status(403).send({ error: 'POSITION_OWNERSHIP_REQUIRED' });
       }

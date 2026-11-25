@@ -30,5 +30,7 @@ test('position serializer converts nested pool bigint values to JSON-safe string
 
   assert.equal(serialized?.pool.reserveUpdatedBlock, '122039000');
   assert.equal(serialized?.pool.createdBlock, '121919485');
+  assert.equal(serialized?.poolCanonical, true);
+  assert.equal(serialized?.replacementPoolAddress, null);
   assert.doesNotThrow(() => JSON.stringify(serialized));
 });

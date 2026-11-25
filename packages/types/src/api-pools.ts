@@ -496,6 +496,8 @@ export const ApiIndexedPositionSchema = z.object({
   openedAt: z.string().datetime(),
   closedAt: z.string().datetime().nullable(),
   calloutId: z.string().uuid().nullable(),
+  poolCanonical: z.boolean(),
+  replacementPoolAddress: AddressSchema.nullable(),
   bins: z.array(z.object({ binId: z.number().int(), shares: IntegerStringSchema })),
   pool: ApiPoolSchema,
 });

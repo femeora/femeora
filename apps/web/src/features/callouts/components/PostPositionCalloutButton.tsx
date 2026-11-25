@@ -6,6 +6,7 @@ import { useId, useRef, useState } from 'react';
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { useToast } from '@/components/feedback/toast';
 import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { Close } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/Switch';
 import { useSession } from '@/features/session/store';
@@ -34,6 +35,28 @@ export function PostPositionCalloutButton({ position, onPosted, className }: Pos
   const [showSize, setShowSize] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!position.poolCanonical) {
+    return (
+      <div className={cn('flex flex-wrap items-center gap-2', className)}>
+        <Button
+          className="min-h-9"
+          disabled
+          title="This position belongs to a legacy pool. New callouts can only be posted from the active pool."
+        >
+          Callout unavailable
+        </Button>
+        {position.replacementPoolAddress ? (
+          <ButtonLink
+            className="min-h-9 px-3"
+            href={`/p/${position.chainId}/${position.replacementPoolAddress}`}
+          >
+            Active pool
+          </ButtonLink>
+        ) : null}
+      </div>
+    );
+  }
 
   const open = () => {
     if (!user) {

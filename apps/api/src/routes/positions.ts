@@ -6,7 +6,27 @@ import { serializePool } from './pools.js';
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform(value => value.toLowerCase());
 
-export function serializePosition(position: Awaited<ReturnType<typeof loadPosition>>) {
+type PoolIdentity = {
+  address: string;
+  canonical: boolean;
+  type: string;
+  tokenX: string;
+  tokenY: string;
+};
+
+function marketKey(pool: Pick<PoolIdentity, 'type' | 'tokenX' | 'tokenY'>): string {
+  return `${pool.type}:${[pool.tokenX.toLowerCase(), pool.tokenY.toLowerCase()].sort().join(':')}`;
+}
+
+function replacementAddress(pool: PoolIdentity, canonicalPools: readonly PoolIdentity[]): string | null {
+  if (pool.canonical) return null;
+  return canonicalPools.find(candidate => candidate.canonical && marketKey(candidate) === marketKey(pool))?.address ?? null;
+}
+
+export function serializePosition(
+  position: Awaited<ReturnType<typeof loadPosition>>,
+  replacementPoolAddress: string | null = null,
+) {
   if (!position) return null;
   const { callouts, ...record } = position;
   return {
@@ -25,6 +45,8 @@ export function serializePosition(position: Awaited<ReturnType<typeof loadPositi
     bins: position.bins.map(bin => ({ binId: bin.binId, shares: bin.shares.toString() })),
     pool: serializePool(position.pool),
     calloutId: callouts[0]?.id ?? null,
+    poolCanonical: position.pool.canonical,
+    replacementPoolAddress,
   };
 }
 
@@ -65,7 +87,16 @@ export async function registerPositionRoutes(app: FastifyInstance, chainId: numb
       orderBy: { openedAt: 'desc' },
       take: query.data.limit,
     });
-    return { data: positions.map(position => serializePosition(position)) };
+    const canonicalPools = await prisma.pool.findMany({
+      where: { chainId, canonical: true },
+      select: { address: true, canonical: true, type: true, tokenX: true, tokenY: true },
+    });
+    return {
+      data: positions.map(position => serializePosition(
+        position,
+        replacementAddress(position.pool, canonicalPools),
+      )),
+    };
   });
 
   app.get('/v1/positions/:chain/:id', async (request, reply) => {
@@ -80,6 +111,21 @@ export async function registerPositionRoutes(app: FastifyInstance, chainId: numb
     }
     const position = await loadPosition(chainId, params.data.id);
     if (!position) return reply.status(404).send({ error: 'POSITION_NOT_FOUND' });
-    return serializePosition(position);
+    const replacement = position.pool.canonical
+      ? null
+      : await prisma.pool.findFirst({
+          where: {
+            chainId,
+            canonical: true,
+            type: position.pool.type,
+            OR: [
+              { tokenX: position.pool.tokenX, tokenY: position.pool.tokenY },
+              { tokenX: position.pool.tokenY, tokenY: position.pool.tokenX },
+            ],
+          },
+          orderBy: { createdBlock: 'desc' },
+          select: { address: true },
+        });
+    return serializePosition(position, replacement?.address ?? null);
   });
 }

@@ -20,6 +20,13 @@ test('explains a deposit that is too small for its selected range', () => {
   assert.doesNotMatch(message, /DEPOSIT_TOO_SMALL/);
 });
 
+test('explains why a legacy-pool position cannot create a callout', () => {
+  const message = friendlyErrorMessage('POSITION_POOL_NOT_CANONICAL');
+  assert.match(message, /legacy pool/i);
+  assert.match(message, /manage or close/i);
+  assert.doesNotMatch(message, /POSITION_POOL_NOT_CANONICAL/);
+});
+
 test('never returns an unknown technical error verbatim', () => {
   const raw = 'Internal JSON-RPC error: execution payload 0xdeadbeef';
   const message = friendlyErrorMessage(raw);

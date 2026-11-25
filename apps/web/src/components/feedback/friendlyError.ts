@@ -11,6 +11,9 @@ export function friendlyErrorMessage(error: string): string {
   if (value.includes('SWAP_POOL_MIGRATION_REQUIRED')) {
     return 'Swaps for this pool are temporarily paused while its USDG/WETH decimal handling is upgraded. Your liquidity positions are unaffected.';
   }
+  if (value.includes('POSITION_POOL_NOT_CANONICAL')) {
+    return 'This position belongs to a legacy pool. You can still manage or close it, but new callouts can only be posted from the active pool.';
+  }
   if (includesAny(value, ['REJECT', 'DENIED', 'DECLINED', 'CANCELLED', 'CANCELED', 'USER_REFUSED'])) {
     return 'The request was cancelled in your wallet. No changes were made. You can try again when ready.';
   }

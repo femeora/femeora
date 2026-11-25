@@ -117,7 +117,7 @@ export function PortfolioScreen() {
               <td className={cell}>Bin {position.lowerBin} to {position.upperBin}<span className="block text-faint">{position.bins.length} owned bins</span></td>
               <td className={cell}>{position.depositedQuote}</td><td className={cell}>{position.withdrawnQuote}</td>
               <td className={cell}>{position.valueQuote ?? 'Unavailable'}</td><td className={cell}>{position.earnedQuote}</td>
-              <td className={`${cell} capitalize`}>{positionStatus(position)}</td><td className={cell}>{position.calloutId ? 'Posted' : 'Not posted'}</td>
+              <td className={`${cell} capitalize`}>{positionStatus(position)}</td><td className={cell}>{position.calloutId ? 'Posted' : position.poolCanonical ? 'Not posted' : 'Legacy pool'}</td>
               <td className={cell}><div className="flex gap-2">
                 {!position.calloutId && position.status === 'open' ? <PostPositionCalloutButton position={position} onPosted={mutate} /> : null}
                 {position.status === 'open' ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
