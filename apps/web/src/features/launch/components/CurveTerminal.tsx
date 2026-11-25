@@ -10,23 +10,48 @@ import {
   type ApiCurveTradePreparation,
   type ApiLaunchDetail,
 } from '@fomeora/types';
+import type { UTCTimestamp } from 'lightweight-charts';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { formatUnits } from 'viem';
 
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { Button } from '@/components/ui/Button';
+import { CandlestickChart } from '@/components/ui/icons';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { TokenIcon } from '@/components/ui/TokenPair';
 import { TxButton } from '@/features/pool/components/TxButton';
+import { useLightweightChart } from '@/features/pool/hooks/useLightweightChart';
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
 import { useWallet } from '@/features/wallet/store';
 import { TransactionExecutionError } from '@/features/wallet/transactionError';
 import { browserApiRequest } from '@/lib/api/client';
 import { openApiEventStream } from '@/lib/api/realtime';
 import { useApiResource } from '@/lib/api/useApiResource';
+import { tokenColor } from '@/lib/theme';
 
 const control = 'glass-control mt-2 min-h-11 w-full rounded-[2px] px-3 text-fg';
+type CurveInterval = '5m' | '15m' | '1h' | '4h';
+const curveIntervals = [
+  { value: '5m', label: '5m' },
+  { value: '15m', label: '15m' },
+  { value: '1h', label: '1h' },
+  { value: '4h', label: '4h' },
+] as const;
+const curveIntervalSeconds: Record<CurveInterval, number> = {
+  '5m': 300,
+  '15m': 900,
+  '1h': 3_600,
+  '4h': 14_400,
+};
 
-export function CurveTerminal({ initial }: { initial: ApiLaunchDetail }) {
+export function CurveTerminal({
+  initial,
+  initialQuote,
+}: {
+  initial: ApiLaunchDetail;
+  initialQuote: { symbol: string; name: string; decimals: number; logoUrl: string | null };
+}) {
   const router = useRouter();
   const launchResource = useApiResource(`/v1/launches/${initial.token}`, ApiLaunchDetailSchema, {
     fallbackData: initial,
@@ -37,8 +62,10 @@ export function CurveTerminal({ initial }: { initial: ApiLaunchDetail }) {
   const quoteAsset = assets.data?.data.find(
     asset => asset.address.toLowerCase() === launch.launchpad.quoteToken.toLowerCase()
   );
-  const quoteSymbol = quoteAsset?.symbol ?? 'QUOTE';
-  const quoteDecimals = quoteAsset?.decimals ?? 18;
+  const quoteSymbol = quoteAsset?.symbol ?? initialQuote.symbol;
+  const quoteName = quoteAsset?.name ?? initialQuote.name;
+  const quoteLogoUrl = quoteAsset?.logoUrl ?? initialQuote.logoUrl;
+  const quoteDecimals = quoteAsset?.decimals ?? initialQuote.decimals;
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState('0.5');
@@ -190,9 +217,80 @@ export function CurveTerminal({ initial }: { initial: ApiLaunchDetail }) {
   };
   const outputSymbol = side === 'buy' ? launch.symbol : quoteSymbol;
   const inputSymbol = side === 'buy' ? quoteSymbol : launch.symbol;
+  const latestTrade = launch.trades[0];
+  const latestQuoteAmount = latestTrade
+    ? Number(formatUnits(BigInt(latestTrade.quoteAmountRaw), quoteDecimals))
+    : 0;
+  const latestTokenAmount = latestTrade
+    ? Number(formatUnits(BigInt(latestTrade.tokenAmountRaw), 18))
+    : 0;
+  const latestPrice = latestTokenAmount > 0 ? latestQuoteAmount / latestTokenAmount : null;
+  const totalSupply = Number(formatUnits(BigInt(launch.totalSupplyRaw), 18));
+  const marketCap = latestPrice === null ? null : latestPrice * totalSupply;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="flex flex-col gap-4 px-gutter py-5">
+      <header className="flex flex-col gap-4 border-b border-line pb-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex shrink-0 items-center pl-1">
+            <TokenIcon
+              token={launch.token}
+              logoUrl={launch.imageUrl}
+              name={launch.name}
+              className="z-10 size-11"
+            />
+            <TokenIcon
+              token={launch.launchpad.quoteToken}
+              logoUrl={quoteLogoUrl}
+              name={quoteName}
+              className="-ml-3 size-11"
+            />
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-medium tracking-tight">
+              {launch.symbol} <span className="text-muted">/ {quoteSymbol}</span>
+            </h1>
+            <p className="mt-0.5 truncate text-sm text-muted">
+              {launch.name} · {quoteName}
+            </p>
+            <p className="t-label mt-0.5 flex flex-wrap items-center gap-x-2 text-muted">
+              <span className="rounded-[2px] border border-line-strong px-1.5 text-fg">Curve</span>
+              <span>Fee {launch.launchpad.tradeFeePips / 10_000}%</span>·
+              <a className="text-signal hover:underline" href={`/lp/${launch.launchpad.slug}`}>
+                {launch.launchpad.name}
+              </a>
+            </p>
+          </div>
+        </div>
+        <dl className="grid grid-cols-3 gap-x-6 gap-y-3 sm:grid-cols-6">
+          <HeaderMetric label="MCap" value={marketCap === null ? '—' : formatCompact(marketCap, quoteSymbol)} />
+          <HeaderMetric label="Price" value={latestPrice === null ? '—' : formatPrice(latestPrice, quoteSymbol)} />
+          <HeaderMetric label="Progress" value={`${progress.toFixed(2)}%`} />
+          <HeaderMetric label="Reserve" value={`${quoteReserve} ${quoteSymbol}`} />
+          <HeaderMetric label="Trades" value={String(launch.trades.length)} />
+          <HeaderMetric
+            label="Status"
+            value={graduated ? 'Graduated' : 'Curve live'}
+            {...(graduated ? { tone: 'up' as const } : {})}
+          />
+        </dl>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <section className="glass flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[2px] p-3">
+          <StripCell label="Quote reserve">{quoteReserve} {quoteSymbol}</StripCell>
+          <StripCell label="Threshold">{graduationThreshold} {quoteSymbol}</StripCell>
+          <StripCell label="Inventory">{tokenInventory} {launch.symbol}</StripCell>
+        </section>
+        <section className="glass flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[2px] p-3">
+          <StripCell label="Creator">{launch.creator.slice(0, 8)}…{launch.creator.slice(-4)}</StripCell>
+          <StripCell label="Dev holds">{(launch.devHoldingsPips / 10_000).toFixed(2)}%</StripCell>
+          <StripCell label="Protection">{launch.launchpad.protectionEnabled ? 'On' : 'Off'}</StripCell>
+          <StripCell label="X identity">{launch.launchpad.xRequired ? 'Required' : 'Optional'}</StripCell>
+        </section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
       <section className="glass rounded-[2px] p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -438,6 +536,7 @@ export function CurveTerminal({ initial }: { initial: ApiLaunchDetail }) {
           </div>
         ) : null}
       </aside>
+      </div>
     </div>
   );
 }
@@ -453,101 +552,138 @@ function CurvePriceChart({
   quoteSymbol: string;
   tokenSymbol: string;
 }) {
-  const points = [...trades]
-    .reverse()
-    .map(trade => {
+  const [interval, setInterval] = useState<CurveInterval>('1h');
+  const { containerRef, handles } = useLightweightChart();
+  const candles = useMemo(() => {
+    const seconds = curveIntervalSeconds[interval];
+    const buckets = new Map<number, { time: number; open: number; high: number; low: number; close: number; volume: number }>();
+    [...trades].reverse().forEach(trade => {
       const quote = Number(formatUnits(BigInt(trade.quoteAmountRaw), quoteDecimals));
       const tokens = Number(formatUnits(BigInt(trade.tokenAmountRaw), 18));
-      return {
-        price: tokens > 0 ? quote / tokens : Number.NaN,
-        timestamp: Date.parse(trade.timestamp),
-      };
-    })
-    .filter(point => Number.isFinite(point.price) && point.price > 0);
-  if (points.length === 0) {
-    return (
-      <section className="mt-8 border border-line bg-panel-2 p-5">
-        <p className="t-label text-faint">
-          Curve price · {quoteSymbol} per {tokenSymbol}
-        </p>
-        <div className="flex h-44 items-center justify-center text-sm text-muted">
-          Price history begins with the first confirmed curve trade.
-        </div>
-      </section>
+      const price = tokens > 0 ? quote / tokens : Number.NaN;
+      const timestamp = Math.floor(Date.parse(trade.timestamp) / 1_000);
+      if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp)) return;
+      const time = Math.floor(timestamp / seconds) * seconds;
+      const candle = buckets.get(time);
+      if (candle) {
+        candle.high = Math.max(candle.high, price);
+        candle.low = Math.min(candle.low, price);
+        candle.close = price;
+        candle.volume += quote;
+      } else {
+        buckets.set(time, { time, open: price, high: price, low: price, close: price, volume: quote });
+      }
+    });
+    return [...buckets.values()].sort((a, b) => a.time - b.time);
+  }, [interval, quoteDecimals, trades]);
+
+  useEffect(() => {
+    if (!handles) return;
+    handles.chart.applyOptions({
+      localization: { priceFormatter: (value: number) => formatCurvePrice(value) },
+    });
+    handles.candles.applyOptions({
+      priceFormat: { type: 'custom', formatter: formatCurvePrice, minMove: 1e-12 },
+    });
+    handles.candles.setData(
+      candles.map(candle => ({
+        time: candle.time as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      }))
     );
-  }
-  const prices = points.map(point => point.price);
-  const minimum = Math.min(...prices);
-  const maximum = Math.max(...prices);
-  const spread = Math.max(maximum - minimum, maximum * 0.02, Number.EPSILON);
-  const width = 800;
-  const height = 220;
-  const insetX = 18;
-  const insetY = 20;
-  const drawableWidth = width - insetX * 2;
-  const drawableHeight = height - insetY * 2;
-  const coordinates = points.map((point, index) => ({
-    x:
-      insetX +
-      (points.length === 1 ? drawableWidth / 2 : (index / (points.length - 1)) * drawableWidth),
-    y: insetY + ((maximum + spread * 0.1 - point.price) / (spread * 1.2)) * drawableHeight,
-  }));
-  const line = coordinates.map(point => `${point.x},${point.y}`).join(' ');
-  const area = `${insetX},${height - insetY} ${line} ${width - insetX},${height - insetY}`;
-  const latest = prices.at(-1)!;
+    handles.volume.setData(
+      candles.map(candle => ({
+        time: candle.time as UTCTimestamp,
+        value: candle.volume,
+        color: tokenColor(candle.close >= candle.open ? 'up' : 'down', 0.25),
+      }))
+    );
+    handles.chart.timeScale().fitContent();
+  }, [candles, handles]);
+
+  const latest = candles.at(-1);
   return (
-    <section className="mt-8 border border-line bg-panel-2 p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="t-label text-faint">
-            Curve price · {quoteSymbol} per {tokenSymbol}
-          </p>
-          <p className="mt-1 font-mono text-lg tabular-nums">{latest.toPrecision(7)}</p>
-        </div>
-        <p className="t-label text-muted">
-          {points.length} confirmed trade{points.length === 1 ? '' : 's'}
+    <section className="mt-8 min-w-0">
+      <div className="flex flex-wrap items-center gap-2 py-3">
+        <SegmentedControl
+          label="Chart interval"
+          options={curveIntervals}
+          value={interval}
+          onChange={setInterval}
+        />
+        <p className="t-label ml-auto hidden text-[0.6875rem] text-faint lg:block">
+          Drag to pan · scroll or pinch to zoom
         </p>
       </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="mt-4 h-48 w-full overflow-visible"
-        role="img"
-        aria-label={`${tokenSymbol} bonding curve price history`}
-      >
-        <defs>
-          <linearGradient id="curve-price-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="rgb(var(--signal))" stopOpacity="0.28" />
-            <stop offset="1" stopColor="rgb(var(--signal))" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75].map(ratio => (
-          <line
-            key={ratio}
-            x1={insetX}
-            x2={width - insetX}
-            y1={height * ratio}
-            y2={height * ratio}
-            stroke="rgb(var(--line))"
-            strokeWidth="1"
-          />
-        ))}
-        <polygon points={area} fill="url(#curve-price-fill)" />
-        <polyline
-          points={line}
-          fill="none"
-          stroke="rgb(var(--signal))"
-          strokeWidth="2.5"
-          vectorEffect="non-scaling-stroke"
-        />
-        {coordinates.length === 1 ? (
-          <circle cx={coordinates[0]!.x} cy={coordinates[0]!.y} r="4" fill="rgb(var(--signal))" />
+      <div className="mb-2 flex items-center gap-2 text-[0.6875rem] uppercase tracking-[0.12em] text-faint">
+        <span className="inline-block size-1.5 rounded-full bg-signal" />
+        Bonding curve trades · on-chain only · {quoteSymbol} per {tokenSymbol}
+      </div>
+      <div className="glass relative h-[320px] overflow-hidden rounded-[2px] sm:h-[440px]">
+        {latest ? (
+          <p className="t-label pointer-events-none absolute left-2 top-1 z-10 flex flex-wrap gap-x-3 text-muted">
+            <span>O <span className="text-fg">{formatCurvePrice(latest.open)}</span></span>
+            <span>H <span className="text-fg">{formatCurvePrice(latest.high)}</span></span>
+            <span>L <span className="text-fg">{formatCurvePrice(latest.low)}</span></span>
+            <span>C <span className="text-fg">{formatCurvePrice(latest.close)}</span></span>
+          </p>
         ) : null}
-      </svg>
-      <div className="t-label mt-1 flex justify-between text-faint">
-        <span>{new Date(points[0]!.timestamp).toLocaleString()}</span>
-        <span>{new Date(points.at(-1)!.timestamp).toLocaleString()}</span>
+        <div ref={containerRef} className="h-full w-full font-mono" />
+        {!latest ? (
+          <div className="absolute inset-0 z-20 grid place-items-center overflow-hidden bg-bg/90 px-6 text-center">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgb(var(--fg)/0.12)_1px,transparent_1px),linear-gradient(90deg,rgb(var(--fg)/0.12)_1px,transparent_1px)] [background-size:44px_44px]" />
+            <div className="relative flex max-w-md flex-col items-center">
+              <span className="grid size-12 place-items-center rounded-full border border-line bg-panel-2 text-muted">
+                <CandlestickChart aria-hidden="true" className="size-5" strokeWidth={1.5} />
+              </span>
+              <h2 className="mt-4 text-lg font-medium">No curve price history yet</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                The chart will appear automatically after the first confirmed buy or sell.
+              </p>
+              <p className="t-label mt-5 border border-line bg-panel-2 px-3 py-2 text-faint">
+                Waiting for the first trade · no demo data
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function formatCurvePrice(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value === 0) return '0';
+  if (Math.abs(value) < 0.0001) return value.toExponential(4);
+  return value.toLocaleString(undefined, { maximumSignificantDigits: 8 });
+}
+
+function formatPrice(value: number, symbol: string): string {
+  return `${formatCurvePrice(value)} ${symbol}`;
+}
+
+function formatCompact(value: number, symbol: string): string {
+  return `${new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(value)} ${symbol}`;
+}
+
+function HeaderMetric({ label, value, tone }: { label: string; value: string; tone?: 'up' }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="t-label text-faint">{label}</dt>
+      <dd className={`truncate font-mono text-sm tabular-nums ${tone === 'up' ? 'text-up' : ''}`} title={value}>{value}</dd>
+    </div>
+  );
+}
+
+function StripCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2 whitespace-nowrap">
+      <span className="t-label text-faint">{label}</span>
+      <span className="font-mono text-[0.8125rem] tabular-nums">{children}</span>
+    </div>
   );
 }
 
