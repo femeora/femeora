@@ -43,6 +43,34 @@ async function optional<T>(request: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+function createRequestLimiter(maxConcurrent: number) {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  const acquire = () => new Promise<void>(resolve => {
+    if (active < maxConcurrent) {
+      active += 1;
+      resolve();
+      return;
+    }
+    waiting.push(() => {
+      active += 1;
+      resolve();
+    });
+  });
+  const release = () => {
+    active -= 1;
+    waiting.shift()?.();
+  };
+  return async <T,>(request: () => Promise<T>): Promise<T> => {
+    await acquire();
+    try {
+      return await request();
+    } finally {
+      release();
+    }
+  };
+}
+
 function Unavailable() {
   return (
     <section className="mx-auto flex min-h-[55vh] max-w-3xl flex-col justify-center px-gutter py-16">
@@ -89,20 +117,24 @@ export default async function PoolPage({ params }: PageProps) {
     createdAt: null,
     counts: detail.counts,
   };
+  // A pool page needs several independent read models. Keep its fan-out below
+  // the API's small production database pool so the first navigation does not
+  // turn queued reads into empty fallbacks.
+  const limited = createRequestLimiter(4);
   const [stats, pool5m, pool15m, pool1h, pool4h, reference5m, reference15m, reference1h, reference4h, bins, trades, lps, callouts] = await Promise.all([
-    optional(getPoolStats(detail.address), fallbackStats),
-    optional(getPoolCandles(detail.address, '5m', candleLimits['5m'], 'pool'), emptyList),
-    optional(getPoolCandles(detail.address, '15m', candleLimits['15m'], 'pool'), emptyList),
-    optional(getPoolCandles(detail.address, '1h', candleLimits['1h'], 'pool'), emptyList),
-    optional(getPoolCandles(detail.address, '4h', candleLimits['4h'], 'pool'), emptyList),
-    optional(getPoolCandles(detail.address, '5m', candleLimits['5m'], 'reference'), emptyList),
-    optional(getPoolCandles(detail.address, '15m', candleLimits['15m'], 'reference'), emptyList),
-    optional(getPoolCandles(detail.address, '1h', candleLimits['1h'], 'reference'), emptyList),
-    optional(getPoolCandles(detail.address, '4h', candleLimits['4h'], 'reference'), emptyList),
-    detail.type === 'DLMM' ? optional(getPoolBins(detail.address, from, to), emptyList) : emptyList,
-    optional(getPoolTrades(detail.address), emptyList),
-    optional(getPoolLps(detail.address), emptyList),
-    optional(getPoolCallouts(detail.address), emptyList),
+    optional(limited(() => getPoolStats(detail.address)), fallbackStats),
+    optional(limited(() => getPoolCandles(detail.address, '5m', candleLimits['5m'], 'pool')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '15m', candleLimits['15m'], 'pool')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '1h', candleLimits['1h'], 'pool')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '4h', candleLimits['4h'], 'pool')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '5m', candleLimits['5m'], 'reference')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '15m', candleLimits['15m'], 'reference')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '1h', candleLimits['1h'], 'reference')), emptyList),
+    optional(limited(() => getPoolCandles(detail.address, '4h', candleLimits['4h'], 'reference')), emptyList),
+    detail.type === 'DLMM' ? optional(limited(() => getPoolBins(detail.address, from, to)), emptyList) : emptyList,
+    optional(limited(() => getPoolTrades(detail.address)), emptyList),
+    optional(limited(() => getPoolLps(detail.address)), emptyList),
+    optional(limited(() => getPoolCallouts(detail.address)), emptyList),
   ]);
   const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
   const pool = apiPoolToPool(detail, latest, stats);

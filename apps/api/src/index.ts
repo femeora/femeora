@@ -56,6 +56,14 @@ export async function createServer(environment = loadApiEnvironment()) {
     },
   });
 
+  app.setErrorHandler((error, request, reply) => {
+    if ('code' in error && error.code === 'P2024') {
+      request.log.warn({ route: request.routeOptions.url }, 'Database connection pool was temporarily busy.');
+      return reply.status(503).send({ error: 'SERVICE_TEMPORARILY_BUSY' });
+    }
+    return reply.send(error);
+  });
+
   // Security Plugins
   await app.register(helmet, {
     contentSecurityPolicy: true,

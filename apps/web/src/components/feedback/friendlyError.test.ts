@@ -27,6 +27,12 @@ test('explains why a legacy-pool position cannot create a callout', () => {
   assert.doesNotMatch(message, /POSITION_POOL_NOT_CANONICAL/);
 });
 
+test('turns database pool pressure into a temporary user-facing message', () => {
+  const message = friendlyErrorMessage('SERVICE_TEMPORARILY_BUSY');
+  assert.match(message, /high activity|try again/i);
+  assert.doesNotMatch(message, /SERVICE_TEMPORARILY_BUSY|P2024/i);
+});
+
 test('never returns an unknown technical error verbatim', () => {
   const raw = 'Internal JSON-RPC error: execution payload 0xdeadbeef';
   const message = friendlyErrorMessage(raw);

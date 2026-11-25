@@ -89,7 +89,13 @@ async function createStatsEvent(
 async function findVisibleCallout(id: string, chainId: number) {
   return prisma.callout.findFirst({
     where: { id, chainId, ...visibleCalloutWhere },
-    select: { id: true, userId: true, chainId: true, createdAt: true },
+    select: {
+      id: true,
+      userId: true,
+      chainId: true,
+      createdAt: true,
+      pool: { select: { address: true } },
+    },
   });
 }
 
@@ -457,8 +463,25 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
         data: [{ calloutId: callout.id, day, viewerHash }],
         skipDuplicates: true,
       });
-      if (created.count === 1) await createStatsEvent(transaction, callout.id, chainId, 'view');
-      return transaction.viewDaily.count({ where: { calloutId: callout.id } });
+      const total = await transaction.viewDaily.count({ where: { calloutId: callout.id } });
+      if (created.count === 1) {
+        // A view is generated automatically for every visible callout card. Do
+        // not run the full seven-query social rollup while holding this
+        // transaction connection: a feed entering the viewport would
+        // otherwise exhaust a small production pool. Realtime consumers only
+        // use this event as an invalidation signal and fetch the canonical
+        // aggregate from the API.
+        await transaction.outboxEvent.create({
+          data: {
+            dedupKey: `social:view:${callout.id}:${randomUUID()}`,
+            topic: 'callout.stats',
+            aggregateId: callout.pool.address.toLowerCase(),
+            chainId,
+            payload: { id: callout.id, views: total },
+          },
+        });
+      }
+      return total;
     });
     return { views };
   });
