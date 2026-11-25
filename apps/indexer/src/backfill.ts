@@ -275,9 +275,23 @@ export async function backfillPoolRegistry(
         tokenDecimals.set(token, decimals);
       })
     );
-    const poolCaps = new Map<string, { reserveCapX: string; reserveCapY: string }>();
+    const poolCaps = new Map<string, { reserveCapX: string; reserveCapY: string }>(
+      existingPools.flatMap(pool => (
+        pool.reserveCapX !== null && pool.reserveCapY !== null
+          ? [[pool.address.toLowerCase(), {
+              reserveCapX: pool.reserveCapX.toFixed(0),
+              reserveCapY: pool.reserveCapY.toFixed(0),
+            }] as const]
+          : []
+      ))
+    );
     await Promise.all(
       discoveryLogs.map(async log => {
+        // Reprocessing an already indexed discovery event must not require an
+        // archival state call. Public RPCs commonly retain logs longer than
+        // contract state, while these immutable/configured values are already
+        // stored in the canonical pool row.
+        if (poolCaps.has(log.args.pool.toLowerCase())) return;
         const blockNumber = requireMinedValue(log.blockNumber, 'BLOCK_NUMBER');
         const type = Number(log.args.key.model) === 0 ? 'DAMM' : 'DLMM';
         const caps = await readPoolReserveCaps(
