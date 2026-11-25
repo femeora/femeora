@@ -23,7 +23,7 @@ import { executePreparedPosition } from '../model/executePosition';
 import { formatCompactUsd, formatUnit, toUnit, type ValueUnit } from '../model/format';
 import { toContractAmounts } from '../model/orientation';
 import type { Pool } from '../model/pool';
-import { applyPct, PRESETS, pricePosition, sideLabel, snapRangeBound } from '../model/range';
+import { applyPct, fitRangeToBinLimit, PRESETS, pricePosition, sideLabel, snapRangeBound } from '../model/range';
 
 import { AmountField } from './AmountField';
 import { BinsPreview } from './BinsPreview';
@@ -151,15 +151,17 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
               key={preset.id}
               type="button"
               aria-pressed={draft.presetId === preset.id}
-              onClick={() =>
-                (invalidateQuote(), dispatch({
+              onClick={() => {
+                const fitted = fitRangeToBinLimit(preset, pool.binStepBps);
+                invalidateQuote();
+                dispatch({
                   type: 'apply',
                   shape: preset.shape,
-                  minPct: preset.minPct,
-                  maxPct: preset.maxPct,
+                  minPct: fitted.minPct,
+                  maxPct: fitted.maxPct,
                   presetId: preset.id,
-                }))
-              }
+                });
+              }}
               className={cn(
                 'glass-control flex min-h-11 flex-col items-start gap-1 rounded-[2px] p-2 text-left',
                 draft.presetId === preset.id && 'border-signal bg-signal/10 hover:border-signal'
@@ -261,6 +263,7 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
           <div className="t-label flex justify-between gap-4"><dt className="text-muted">Slippage limit</dt><dd>{quote.slippageBps / 100}%</dd></div>
         </dl>
       ) : null}
+      <p role="alert" className="t-label min-h-4 text-down">{error}</p>
       <Button type="button" block onClick={() => void requestQuote()} disabled={Boolean(error) || quoting}>
         {quoting ? (damm ? 'Reading pool state…' : 'Reading canonical bins…') : 'Review live position'}
       </Button>

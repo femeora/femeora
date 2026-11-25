@@ -9,6 +9,7 @@ import type { Pool } from '../model/pool';
 import {
   binCount,
   DEFAULT_POSITION_PRESET_ID,
+  fitRangeToBinLimit,
   PRESETS,
   rangeError,
   rangeSide,
@@ -104,7 +105,10 @@ function requiredTokens(side: RangeSide): { quote: boolean; base: boolean } {
  * deposit value and the first blocking error. Pure derivations live in `model/`.
  */
 export function usePositionDraft(pool: Pool) {
-  const [draft, dispatch] = useReducer(positionDraftReducer, initialDraft);
+  const [draft, dispatch] = useReducer(positionDraftReducer, {
+    ...initialDraft,
+    ...fitRangeToBinLimit(initialDraft, pool.binStepBps),
+  });
 
   const derived = useMemo(() => {
     const side = rangeSide(draft);

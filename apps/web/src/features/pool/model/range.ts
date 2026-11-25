@@ -79,6 +79,17 @@ export function rangeError(range: RangeInput, binStepBps: number): string | null
   return null;
 }
 
+/** Keep a strategy centered while fitting the PositionManager batch limit. */
+export function fitRangeToBinLimit(range: RangeInput, binStepBps: number): RangeInput {
+  let minPct = Math.round(range.minPct);
+  let maxPct = Math.round(range.maxPct);
+  while (binCount({ minPct, maxPct }, binStepBps) > RANGE_LIMITS.maxBins) {
+    if (Math.abs(minPct) >= Math.abs(maxPct)) minPct += 1;
+    else maxPct -= 1;
+  }
+  return { minPct, maxPct };
+}
+
 export function applyPct(value: number, pct: number): number {
   return value * (1 + pct / 100);
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { binCount, DEFAULT_POSITION_PRESET_ID, PRESETS, snapRangeBound } from './range';
+import { binCount, DEFAULT_POSITION_PRESET_ID, fitRangeToBinLimit, PRESETS, snapRangeBound } from './range';
 
 test('defaults to a two-sided range around the active price', () => {
   const preset = PRESETS.find(item => item.id === DEFAULT_POSITION_PRESET_ID);
@@ -15,6 +15,12 @@ test('keeps the active price centered inside every preset range', () => {
     assert.equal(preset.minPct, -20, `${preset.id} min`);
     assert.equal(preset.maxPct, 20, `${preset.id} max`);
   }
+});
+
+test('fits presets to a narrow bin step without losing the active price', () => {
+  const fitted = fitRangeToBinLimit({ minPct: -20, maxPct: 20 }, 25);
+  assert.deepEqual(fitted, { minPct: -7, maxPct: 8 });
+  assert.ok(binCount(fitted, 25) <= 61);
 });
 
 test('normalizes chart bounds to whole percentages', () => {
