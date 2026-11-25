@@ -31,9 +31,12 @@ export function FeedRail() {
           {isLoading ? <li className="py-4 text-sm text-muted">Loading pools…</li> : null}
           {!isLoading && !error && trendingPools.length === 0 ? <li className="py-5"><p className="text-sm">No trending pools yet</p><p className="mt-1 text-xs leading-relaxed text-muted">The first confirmed callout starts this 24h ranking.</p></li> : null}
           {trendingPools.map((pool, index) => {
-            const tokenX = assetsByAddress.get(pool.tokenX.toLowerCase());
-            const tokenYAddress = pool.quoteToken ?? pool.tokenY;
-            const tokenY = assetsByAddress.get(tokenYAddress.toLowerCase());
+            const quoteAddress = pool.quoteToken ?? pool.tokenY;
+            const baseAddress = quoteAddress.toLowerCase() === pool.tokenX.toLowerCase()
+              ? pool.tokenY
+              : pool.tokenX;
+            const baseAsset = assetsByAddress.get(baseAddress.toLowerCase());
+            const quoteAsset = assetsByAddress.get(quoteAddress.toLowerCase());
             return (
             <li key={pool.address} className="border-b border-line last:border-b-0">
               <Link
@@ -42,10 +45,10 @@ export function FeedRail() {
               >
                 <span className="t-label w-5 text-faint">{index + 1}</span>
                 <span className="min-w-0 flex-1"><TokenPair
-                  tokenX={pool.tokenX}
-                  tokenY={tokenYAddress}
-                  {...(tokenX ? { tokenXIdentity: { symbol: tokenX.symbol, name: tokenX.name, logoUrl: tokenX.logoUrl } } : {})}
-                  {...(tokenY ? { tokenYIdentity: { symbol: tokenY.symbol, name: tokenY.name, logoUrl: tokenY.logoUrl } } : {})}
+                  tokenX={baseAddress}
+                  tokenY={quoteAddress}
+                  {...(baseAsset ? { tokenXIdentity: { symbol: baseAsset.symbol, name: baseAsset.name, logoUrl: baseAsset.logoUrl } } : {})}
+                  {...(quoteAsset ? { tokenYIdentity: { symbol: quoteAsset.symbol, name: quoteAsset.name, logoUrl: quoteAsset.logoUrl } } : {})}
                   compact
                 /></span>
                 <span className="t-label text-muted">{pool.callouts24h}</span>
