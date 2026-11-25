@@ -66,12 +66,34 @@ export function PoolTerminal({
 
   useEffect(() => {
     let refreshTimer: number | null = null;
+    let reconciliationTimer: number | null = null;
+    let reconciliationDeadline = 0;
     const queuePoolRefresh = () => {
       if (refreshTimer !== null) return;
       refreshTimer = window.setTimeout(() => {
         refreshTimer = null;
         router.refresh();
       }, 500);
+    };
+    const stopReconciliation = () => {
+      if (reconciliationTimer !== null) window.clearInterval(reconciliationTimer);
+      reconciliationTimer = null;
+      reconciliationDeadline = 0;
+    };
+    const reconcileConfirmedPosition = () => {
+      window.dispatchEvent(
+        new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } })
+      );
+      queuePoolRefresh();
+      if (Date.now() >= reconciliationDeadline) stopReconciliation();
+    };
+    const onPositionConfirmed = (event: Event) => {
+      const detail = (event as CustomEvent<{ pool?: string }>).detail;
+      if (detail?.pool?.toLowerCase() !== pool.address.toLowerCase()) return;
+      stopReconciliation();
+      reconciliationDeadline = Date.now() + 120_000;
+      reconcileConfirmedPosition();
+      reconciliationTimer = window.setInterval(reconcileConfirmedPosition, 4_000);
     };
     const positionTopics = new Set([
       'position.created', 'position.increased', 'position.decreased', 'position.closed', 'position.transferred',
@@ -101,6 +123,7 @@ export function PoolTerminal({
           }
         }
         if (positionTopics.has(message.topic)) {
+          if (message.topic === 'position.created') stopReconciliation();
           window.dispatchEvent(new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } }));
         }
         queuePoolRefresh();
@@ -113,11 +136,14 @@ export function PoolTerminal({
       if (document.visibilityState === 'visible') queuePoolRefresh();
     };
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('fomeora:position-confirmed', onPositionConfirmed);
     return () => {
       stop();
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      stopReconciliation();
       window.clearInterval(poll);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('fomeora:position-confirmed', onPositionConfirmed);
     };
   }, [pool.address, router, showToast]);
 

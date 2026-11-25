@@ -139,6 +139,15 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     setTransactionHash(hash);
     setQuote(null);
     dispatch({ type: 'submitted' });
+    window.dispatchEvent(
+      new CustomEvent('fomeora:position-confirmed', {
+        detail: {
+          pool: pool.address,
+          transactionHash: hash,
+          expectsCallout: draft.postAsCallout,
+        },
+      })
+    );
     return hash;
   };
 
