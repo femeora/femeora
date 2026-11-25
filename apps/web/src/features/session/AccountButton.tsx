@@ -107,13 +107,14 @@ function ConnectedWalletButton({
 
 /** Wallet-first top bar. X is requested only when social identity is needed. */
 export function AccountButton() {
-  const { user, openSignIn } = useSession();
+  const { user, openSignIn, refreshSession } = useSession();
   const { account, status: walletStatus, connect } = useWallet();
   const showResult = useToast(state => state.show);
   const connectWallet = async () => {
     await connect();
     const wallet = useWallet.getState();
     if (wallet.account) {
+      if (useSession.getState().user) await refreshSession();
       showResult(`Wallet ${short(wallet.account)} connected.`, { title: 'Wallet connected' });
     } else {
       showResult(friendlyErrorMessage(wallet.error ?? 'WALLET_CONNECTION_FAILED'), {
@@ -157,8 +158,8 @@ export function AccountButton() {
 
   if (!user.wallets.some(wallet => wallet.toLowerCase() === account.toLowerCase())) {
     return (
-      <Button variant="primary" onClick={() => void connectWallet()} className="min-h-9 px-3.5">
-        Select linked wallet
+      <Button variant="primary" onClick={openSignIn} className="min-h-9 px-3.5">
+        Link this wallet
       </Button>
     );
   }

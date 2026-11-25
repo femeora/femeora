@@ -4,6 +4,7 @@ import { useEffect, useId, useRef } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Close, XLogo } from '@/components/ui/icons';
+import { useWallet } from '@/features/wallet/store';
 
 import { useSession } from './store';
 
@@ -31,6 +32,7 @@ const ERRORS: Record<string, string> = {
 /** Real X OAuth and one-time EIP-191 wallet-link flow. */
 export function SignInSheet() {
   const { signInOpen, closeSignIn, startXSignIn, linkWallet, user, error } = useSession();
+  const account = useWallet(state => state.account);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -41,7 +43,12 @@ export function SignInSheet() {
     if (!signInOpen && dialog.open) dialog.close();
   }, [signInOpen]);
 
-  const needsWallet = Boolean(user && !user.wallet);
+  const activeWalletNeedsLink = Boolean(
+    user &&
+      account &&
+      !user.wallets.some(wallet => wallet.toLowerCase() === account.toLowerCase()),
+  );
+  const needsWallet = Boolean(user && (!user.wallet || activeWalletNeedsLink));
 
   return (
     <dialog
