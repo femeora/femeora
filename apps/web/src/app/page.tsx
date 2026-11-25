@@ -14,6 +14,11 @@ import { Ambient } from '@/components/ui/Ambient';
 import { Grain } from '@/components/ui/Grain';
 import { marquee } from '@/content/landing';
 
+// HERO_CA_ADDRESS is intentionally server-only. Render the landing page at
+// request time so Railway runtime variables are reflected without exposing
+// them through a NEXT_PUBLIC_ variable or freezing them into a static build.
+export const dynamic = 'force-dynamic';
+
 export default function LandingPage() {
   const { APP_NETWORK: network, HERO_CA_ADDRESS: contractAddress } = loadWebEnvironment();
 
