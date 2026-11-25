@@ -21,7 +21,7 @@ import type { BinShape } from '@/types/callout';
 import type { PositionDraftState } from '../hooks/usePositionDraft';
 import { executePreparedPosition } from '../model/executePosition';
 import { formatCompactUsd, formatUnit, toUnit, type ValueUnit } from '../model/format';
-import { toContractAmounts } from '../model/orientation';
+import { toContractAmounts, toContractRange } from '../model/orientation';
 import type { Pool } from '../model/pool';
 import { applyPct, fitRangeToBinLimit, PRESETS, pricePosition, sideLabel, snapRangeBound } from '../model/range';
 
@@ -81,10 +81,11 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       damm || needs.base ? draft.baseAmount : '0',
       damm || needs.quote ? draft.quoteAmount : '0',
     );
+    const range = toContractRange(pool.baseIsTokenX, draft);
     return {
       shape: draft.shape,
-      minPct: draft.minPct,
-      maxPct: draft.maxPct,
+      minPct: range.minPct,
+      maxPct: range.maxPct,
       ...amounts,
       slippageBps: 50,
     };

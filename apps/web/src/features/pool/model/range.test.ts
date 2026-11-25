@@ -10,11 +10,12 @@ test('defaults to a two-sided range around the active price', () => {
   assert.ok((preset?.maxPct ?? 0) > 0);
 });
 
-test('keeps the active price centered inside every preset range', () => {
-  for (const preset of PRESETS) {
-    assert.equal(preset.minPct, -20, `${preset.id} min`);
-    assert.equal(preset.maxPct, 20, `${preset.id} max`);
-  }
+test('keeps strategy presets on their intended side of the active price', () => {
+  assert.deepEqual(PRESETS.map(({ id, minPct, maxPct }) => ({ id, minPct, maxPct })), [
+    { id: 'buy-the-dip', minPct: -20, maxPct: -1 },
+    { id: 'sell-into-strength', minPct: 1, maxPct: 20 },
+    { id: 'fee-farm', minPct: -20, maxPct: 20 },
+  ]);
 });
 
 test('fits presets to a narrow bin step without losing the active price', () => {

@@ -3,6 +3,11 @@ export interface ContractAmounts {
   amountY: string;
 }
 
+export interface PercentageRange {
+  minPct: number;
+  maxPct: number;
+}
+
 /** Convert user-facing base/quote amounts back to the pool contract's X/Y order. */
 export function toContractAmounts(
   baseIsTokenX: boolean,
@@ -12,4 +17,16 @@ export function toContractAmounts(
   return baseIsTokenX
     ? { amountX: baseAmount, amountY: quoteAmount }
     : { amountX: quoteAmount, amountY: baseAmount };
+}
+
+/** Convert a user-facing quote/base price range to tokenY/tokenX bin space. */
+export function toContractRange(
+  baseIsTokenX: boolean,
+  range: PercentageRange,
+): PercentageRange {
+  if (baseIsTokenX) return range;
+  return {
+    minPct: (1 / (1 + range.maxPct / 100) - 1) * 100,
+    maxPct: (1 / (1 + range.minPct / 100) - 1) * 100,
+  };
 }
