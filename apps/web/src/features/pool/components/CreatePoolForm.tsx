@@ -6,14 +6,13 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
 import { Button } from '@/components/ui/Button';
-import { TokenIcon } from '@/components/ui/TokenPair';
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
 import { useWallet } from '@/features/wallet/store';
 import { TransactionExecutionError } from '@/features/wallet/transactionError';
 import { browserApiRequest } from '@/lib/api/client';
 import { useApiResource } from '@/lib/api/useApiResource';
 
-import { PoolAssetSelect } from './PoolAssetSelect';
+import { AssetLogo, PoolAssetSelect } from './PoolAssetSelect';
 import { TxButton } from './TxButton';
 
 const control = 'glass-control mt-2 min-h-11 w-full rounded-[2px] px-3 text-fg';
@@ -63,6 +62,12 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
     return hash;
   };
   const options = useMemo(() => assets.data?.data ?? [], [assets.data]);
+  const preparedToken0 = prepared
+    ? options.find(asset => asset.address.toLowerCase() === prepared.token0.address.toLowerCase()) ?? prepared.token0
+    : null;
+  const preparedToken1 = prepared
+    ? options.find(asset => asset.address.toLowerCase() === prepared.token1.address.toLowerCase()) ?? prepared.token1
+    : null;
   useEffect(() => {
     const first = options.find(asset => asset.address.toLowerCase() === tokenA.toLowerCase());
     const second = options.find(asset => asset.address.toLowerCase() === tokenB.toLowerCase());
@@ -112,7 +117,7 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
       <aside className="glass h-fit rounded-[2px] p-5 sm:p-6">
         <p className="t-label text-muted">Review</p>
         {!prepared ? <p className="mt-4 text-sm text-muted">Complete the configuration to see the canonical pair, predicted address, and transaction simulation.</p> : <div className="mt-4 grid gap-4">
-          <div className="flex items-center gap-3"><TokenIcon token={prepared.token0.address} /><TokenIcon token={prepared.token1.address} className="-ml-5" /><div><p className="font-medium">{prepared.token0.symbol} / {prepared.token1.symbol}</p><p className="t-label text-muted">{prepared.model} · {prepared.feePips / 10_000}% fee</p></div></div>
+          <div className="flex items-center gap-3"><span className="flex items-center pl-1">{preparedToken0 ? <AssetLogo asset={preparedToken0} className="z-10" /> : null}{preparedToken1 ? <AssetLogo asset={preparedToken1} className="-ml-3" /> : null}</span><div><p className="font-medium">{prepared.token0.symbol} / {prepared.token1.symbol}</p><p className="t-label text-muted">{prepared.model} · {prepared.feePips / 10_000}% fee</p></div></div>
           <dl className="t-label grid gap-2 border-y border-line py-4 text-muted">
             {prepared.initialActiveBin !== null ? <div className="flex justify-between"><dt>Initial bin</dt><dd className="text-fg">{prepared.initialActiveBin}</dd></div> : null}
             {prepared.representedPrice ? <div className="flex justify-between"><dt>Represented price</dt><dd className="text-fg">{prepared.representedPrice}</dd></div> : null}

@@ -105,6 +105,7 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
         logoUrl: display?.logoUrl ?? (asset.source === 'robinhood' ? null : asset.logoUrl),
         candidateEnabled: display?.candidateEnabled ?? asset.source === 'robinhood',
         candidateRank: display?.candidateRank ?? null,
+        candidateQuoteAddress: display?.candidateQuoteAddress ? getAddress(display.candidateQuoteAddress) : null,
       };
     });
     return { data: data.sort((a, b) => Number(b.executable) - Number(a.executable)
@@ -187,8 +188,8 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       if (existingPool === zeroAddress) gas = await client.estimateGas({ account: input.wallet, to: deployment.poolFactory, data, value: 0n });
       return {
         chainId, factory: deployment.poolFactory, poolId, model: input.model,
-        token0: { ...token0, chainId, logoUrl: null, category: token0.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null },
-        token1: { ...token1, chainId, logoUrl: null, category: token1.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null },
+        token0: { ...token0, chainId, logoUrl: null, category: token0.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null, candidateQuoteAddress: null },
+        token1: { ...token1, chainId, logoUrl: null, category: token1.symbol.toUpperCase().includes('USD') ? 'stablecoin' : 'crypto', executable: true, source: 'chain', isin: null, tradingStatus: null, currentMultiplier: null, candidateEnabled: false, candidateRank: null, candidateQuoteAddress: null },
         feePips: input.feePips, binStepBps: input.binStepBps, initialActiveBin, representedPrice,
         existingPool: existingPool === zeroAddress ? null : existingPool, predictedPool,
         transaction: { chainId, to: deployment.poolFactory, data, value: '0x0', ...(gas ? { gas: toHex(gas) } : {}) },

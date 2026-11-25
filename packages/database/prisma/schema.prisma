@@ -81,6 +81,7 @@ model AssetDisplayConfig {
   address          String   @db.VarChar(42)
   candidateEnabled Boolean  @default(true) @map("candidate_enabled")
   candidateRank    Int?     @map("candidate_rank")
+  candidateQuoteAddress String? @map("candidate_quote_address") @db.VarChar(42)
   logoUrl          String?  @map("logo_url") @db.Text
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")

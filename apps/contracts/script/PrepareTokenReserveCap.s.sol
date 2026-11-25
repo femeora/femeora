@@ -76,7 +76,11 @@ contract PrepareTokenReserveCap {
         vm.serializeBytes(key, "scheduleCalldata", schedule);
         json = vm.serializeBytes(key, "executeCalldata", execute);
         if (vm.envBool("WRITE_TOKEN_RESERVE_CAP_MANIFEST")) {
-            vm.writeJson(json, string.concat(root, "/deployments/", network, "-token-reserve-cap.json"));
+            string memory manifestName = vm.envString("TOKEN_RESERVE_CAP_MANIFEST_NAME");
+            vm.writeJson(
+                json,
+                string.concat(root, "/deployments/", network, "-", manifestName, "-reserve-cap.json")
+            );
         }
     }
 }

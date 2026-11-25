@@ -21,6 +21,7 @@ export const ApiPoolAssetSchema = z.object({
   currentMultiplier: z.string().nullable(),
   candidateEnabled: z.boolean(),
   candidateRank: z.number().int().positive().nullable(),
+  candidateQuoteAddress: AddressSchema.nullable(),
 });
 export const ApiPoolAssetListSchema = z.object({ data: z.array(ApiPoolAssetSchema) });
 export type ApiPoolAsset = z.infer<typeof ApiPoolAssetSchema>;

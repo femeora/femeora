@@ -56,14 +56,20 @@ export default async function PoolsPage() {
   }
 
   const liveTokens = new Set(result.data.flatMap(pool => [pool.tokenX.toLowerCase(), pool.tokenY.toLowerCase()]));
-  const quote = assets.find(asset => asset.executable && asset.symbol.toUpperCase() === 'USDG' && asset.category === 'stablecoin');
-  const candidates = quote
-    ? assets
-      .filter(asset => asset.executable && asset.address.toLowerCase() !== quote.address.toLowerCase() && !liveTokens.has(asset.address.toLowerCase()))
-      .filter(asset => asset.candidateEnabled)
-      .sort((a, b) => (a.candidateRank ?? Number.MAX_SAFE_INTEGER) - (b.candidateRank ?? Number.MAX_SAFE_INTEGER) || a.symbol.localeCompare(b.symbol))
-      .slice(0, 24)
-    : [];
+  const defaultQuote = assets.find(asset => asset.executable && asset.symbol.toUpperCase() === 'USDG' && asset.category === 'stablecoin');
+  const assetsByAddress = new Map(assets.map(asset => [asset.address.toLowerCase(), asset]));
+  const candidates = assets
+    .filter(asset => asset.executable && !liveTokens.has(asset.address.toLowerCase()) && asset.candidateEnabled)
+    .sort((a, b) => (a.candidateRank ?? Number.MAX_SAFE_INTEGER) - (b.candidateRank ?? Number.MAX_SAFE_INTEGER) || a.symbol.localeCompare(b.symbol))
+    .flatMap(asset => {
+      const quote = asset.candidateQuoteAddress
+        ? assetsByAddress.get(asset.candidateQuoteAddress.toLowerCase())
+        : defaultQuote;
+      return quote && quote.executable && quote.address.toLowerCase() !== asset.address.toLowerCase()
+        ? [{ asset, quote }]
+        : [];
+    })
+    .slice(0, 24);
 
   return (
     <section className="px-gutter py-8">
@@ -110,18 +116,18 @@ export default async function PoolsPage() {
       )}
 
       <div className="mt-12 flex items-end justify-between gap-4 border-b border-line pb-3">
-        <div><p className="t-label text-signal">Verified asset catalog</p><h2 className="mt-1 text-xl font-medium">Candidate markets</h2><p className="mt-2 max-w-2xl text-sm text-muted">These are candidate stock/USDG markets, not live pools. Each stock token still requires a governance reserve cap before permissionless creation; TVL and volume begin only after an on-chain pool exists.</p></div>
+        <div><p className="t-label text-signal">Verified asset catalog</p><h2 className="mt-1 text-xl font-medium">Candidate markets</h2><p className="mt-2 max-w-2xl text-sm text-muted">These are configured candidate markets, not live pools. Each token requires an active governance reserve cap before permissionless creation; TVL and volume begin only after an on-chain pool exists.</p></div>
         <p className="t-label shrink-0 text-muted">{candidates.length} candidates</p>
       </div>
 
-      {quote && candidates.length > 0 ? <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {candidates.map(asset => <li key={`${asset.chainId}:${asset.address}`} className="glass rounded-[2px] p-5">
+      {candidates.length > 0 ? <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {candidates.map(({ asset, quote }) => <li key={`${asset.chainId}:${asset.address}:${quote.address}`} className="glass rounded-[2px] p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3"><span className="flex items-center pl-1"><AssetLogo asset={asset} className="z-10" /><AssetLogo asset={quote} className="-ml-3" /></span><div className="min-w-0"><h3 className="truncate font-medium">{asset.symbol} / {quote.symbol}</h3><p className="truncate text-sm text-muted">{asset.name}</p></div></div>
             <span className="t-label border border-signal/40 bg-signal/10 px-2 py-1 text-signal">Candidate</span>
           </div>
           <dl className="t-label mt-5 grid grid-cols-2 gap-3 border-y border-line py-4 text-muted">
-            <div><dt className="text-faint">Asset type</dt><dd className="mt-1 text-fg">{asset.category === 'etf' ? 'Tokenized ETF' : 'Stock token'}</dd></div>
+            <div><dt className="text-faint">Asset type</dt><dd className="mt-1 text-fg">{asset.category === 'etf' ? 'Tokenized ETF' : asset.category === 'stock' ? 'Stock token' : 'Crypto token'}</dd></div>
             <div><dt className="text-faint">Market</dt><dd className="mt-1 capitalize text-fg">{marketStatus(asset)}</dd></div>
             <div><dt className="text-faint">ISIN</dt><dd className="mt-1 truncate text-fg">{asset.isin ?? '—'}</dd></div>
             <div><dt className="text-faint">Pool status</dt><dd className="mt-1 text-signal">Reserve cap pending</dd></div>
