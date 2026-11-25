@@ -62,6 +62,8 @@ interface IPositionManagerV2 {
     event DammPositionIncreased(uint256 indexed id, uint256 sharesAdded, uint256 totalShares);
     event DammPositionDecreased(uint256 indexed id, uint16 bps, uint256 amountX, uint256 amountY);
     event DammPositionClosed(uint256 indexed id);
+    event PositionLocked(uint256 indexed id, address indexed owner);
+    event DammFeesClaimed(uint256 indexed id, address indexed recipient, uint256 amountX, uint256 amountY);
 
     function createRangePosition(CreateParams calldata params) external returns (uint256 positionId);
     function createDammPosition(CreateDammParams calldata params) external returns (uint256 positionId);
@@ -89,4 +91,6 @@ interface IPositionManagerV2 {
     function closeDamm(uint256 id, uint256 minX, uint256 minY, address recipient, uint256 deadline)
         external
         returns (uint256 amountX, uint256 amountY);
+    function lockPosition(uint256 id) external;
+    function claimDammFees(uint256 id, address recipient) external returns (uint256 amountX, uint256 amountY);
 }

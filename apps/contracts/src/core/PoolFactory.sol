@@ -29,6 +29,7 @@ contract PoolFactory is ProtocolAccess, UUPSUpgradeable {
     event PoolDeployersUpdated(address indexed dammDeployer, address indexed dlmmDeployer);
     event TokenReserveCapUpdated(address indexed token, uint256 reserveCap);
     event DlmmPoolReplaced(bytes32 indexed poolId, address indexed previousPool, address indexed pool, PoolKey key);
+    event LaunchDammPoolCreated(address indexed pool, address indexed token0, address indexed token1);
 
     constructor() {
         _disableInitializers();
@@ -126,6 +127,40 @@ contract PoolFactory is ProtocolAccess, UUPSUpgradeable {
         if (binStepBps == 0 || binStepBps > 1_000) revert InvalidConfiguration();
         PoolKey memory key = PoolKeyLib.normalize(tokenA, tokenB, PoolModel.DLMM, feePips, binStepBps);
         pool = _createPool(key, initialActiveBin);
+    }
+
+    /// @notice Creates the DAMM graduation pool for a registered Launch graduator.
+    /// @dev The assigned FACTORY_ROLE is intentionally narrower than protocol admin.
+    function createLaunchDammPool(
+        address tokenA,
+        address tokenB,
+        uint24 feePips,
+        uint112 reserveCapA,
+        uint112 reserveCapB,
+        uint24 startFeePips,
+        uint32 feeDurationSeconds,
+        bool exponential
+    ) external onlyRole(FACTORY_ROLE) returns (address pool) {
+        if (
+            tokenA.code.length == 0 || tokenB.code.length == 0 || feePips == 0 || feePips >= 1_000_000
+                || reserveCapA == 0 || reserveCapB == 0
+        ) revert InvalidConfiguration();
+        PoolKey memory key = PoolKeyLib.normalize(tokenA, tokenB, PoolModel.DAMM, feePips, 0);
+        uint112 cap0 = key.token0 == tokenA ? reserveCapA : reserveCapB;
+        uint112 cap1 = key.token1 == tokenB ? reserveCapB : reserveCapA;
+        bytes32 poolId = PoolKeyLib.id(key);
+        if (registry.poolById(poolId) != address(0)) revert PoolAlreadyExists();
+        pool = dammDeployer.deploy(key, address(this));
+        // A permissionless launch may define its own graduation threshold, but
+        // it must never raise the factory-wide cap of a shared quote asset.
+        // The graduation pool receives isolated headroom derived by Graduator.
+        DammPool(pool).setReserveCaps(cap0, cap1);
+        DammPool(pool).setProtocolFeeConfiguration(protocolFeeRecipient, protocolFeeSharePips);
+        DammPool(pool).configureFeeSchedule(startFeePips, feePips, feeDurationSeconds, exponential);
+        DammPool(pool).setAdministrator(poolAdministrator);
+        registry.registerPool(poolId, pool, key);
+        emit PoolCreated(poolId, pool, key);
+        emit LaunchDammPoolCreated(pool, key.token0, key.token1);
     }
 
     /// @notice Deploys a corrected DLMM pool and atomically makes it canonical in the registry.

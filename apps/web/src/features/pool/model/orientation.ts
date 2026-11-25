@@ -1,3 +1,5 @@
+import { rangeBinBounds, rangeFromBinBounds, type RangeInput } from './range';
+
 export interface ContractAmounts {
   amountX: string;
   amountY: string;
@@ -29,4 +31,27 @@ export function toContractRange(
     minPct: (1 / (1 + range.maxPct / 100) - 1) * 100,
     maxPct: (1 / (1 + range.minPct / 100) - 1) * 100,
   };
+}
+
+export interface ContractBinBounds {
+  lowerBin: number;
+  upperBin: number;
+}
+
+export function toContractBinBounds(
+  baseIsTokenX: boolean,
+  activeBin: number,
+  visibleRange: RangeInput,
+  binStepBps: number,
+): ContractBinBounds {
+  return rangeBinBounds(activeBin, toContractRange(baseIsTokenX, visibleRange), binStepBps);
+}
+
+export function fromContractBinBounds(
+  baseIsTokenX: boolean,
+  activeBin: number,
+  bounds: ContractBinBounds,
+  binStepBps: number,
+): RangeInput {
+  return toContractRange(baseIsTokenX, rangeFromBinBounds(activeBin, bounds, binStepBps));
 }

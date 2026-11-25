@@ -367,6 +367,89 @@ export async function ensureCanonicalCursor(
       where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
       data: { canonical: false },
     });
+    await transaction.curveTrade.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    await transaction.launchpadRevenue.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    await transaction.launchpadStatusEvent.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    await transaction.graduation.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    const orphanedLaunchAssets = await transaction.launch.findMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      select: { token: true },
+    });
+    await transaction.launch.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    if (orphanedLaunchAssets.length > 0) {
+      await transaction.assetCatalog.deleteMany({
+        where: {
+          chainId,
+          source: 'launchpad',
+          address: { in: orphanedLaunchAssets.map(asset => asset.token) },
+        },
+      });
+    }
+    await transaction.launchpad.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    const survivingLaunchpads = await transaction.launchpad.findMany({
+      where: { chainId, canonical: true },
+      select: { launchpadId: true },
+    });
+    for (const launchpad of survivingLaunchpads) {
+      const latestStatus = await transaction.launchpadStatusEvent.findFirst({
+        where: {
+          chainId,
+          launchpadId: launchpad.launchpadId,
+          canonical: true,
+          blockNumber: { lte: commonBlock },
+        },
+        orderBy: [{ blockNumber: 'desc' }, { logIndex: 'desc' }],
+        select: { active: true },
+      });
+      await transaction.launchpad.update({
+        where: { chainId_launchpadId: { chainId, launchpadId: launchpad.launchpadId } },
+        data: { active: latestStatus?.active ?? true },
+      });
+    }
+    const survivingLaunches = await transaction.launch.findMany({
+      where: { chainId, canonical: true },
+      include: { launchpad: true },
+    });
+    for (const launch of survivingLaunches) {
+      const [latestTrade, graduation] = await Promise.all([
+        transaction.curveTrade.findFirst({
+          where: { chainId, launchId: launch.launchId, canonical: true, blockNumber: { lte: commonBlock } },
+          orderBy: [{ blockNumber: 'desc' }, { logIndex: 'desc' }],
+        }),
+        transaction.graduation.findFirst({
+          where: { chainId, launchId: launch.launchId, canonical: true, blockNumber: { lte: commonBlock } },
+        }),
+      ]);
+      await transaction.launch.update({
+        where: { chainId_launchId: { chainId, launchId: launch.launchId } },
+        data: graduation
+          ? { status: 'graduated', progressPips: 1_000_000, quoteReserve: '0', tokenInventory: '0' }
+          : {
+              status: 'curve',
+              quoteReserve: latestTrade?.quoteReserve.toFixed(0) ?? '0',
+              tokenInventory: latestTrade?.tokenInventory.toFixed(0) ?? launch.launchpad.curveTokenSupply.toFixed(0),
+              progressPips: latestTrade?.progressPips ?? 0,
+            },
+      });
+    }
     await transaction.pool.updateMany({
       where: { chainId, canonical: true, createdBlock: { gt: commonBlock } },
       data: { canonical: false },

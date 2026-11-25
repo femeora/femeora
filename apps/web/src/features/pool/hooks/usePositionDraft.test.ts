@@ -7,6 +7,8 @@ const feeFarmDraft: PositionDraft = {
   shape: 'curve',
   minPct: -20,
   maxPct: 20,
+  lowerBin: -20,
+  upperBin: 20,
   presetId: 'fee-farm',
   quoteAmount: '',
   baseAmount: '',
@@ -18,8 +20,10 @@ const feeFarmDraft: PositionDraft = {
 test('retains the selected preset when a range handle changes', () => {
   const changed = positionDraftReducer(feeFarmDraft, {
     type: 'range',
-    bound: 'minPct',
-    value: -12,
+    minPct: -12,
+    maxPct: 20,
+    lowerBin: -12,
+    upperBin: 20,
   });
   assert.equal(changed.minPct, -12);
   assert.equal(changed.presetId, 'fee-farm');

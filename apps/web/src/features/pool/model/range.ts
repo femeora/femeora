@@ -62,9 +62,57 @@ export function rangeSide({ minPct, maxPct }: RangeInput): RangeSide {
 
 /** Number of bins spanned by the range for a given bin step. */
 export function binCount({ minPct, maxPct }: RangeInput, binStepBps: number): number {
-  if (maxPct <= minPct) return 0;
-  const step = Math.log(1 + binStepBps / 10_000);
-  return Math.max(1, Math.round(Math.log((1 + maxPct / 100) / (1 + minPct / 100)) / step));
+  if (maxPct <= minPct || minPct <= -100 || binStepBps <= 0) return 0;
+  const { lowerOffset, upperOffset } = rangeBinOffsets({ minPct, maxPct }, binStepBps);
+  return Math.max(0, upperOffset - lowerOffset + 1);
+}
+
+/** Exact inclusive offsets used by the API's percentage-compatible range path. */
+export function rangeBinOffsets({ minPct, maxPct }: RangeInput, binStepBps: number): {
+  lowerOffset: number;
+  upperOffset: number;
+} {
+  if (!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct <= -100 || maxPct <= minPct || binStepBps <= 0) {
+    throw new RangeError('INVALID_RANGE');
+  }
+  const step = Math.log1p(binStepBps / 10_000);
+  const lower = Math.log1p(minPct / 100) / step;
+  const upper = Math.log1p(maxPct / 100) / step;
+  // Percentages derived from exact bins can land a few ulps to either side of
+  // an integer after an inverse base/quote transform. Preserve that bin.
+  const epsilon = 1e-9;
+  return {
+    lowerOffset: Math.ceil(lower - epsilon),
+    upperOffset: Math.floor(upper + epsilon),
+  };
+}
+
+/** Convert the visible range into the exact inclusive bins submitted on-chain. */
+export function rangeBinBounds(activeBin: number, range: RangeInput, binStepBps: number): {
+  lowerBin: number;
+  upperBin: number;
+} {
+  const { lowerOffset, upperOffset } = rangeBinOffsets(range, binStepBps);
+  const lowerBin = activeBin + lowerOffset;
+  const upperBin = activeBin + upperOffset;
+  if (lowerBin < -10_000 || upperBin > 10_000 || lowerBin > upperBin || upperBin - lowerBin + 1 > RANGE_LIMITS.maxBins) {
+    throw new RangeError('INVALID_RANGE');
+  }
+  return { lowerBin, upperBin };
+}
+
+/** Derive display percentages from exact inclusive bins around an active bin. */
+export function rangeFromBinBounds(
+  activeBin: number,
+  bounds: { lowerBin: number; upperBin: number },
+  binStepBps: number,
+): RangeInput {
+  if (bounds.lowerBin > bounds.upperBin || binStepBps <= 0) throw new RangeError('INVALID_RANGE');
+  const step = 1 + binStepBps / 10_000;
+  return {
+    minPct: (Math.pow(step, bounds.lowerBin - activeBin) - 1) * 100,
+    maxPct: (Math.pow(step, bounds.upperBin - activeBin) - 1) * 100,
+  };
 }
 
 /** First problem with the range, or null when it is valid. */

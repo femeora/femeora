@@ -21,7 +21,7 @@ import type { BinShape } from '@/types/callout';
 import type { PositionDraftState } from '../hooks/usePositionDraft';
 import { executePreparedPosition } from '../model/executePosition';
 import { formatCompactUsd, formatUnit, toUnit, type ValueUnit } from '../model/format';
-import { toContractAmounts, toContractRange } from '../model/orientation';
+import { fromContractBinBounds, toContractAmounts, toContractBinBounds, toContractRange } from '../model/orientation';
 import type { Pool } from '../model/pool';
 import { applyPct, fitRangeToBinLimit, PRESETS, pricePosition, sideLabel, snapRangeBound } from '../model/range';
 
@@ -66,13 +66,16 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
     setQuote(null);
     setQuoteError(null);
     setTransactionHash(null);
-  }, [draft.minPct, draft.maxPct, draft.shape]);
+  }, [draft.lowerBin, draft.upperBin, draft.shape, pool.activeBinId]);
   const updateRange = (bound: 'minPct' | 'maxPct', value: number) => {
     invalidateQuote();
+    const nextRange = { ...draft, [bound]: snapRangeBound(draft, bound, value, pool.binStepBps) };
+    const exact = toContractBinBounds(pool.baseIsTokenX, pool.activeBinId, nextRange, pool.binStepBps);
+    const visible = fromContractBinBounds(pool.baseIsTokenX, pool.activeBinId, exact, pool.binStepBps);
     dispatch({
       type: 'range',
-      bound,
-      value: snapRangeBound(draft, bound, value, pool.binStepBps),
+      ...visible,
+      ...exact,
     });
   };
   const requestBody = () => {
@@ -81,11 +84,12 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
       damm || needs.base ? draft.baseAmount : '0',
       damm || needs.quote ? draft.quoteAmount : '0',
     );
-    const range = toContractRange(pool.baseIsTokenX, draft);
+    const submittedRange = damm
+      ? toContractRange(pool.baseIsTokenX, draft)
+      : { lowerBin: draft.lowerBin, upperBin: draft.upperBin };
     return {
       shape: draft.shape,
-      minPct: range.minPct,
-      maxPct: range.maxPct,
+      ...submittedRange,
       ...amounts,
       slippageBps: 50,
     };
@@ -163,12 +167,14 @@ export function CreatePositionForm({ pool, unit, position }: CreatePositionFormP
               aria-pressed={draft.presetId === preset.id}
               onClick={() => {
                 const fitted = fitRangeToBinLimit(preset, pool.binStepBps);
+                const exact = toContractBinBounds(pool.baseIsTokenX, pool.activeBinId, fitted, pool.binStepBps);
+                const visible = fromContractBinBounds(pool.baseIsTokenX, pool.activeBinId, exact, pool.binStepBps);
                 invalidateQuote();
                 dispatch({
                   type: 'apply',
                   shape: preset.shape,
-                  minPct: fitted.minPct,
-                  maxPct: fitted.maxPct,
+                  ...visible,
+                  ...exact,
                   presetId: preset.id,
                 });
               }}

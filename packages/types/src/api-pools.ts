@@ -17,7 +17,13 @@ export const ApiPoolAssetSchema = z.object({
   executable: z.boolean(),
   source: z.enum(['chain', 'robinhood']),
   isin: z.string().nullable(),
-  tradingStatus: z.object({ market: z.string().nullable(), extended: z.string().nullable(), overnight: z.string().nullable() }).nullable(),
+  tradingStatus: z
+    .object({
+      market: z.string().nullable(),
+      extended: z.string().nullable(),
+      overnight: z.string().nullable(),
+    })
+    .nullable(),
   currentMultiplier: z.string().nullable(),
   candidateEnabled: z.boolean(),
   candidateRank: z.number().int().positive().nullable(),
@@ -37,6 +43,22 @@ export const ApiAssetReferencePriceSchema = z.object({
   multiplierAdjusted: z.literal(true),
 });
 
+export const ApiPoolPairReferenceSchema = z.object({
+  price: DecimalStringSchema.nullable(),
+  source: z.enum(['reference', 'pool', 'robinhood']).nullable(),
+  sourcePool: AddressSchema.nullable(),
+  generatedAt: z.string().datetime().nullable(),
+  samePairPools: z.array(
+    z.object({
+      address: AddressSchema,
+      type: z.enum(['DLMM', 'DAMM']),
+      binStepBps: z.number().int().nonnegative(),
+      feePips: z.number().int().nonnegative(),
+    })
+  ),
+});
+export type ApiPoolPairReference = z.infer<typeof ApiPoolPairReferenceSchema>;
+
 export const ApiPoolCreationPreparationSchema = z.object({
   chainId: z.number().int().positive(),
   factory: AddressSchema,
@@ -55,7 +77,10 @@ export const ApiPoolCreationPreparationSchema = z.object({
     to: AddressSchema,
     data: z.string().regex(/^0x[a-fA-F0-9]*$/),
     value: z.string().regex(/^0x[a-fA-F0-9]+$/),
-    gas: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
+    gas: z
+      .string()
+      .regex(/^0x[a-fA-F0-9]+$/)
+      .optional(),
   }),
   expiresAt: z.string().datetime(),
 });
@@ -184,6 +209,8 @@ export type ApiLp = z.infer<typeof ApiLpSchema>;
 
 export const ApiCalloutSchema = z.object({
   id: z.string().uuid(),
+  kind: z.enum(['position', 'launch_lp']),
+  launchId: IntegerStringSchema.nullable(),
   chainId: z.number().int().positive(),
   positionId: IntegerStringSchema,
   caption: z.string().nullable(),
@@ -259,21 +286,23 @@ export const ApiCalloutSchema = z.object({
       createdAt: z.string().datetime(),
     })
   ),
-  comments: z.array(z.object({
-    id: z.string().uuid(),
-    calloutId: z.string().uuid(),
-    parentId: z.string().uuid().nullable(),
-    kind: z.enum(['reply', 'quote']),
-    body: z.string().min(1),
-    createdAt: z.string().datetime(),
-    user: z.object({
+  comments: z.array(
+    z.object({
       id: z.string().uuid(),
-      handle: z.string().min(1),
-      name: z.string().nullable(),
-      avatarUrl: z.string().url().nullable(),
-      xVerified: z.boolean(),
-    }),
-  })),
+      calloutId: z.string().uuid(),
+      parentId: z.string().uuid().nullable(),
+      kind: z.enum(['reply', 'quote']),
+      body: z.string().min(1),
+      createdAt: z.string().datetime(),
+      user: z.object({
+        id: z.string().uuid(),
+        handle: z.string().min(1),
+        name: z.string().nullable(),
+        avatarUrl: z.string().url().nullable(),
+        xVerified: z.boolean(),
+      }),
+    })
+  ),
 });
 export type ApiCallout = z.infer<typeof ApiCalloutSchema>;
 
@@ -331,6 +360,18 @@ export const ApiFeedRailSchema = z.object({
       tokenX: AddressSchema,
       tokenY: AddressSchema,
       quoteToken: AddressSchema.nullable(),
+      baseAsset: z.object({
+        address: AddressSchema,
+        symbol: z.string().min(1).max(64),
+        name: z.string().min(1).max(160),
+        logoUrl: z.string().url().nullable(),
+      }),
+      quoteAsset: z.object({
+        address: AddressSchema,
+        symbol: z.string().min(1).max(64),
+        name: z.string().min(1).max(160),
+        logoUrl: z.string().url().nullable(),
+      }),
       callouts24h: z.number().int().nonnegative(),
       change24h: z.number().finite().nullable(),
     })

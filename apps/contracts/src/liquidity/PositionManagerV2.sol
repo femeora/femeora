@@ -7,6 +7,7 @@ import {DammPool} from "../core/DammPool.sol";
 import {PoolRegistry} from "../core/PoolRegistry.sol";
 import {IPositionManagerV2} from "../interfaces/IPositionManagerV2.sol";
 import {TokenTransfer} from "../libraries/TokenTransfer.sol";
+import {FullMath} from "../math/FullMath.sol";
 import {UUPSUpgradeable} from "../proxy/UUPSUpgradeable.sol";
 import {ReentrancyGuard} from "../security/ReentrancyGuard.sol";
 
@@ -39,6 +40,11 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     mapping(address => uint256) private _balances;
     mapping(uint256 => address) private _tokenApprovals;
     mapping(address => mapping(address => bool)) private _operatorApprovals;
+    mapping(uint256 id => bool locked) public positionLocked;
+    mapping(uint256 id => uint256 growthX128) public dammFeeGrowth0Last;
+    mapping(uint256 id => uint256 growthX128) public dammFeeGrowth1Last;
+    mapping(uint256 id => uint256 amount) public dammFeesOwed0;
+    mapping(uint256 id => uint256 amount) public dammFeesOwed1;
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
@@ -100,6 +106,11 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
             open: true
         });
         dammShares[id] = shares;
+        (bool feeAware, uint256 growth0, uint256 growth1) = _dammFeeGrowth(pool);
+        if (feeAware) {
+            dammFeeGrowth0Last[id] = growth0;
+            dammFeeGrowth1Last[id] = growth1;
+        }
         _mint(msg.sender, id);
         emit DammPositionCreated(id, msg.sender, p.pool, shares, p.tag, p.referrer);
     }
@@ -175,10 +186,17 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     {
         _requireDammAuthorized(id);
         DammPool pool = DammPool(positions[id].pool);
+        bool feeAware = _accrueDammFees(id, pool);
         _fundDamm(pool, amountX, amountY);
         sharesAdded = pool.addLiquidity(amountX, amountY, minShares, address(this), deadline);
         _clearDamm(pool);
         dammShares[id] += sharesAdded;
+        if (feeAware) {
+            (bool supportedAfter, uint256 growth0, uint256 growth1) = _dammFeeGrowth(pool);
+            if (!supportedAfter) revert InvalidPool();
+            dammFeeGrowth0Last[id] = growth0;
+            dammFeeGrowth1Last[id] = growth1;
+        }
         emit DammPositionIncreased(id, sharesAdded, dammShares[id]);
     }
 
@@ -188,14 +206,18 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         returns (uint256 amountX, uint256 amountY)
     {
         _requireDammAuthorized(id);
+        if (positionLocked[id]) revert UnauthorizedPosition();
         if (bps == 0 || bps > BPS_DENOMINATOR || recipient == address(0)) revert InvalidRange();
         uint256 owned = dammShares[id];
+        DammPool pool = DammPool(positions[id].pool);
+        bool feeAware = _accrueDammFees(id, pool);
         uint256 removing = bps == BPS_DENOMINATOR ? owned : owned * bps / BPS_DENOMINATOR;
         if (removing == 0) revert InvalidRange();
         dammShares[id] = owned - removing;
-        (amountX, amountY) = DammPool(positions[id].pool).removeLiquidity(removing, minX, minY, recipient, deadline);
+        (amountX, amountY) = pool.removeLiquidity(removing, minX, minY, recipient, deadline);
         emit DammPositionDecreased(id, bps, amountX, amountY);
         if (bps == BPS_DENOMINATOR) {
+            if (feeAware) _payDammFees(id, pool, recipient);
             positions[id].open = false;
             _burn(id);
             emit DammPositionClosed(id);
@@ -207,6 +229,24 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         returns (uint256 amountX, uint256 amountY)
     {
         return decreaseDamm(id, BPS_DENOMINATOR, minX, minY, recipient, deadline);
+    }
+
+    function lockPosition(uint256 id) external {
+        _requireDammAuthorized(id);
+        positionLocked[id] = true;
+        emit PositionLocked(id, ownerOf(id));
+    }
+
+    function claimDammFees(uint256 id, address recipient)
+        external
+        nonReentrant
+        returns (uint256 amountX, uint256 amountY)
+    {
+        _requireDammAuthorized(id);
+        if (recipient == address(0)) revert InvalidRecipient();
+        DammPool pool = DammPool(positions[id].pool);
+        if (!_accrueDammFees(id, pool)) return (0, 0);
+        return _payDammFees(id, pool, recipient);
     }
 
     function positionBins(uint256 id) external view returns (int24[] memory) {
@@ -334,6 +374,42 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     function _clearDamm(DammPool pool) private {
         pool.token0().forceApprove(address(pool), 0);
         pool.token1().forceApprove(address(pool), 0);
+    }
+
+    function _accrueDammFees(uint256 id, DammPool pool) private returns (bool feeAware) {
+        uint256 growth0;
+        uint256 growth1;
+        (feeAware, growth0, growth1) = _dammFeeGrowth(pool);
+        if (!feeAware) return false;
+        uint256 shares = dammShares[id];
+        uint256 previous0 = dammFeeGrowth0Last[id];
+        uint256 previous1 = dammFeeGrowth1Last[id];
+        if (growth0 > previous0) dammFeesOwed0[id] += FullMath.mulDiv(shares, growth0 - previous0, 1 << 128);
+        if (growth1 > previous1) dammFeesOwed1[id] += FullMath.mulDiv(shares, growth1 - previous1, 1 << 128);
+        dammFeeGrowth0Last[id] = growth0;
+        dammFeeGrowth1Last[id] = growth1;
+    }
+
+    function _dammFeeGrowth(DammPool pool) private view returns (bool supported, uint256 growth0, uint256 growth1) {
+        (bool success0, bytes memory data0) = address(pool).staticcall(abi.encodeWithSignature("lpFeeGrowth0X128()"));
+        (bool success1, bytes memory data1) = address(pool).staticcall(abi.encodeWithSignature("lpFeeGrowth1X128()"));
+        supported = success0 && data0.length == 32 && success1 && data1.length == 32;
+        if (supported) {
+            growth0 = abi.decode(data0, (uint256));
+            growth1 = abi.decode(data1, (uint256));
+        }
+    }
+
+    function _payDammFees(uint256 id, DammPool pool, address recipient)
+        private
+        returns (uint256 amountX, uint256 amountY)
+    {
+        amountX = dammFeesOwed0[id];
+        amountY = dammFeesOwed1[id];
+        dammFeesOwed0[id] = 0;
+        dammFeesOwed1[id] = 0;
+        pool.claimLpFees(amountX, amountY, recipient);
+        emit DammFeesClaimed(id, recipient, amountX, amountY);
     }
 
     function _sharesBefore(DlmmPoolV2 pool, int24[] calldata bins) private view returns (uint256[] memory shares) {

@@ -84,6 +84,14 @@ const apiSchema = commonSchema
     X_CLIENT_ID: z.preprocess(emptyToUndefined, configuredString.optional()),
     X_CLIENT_SECRET: z.preprocess(emptyToUndefined, configuredString.optional()),
     X_APP_BEARER_TOKEN: z.preprocess(emptyToUndefined, configuredString.optional()),
+    LAUNCHPAD_FACTORY_ADDRESS: optionalAddress,
+    LAUNCH_FACTORY_ADDRESS: optionalAddress,
+    LAUNCH_IDENTITY_VERIFIER_ADDRESS: optionalAddress,
+    GRADUATOR_ADDRESS: optionalAddress,
+    LAUNCH_IDENTITY_SIGNER_PRIVATE_KEY: z.preprocess(
+      emptyToUndefined,
+      z.string().regex(/^0x[a-fA-F0-9]{64}$/).optional()
+    ),
   })
   .superRefine((value, context) => {
     validateCommon(value, context);
@@ -92,6 +100,27 @@ const apiSchema = commonSchema
         code: z.ZodIssueCode.custom,
         path: ['X_CLIENT_SECRET'],
         message: 'X client ID and secret must be configured together',
+      });
+    }
+    const launchAddresses = [
+      value.LAUNCHPAD_FACTORY_ADDRESS,
+      value.LAUNCH_FACTORY_ADDRESS,
+      value.LAUNCH_IDENTITY_VERIFIER_ADDRESS,
+      value.GRADUATOR_ADDRESS,
+    ];
+    const configuredLaunchAddresses = launchAddresses.filter(Boolean).length;
+    if (configuredLaunchAddresses !== 0 && configuredLaunchAddresses !== launchAddresses.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['LAUNCH_FACTORY_ADDRESS'],
+        message: 'all Launch contract addresses must be configured together',
+      });
+    }
+    if (configuredLaunchAddresses === launchAddresses.length && !value.LAUNCH_IDENTITY_SIGNER_PRIVATE_KEY) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['LAUNCH_IDENTITY_SIGNER_PRIVATE_KEY'],
+        message: 'Launch identity signer private key is required when Launch contracts are enabled',
       });
     }
     if (value.NODE_ENV === 'production' && new URL(value.WEB_BASE_URL).protocol !== 'https:') {
@@ -129,8 +158,28 @@ const indexerSchema = commonSchema
     INDEXER_CONFIRMATIONS: z.coerce.number().int().min(1).max(1_024),
     INDEXER_POLL_INTERVAL_MS: z.coerce.number().int().min(250).max(60_000),
     INDEXER_BATCH_SIZE: z.coerce.number().int().min(1).max(10_000),
+    LAUNCHPAD_FACTORY_ADDRESS: optionalAddress,
+    LAUNCHPAD_REGISTRY_ADDRESS: optionalAddress,
+    LAUNCH_FACTORY_ADDRESS: optionalAddress,
+    GRADUATOR_ADDRESS: optionalAddress,
   })
-  .superRefine(validateCommon);
+  .superRefine((value, context) => {
+    validateCommon(value, context);
+    const addresses = [
+      value.LAUNCHPAD_FACTORY_ADDRESS,
+      value.LAUNCHPAD_REGISTRY_ADDRESS,
+      value.LAUNCH_FACTORY_ADDRESS,
+      value.GRADUATOR_ADDRESS,
+    ];
+    const configured = addresses.filter(Boolean).length;
+    if (configured !== 0 && configured !== addresses.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['LAUNCH_FACTORY_ADDRESS'],
+        message: 'all Launch indexer addresses must be configured together',
+      });
+    }
+  });
 
 function findWorkspaceRoot(start: string): string {
   let current = resolve(start);

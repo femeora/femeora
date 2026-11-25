@@ -5,7 +5,12 @@ import {DammPool} from "../src/core/DammPool.sol";
 import {PoolKey, PoolKeyLib, PoolModel} from "../src/core/PoolTypes.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
+interface VmDammTest {
+    function warp(uint256 timestamp) external;
+}
+
 contract DammPoolTest {
+    VmDammTest private constant vm = VmDammTest(address(uint160(uint256(keccak256("hevm cheat code")))));
     DammPool private pool;
     MockERC20 private token0;
     MockERC20 private token1;
@@ -53,5 +58,48 @@ contract DammPoolTest {
         (bool success,) = address(pool)
             .call(abi.encodeCall(DammPool.addLiquidity, (1 ether, 1 ether, 0, address(this), block.timestamp + 1)));
         require(!success, "reserve cap bypassed");
+    }
+
+    function testLinearFeeScheduleAtStartMiddleAndEnd() public {
+        PoolKey memory key = PoolKeyLib.normalize(address(token0), address(token1), PoolModel.DAMM, 3_000, 0);
+        DammPool scheduled = new DammPool(key, address(this));
+        scheduled.setReserveCaps(type(uint112).max, type(uint112).max);
+        scheduled.configureFeeSchedule(500_000, 3_000, 30 minutes, false);
+        uint256 started = block.timestamp;
+        require(scheduled.feePips() == 500_000, "start fee");
+        vm.warp(started + 15 minutes);
+        require(scheduled.feePips() == 251_500, "middle fee");
+        vm.warp(started + 30 minutes);
+        require(scheduled.feePips() == 3_000, "end fee");
+    }
+
+    function testExponentialFeeScheduleAtStartMiddleAndEnd() public {
+        PoolKey memory key = PoolKeyLib.normalize(address(token0), address(token1), PoolModel.DAMM, 3_000, 0);
+        DammPool scheduled = new DammPool(key, address(this));
+        scheduled.setReserveCaps(type(uint112).max, type(uint112).max);
+        scheduled.configureFeeSchedule(500_000, 3_000, 30 minutes, true);
+        uint256 started = block.timestamp;
+        require(scheduled.feePips() == 500_000, "start fee");
+        vm.warp(started + 15 minutes);
+        require(scheduled.feePips() == 127_250, "middle fee");
+        vm.warp(started + 30 minutes);
+        require(scheduled.feePips() == 3_000, "end fee");
+    }
+
+    function testSwapDoesNotDecreaseConstantProduct() public {
+        uint256 productBefore = uint256(pool.reserve0()) * pool.reserve1();
+        pool.swapExactInput(address(token0), 10 ether, 0, address(this), block.timestamp + 1);
+        uint256 productAfter = uint256(pool.reserve0()) * pool.reserve1();
+        require(productAfter >= productBefore, "constant product decreased");
+    }
+
+    function testLpFeesAreClaimableWithoutTouchingPrincipal() public {
+        pool.swapExactInput(address(token0), 10 ether, 0, address(this), block.timestamp + 1);
+        (uint256 fee0, uint256 fee1) = pool.claimableFees(address(this));
+        require(fee0 != 0 && fee1 == 0, "claimable fee");
+        uint112 reserve0Before = pool.reserve0();
+        uint112 reserve1Before = pool.reserve1();
+        pool.claimLpFees(fee0, fee1, address(this));
+        require(pool.reserve0() == reserve0Before && pool.reserve1() == reserve1Before, "principal changed");
     }
 }

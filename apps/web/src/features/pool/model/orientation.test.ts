@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { toContractAmounts, toContractRange } from './orientation';
+import { fromContractBinBounds, toContractAmounts, toContractBinBounds, toContractRange } from './orientation';
 
 test('keeps base and quote aligned when base is token X', () => {
   assert.deepEqual(toContractAmounts(true, '0.1', '25'), { amountX: '0.1', amountY: '25' });
@@ -19,4 +19,12 @@ test('inverts display percentages when base is token Y', () => {
 
 test('keeps display percentages when base is token X', () => {
   assert.deepEqual(toContractRange(true, { minPct: -7, maxPct: -1 }), { minPct: -7, maxPct: -1 });
+});
+
+test('round-trips a visible range through exact contract bins in inverse orientation', () => {
+  const bounds = toContractBinBounds(false, 2714, { minPct: -15, maxPct: 15 }, 50);
+  const visible = fromContractBinBounds(false, 2714, bounds, 50);
+  assert.ok(visible.minPct < 0);
+  assert.ok(visible.maxPct > 0);
+  assert.deepEqual(toContractBinBounds(false, 2714, visible, 50), bounds);
 });

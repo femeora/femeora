@@ -14,6 +14,7 @@ contract DammPool is ReentrancyGuard {
 
     uint256 public constant MINIMUM_LIQUIDITY = 1_000;
     uint24 public constant PROTOCOL_FEE_SHARE_DENOMINATOR = 1_000_000;
+    uint256 private constant Q128 = 1 << 128;
     address private constant LOCKED_LIQUIDITY_ACCOUNT = address(1);
 
     error DeadlineExpired();
@@ -30,7 +31,7 @@ contract DammPool is ReentrancyGuard {
     address public immutable factory;
     address public immutable token0;
     address public immutable token1;
-    uint24 public immutable feePips;
+    uint24 public immutable baseFeePips;
     address public administrator;
     address public protocolFeeRecipient;
     uint24 public protocolFeeSharePips;
@@ -43,6 +44,19 @@ contract DammPool is ReentrancyGuard {
     uint112 public reserveCap1;
     uint256 public totalShares;
     mapping(address account => uint256 shares) public sharesOf;
+    uint24 public scheduledStartFeePips;
+    uint24 public scheduledEndFeePips;
+    uint32 public scheduledFeeDuration;
+    uint48 public scheduledFeeStartedAt;
+    bool public scheduledFeeExponential;
+    uint256 public lpFeeGrowth0X128;
+    uint256 public lpFeeGrowth1X128;
+    uint256 public unclaimedLpFees0;
+    uint256 public unclaimedLpFees1;
+    mapping(address account => uint256 amount) public feeCredit0;
+    mapping(address account => uint256 amount) public feeCredit1;
+    mapping(address account => uint256 growthX128) private _feeDebt0X128;
+    mapping(address account => uint256 growthX128) private _feeDebt1X128;
 
     event LiquidityAdded(
         address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares
@@ -63,6 +77,8 @@ contract DammPool is ReentrancyGuard {
     event ProtocolFeeConfigurationUpdated(address indexed recipient, uint24 sharePips);
     event AdministratorUpdated(address indexed previousAdministrator, address indexed administrator);
     event ReserveCapsUpdated(uint112 reserveCap0, uint112 reserveCap1);
+    event FeeScheduleSet(uint24 startFeePips, uint24 endFeePips, uint32 durationSeconds, bool exponential);
+    event LpFeesClaimed(address indexed account, address indexed recipient, uint256 amount0, uint256 amount1);
 
     modifier onlyAdministrator() {
         if (msg.sender != administrator) revert Unauthorized();
@@ -79,7 +95,7 @@ contract DammPool is ReentrancyGuard {
         factory = msg.sender;
         token0 = key.token0;
         token1 = key.token1;
-        feePips = key.feePips;
+        baseFeePips = key.feePips;
         administrator = administrator_;
         protocolFeeRecipient = administrator_;
     }
@@ -123,8 +139,10 @@ contract DammPool is ReentrancyGuard {
         amount0 = FullMath.mulDiv(shares, reserve0, supply);
         amount1 = FullMath.mulDiv(shares, reserve1, supply);
         if (amount0 < minimumAmount0 || amount1 < minimumAmount1) revert SlippageExceeded();
+        _settleFees(msg.sender);
         sharesOf[msg.sender] -= shares;
         totalShares = supply - shares;
+        _syncFeeDebt(msg.sender);
         _updateReserves(uint256(reserve0) - amount0, uint256(reserve1) - amount1);
         token0.push(recipient, amount0);
         token1.push(recipient, amount1);
@@ -146,19 +164,22 @@ contract DammPool is ReentrancyGuard {
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
         uint256 totalFee;
-        (amountOut, totalFee) = ConstantProductMath.quoteExactInput(amountIn, reserveIn, reserveOut, feePips);
+        (amountOut, totalFee) = ConstantProductMath.quoteExactInput(amountIn, reserveIn, reserveOut, feePips());
         if (amountOut < minimumAmountOut) revert SlippageExceeded();
         uint256 protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
+        uint256 lpFee = totalFee - protocolFee;
 
         tokenIn.pullExact(msg.sender, amountIn);
         address tokenOut = zeroForOne ? token1 : token0;
         tokenOut.push(recipient, amountOut);
         if (zeroForOne) {
             protocolFees0 += _toUint128(protocolFee);
-            _updateReserves(reserveIn + amountIn - protocolFee, reserveOut - amountOut);
+            _accrueLpFee(true, lpFee);
+            _updateReserves(reserveIn + amountIn - totalFee, reserveOut - amountOut);
         } else {
             protocolFees1 += _toUint128(protocolFee);
-            _updateReserves(reserveOut - amountOut, reserveIn + amountIn - protocolFee);
+            _accrueLpFee(false, lpFee);
+            _updateReserves(reserveOut - amountOut, reserveIn + amountIn - totalFee);
         }
         emit Swap(msg.sender, recipient, tokenIn, amountIn, amountOut, protocolFee);
     }
@@ -173,7 +194,7 @@ contract DammPool is ReentrancyGuard {
         else if (tokenIn != token1) revert InsufficientInput();
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
-        return ConstantProductMath.quoteExactOutput(amountOut, reserveIn, reserveOut, feePips);
+        return ConstantProductMath.quoteExactOutput(amountOut, reserveIn, reserveOut, feePips());
     }
 
     function swapExactOutput(
@@ -191,16 +212,19 @@ contract DammPool is ReentrancyGuard {
         (amountIn, totalFee) = quoteExactOutput(tokenIn, amountOut);
         if (amountIn > maximumAmountIn) revert SlippageExceeded();
         uint256 protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, PROTOCOL_FEE_SHARE_DENOMINATOR);
+        uint256 lpFee = totalFee - protocolFee;
         tokenIn.pullExact(msg.sender, amountIn);
         (uint256 reserveIn, uint256 reserveOut) =
             zeroForOne ? (uint256(reserve0), uint256(reserve1)) : (uint256(reserve1), uint256(reserve0));
         (zeroForOne ? token1 : token0).pushExact(recipient, amountOut);
         if (zeroForOne) {
             protocolFees0 += _toUint128(protocolFee);
-            _updateReserves(reserveIn + amountIn - protocolFee, reserveOut - amountOut);
+            _accrueLpFee(true, lpFee);
+            _updateReserves(reserveIn + amountIn - totalFee, reserveOut - amountOut);
         } else {
             protocolFees1 += _toUint128(protocolFee);
-            _updateReserves(reserveOut - amountOut, reserveIn + amountIn - protocolFee);
+            _accrueLpFee(false, lpFee);
+            _updateReserves(reserveOut - amountOut, reserveIn + amountIn - totalFee);
         }
         emit Swap(msg.sender, recipient, tokenIn, amountIn, amountOut, protocolFee);
     }
@@ -234,6 +258,36 @@ contract DammPool is ReentrancyGuard {
         emit ReserveCapsUpdated(reserveCap0_, reserveCap1_);
     }
 
+    function configureFeeSchedule(uint24 startFeePips, uint24 endFeePips, uint32 durationSeconds, bool exponential)
+        external
+    {
+        if (msg.sender != administrator && msg.sender != factory) revert Unauthorized();
+        if (
+            totalShares != 0 || scheduledFeeStartedAt != 0 || startFeePips <= endFeePips
+                || startFeePips >= PROTOCOL_FEE_SHARE_DENOMINATOR || endFeePips == 0 || durationSeconds == 0
+        ) revert InvalidProtocolFeeShare();
+        scheduledStartFeePips = startFeePips;
+        scheduledEndFeePips = endFeePips;
+        scheduledFeeDuration = durationSeconds;
+        scheduledFeeStartedAt = uint48(block.timestamp);
+        scheduledFeeExponential = exponential;
+        emit FeeScheduleSet(startFeePips, endFeePips, durationSeconds, exponential);
+    }
+
+    function feePips() public view returns (uint24) {
+        uint48 startedAt = scheduledFeeStartedAt;
+        if (startedAt == 0) return baseFeePips;
+        uint256 elapsed = block.timestamp - startedAt;
+        uint256 duration = scheduledFeeDuration;
+        if (elapsed >= duration) return scheduledEndFeePips;
+        uint256 spread = uint256(scheduledStartFeePips) - scheduledEndFeePips;
+        uint256 remaining = duration - elapsed;
+        uint256 decay = scheduledFeeExponential
+            ? spread * remaining * remaining / (duration * duration)
+            : spread * remaining / duration;
+        return uint24(uint256(scheduledEndFeePips) + decay);
+    }
+
     function collectProtocolFees() external nonReentrant returns (uint256 amount0, uint256 amount1) {
         if (msg.sender != protocolFeeRecipient) {
             revert Unauthorized();
@@ -247,9 +301,63 @@ contract DammPool is ReentrancyGuard {
         emit ProtocolFeesCollected(msg.sender, amount0, amount1);
     }
 
+    function claimableFees(address account) external view returns (uint256 amount0, uint256 amount1) {
+        uint256 shares = sharesOf[account];
+        amount0 = feeCredit0[account]
+            + FullMath.mulDiv(shares, lpFeeGrowth0X128 - _feeDebt0X128[account], Q128);
+        amount1 = feeCredit1[account]
+            + FullMath.mulDiv(shares, lpFeeGrowth1X128 - _feeDebt1X128[account], Q128);
+    }
+
+    function claimLpFees(uint256 amount0, uint256 amount1, address recipient) external nonReentrant {
+        if (recipient == address(0)) revert InvalidRecipient();
+        _settleFees(msg.sender);
+        if (amount0 > feeCredit0[msg.sender] || amount1 > feeCredit1[msg.sender]) revert InsufficientLiquidity();
+        if (amount0 != 0) {
+            feeCredit0[msg.sender] -= amount0;
+            unclaimedLpFees0 -= amount0;
+            token0.pushExact(recipient, amount0);
+        }
+        if (amount1 != 0) {
+            feeCredit1[msg.sender] -= amount1;
+            unclaimedLpFees1 -= amount1;
+            token1.pushExact(recipient, amount1);
+        }
+        emit LpFeesClaimed(msg.sender, recipient, amount0, amount1);
+    }
+
     function _mint(address recipient, uint256 shares) private {
+        _settleFees(recipient);
         sharesOf[recipient] += shares;
         totalShares += shares;
+        _syncFeeDebt(recipient);
+    }
+
+    function _accrueLpFee(bool tokenZero, uint256 amount) private {
+        if (amount == 0) return;
+        uint256 supply = totalShares;
+        if (supply == 0) revert InsufficientLiquidity();
+        if (tokenZero) {
+            unclaimedLpFees0 += amount;
+            lpFeeGrowth0X128 += FullMath.mulDiv(amount, Q128, supply);
+        } else {
+            unclaimedLpFees1 += amount;
+            lpFeeGrowth1X128 += FullMath.mulDiv(amount, Q128, supply);
+        }
+    }
+
+    function _settleFees(address account) private {
+        uint256 shares = sharesOf[account];
+        if (shares != 0) {
+            feeCredit0[account] += FullMath.mulDiv(shares, lpFeeGrowth0X128 - _feeDebt0X128[account], Q128);
+            feeCredit1[account] += FullMath.mulDiv(shares, lpFeeGrowth1X128 - _feeDebt1X128[account], Q128);
+        }
+        _syncFeeDebt(account);
+    }
+
+    function _syncFeeDebt(address account) private {
+        _feeDebt0X128[account] = lpFeeGrowth0X128;
+        _feeDebt1X128[account] = lpFeeGrowth1X128;
     }
 
     function _updateReserves(uint256 nextReserve0, uint256 nextReserve1) private {

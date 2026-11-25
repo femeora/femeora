@@ -33,6 +33,7 @@ import {
   type RangeClockSwap,
 } from './processors/range-clock.js';
 import { ensureCanonicalCursor } from './reorg.js';
+import { collectLaunchEvents, persistLaunchEvents } from './launch-events.js';
 
 interface BackfillResult {
   readonly batches: number;
@@ -317,12 +318,50 @@ export async function backfillPoolRegistry(
         });
       })
     );
-    const [poolEvents, positionEvents, positionShareEvents] = await Promise.all([
+    const existingLaunches = await prisma.launch.findMany({
+      where: { chainId: chain.chainId, canonical: true },
+      select: { curve: true, launchpad: { select: { quoteToken: true } } },
+    });
+    const [poolEvents, positionEvents, positionShareEvents, launchEvents] = await Promise.all([
       collectPoolEvents(client, [...descriptorByAddress.values()], nextBlock, endBlock),
       collectPositionEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
       collectPositionShareEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
+      collectLaunchEvents(
+        client,
+        environment,
+        existingLaunches.map(launch => launch.curve as Address),
+        nextBlock,
+        endBlock,
+      ),
     ]);
     const calloutUpdateTypes = classifyCalloutUpdates(positionEvents);
+    const persistedLaunchpadQuotes = await prisma.launchpad.findMany({
+      where: {
+        chainId: chain.chainId,
+        canonical: true,
+        launchpadId: { in: launchEvents.launches.map(launch => launch.launchpadId) },
+      },
+      select: { launchpadId: true, quoteToken: true },
+    });
+    const batchLaunchpadQuotes = new Map(
+      [
+        ...persistedLaunchpadQuotes.map(launchpad => [launchpad.launchpadId, launchpad.quoteToken.toLowerCase()] as const),
+        ...launchEvents.launchpads.map(launchpad => [launchpad.launchpadId, launchpad.quoteToken.toLowerCase()] as const),
+      ]
+    );
+    const quoteByCurve = new Map(
+      existingLaunches.map(launch => [launch.curve.toLowerCase(), launch.launchpad.quoteToken.toLowerCase()])
+    );
+    for (const launch of launchEvents.launches) {
+      const quoteToken = batchLaunchpadQuotes.get(launch.launchpadId);
+      if (quoteToken) quoteByCurve.set(launch.curve.toLowerCase(), quoteToken);
+    }
+    const graduationQuoteByPool = new Map(
+      launchEvents.graduations.flatMap(graduation => {
+        const quoteToken = quoteByCurve.get(graduation.curve.toLowerCase());
+        return quoteToken ? [[graduation.pool.toLowerCase(), quoteToken] as const] : [];
+      })
+    );
 
     const feeBinIds = [...new Set(poolEvents.binFees.map(fee => fee.binId))];
     const sharePositionIds = [...new Set(positionShareEvents.map(event => event.positionId))];
@@ -365,11 +404,9 @@ export async function backfillPoolRegistry(
         for (const log of discoveryLogs) {
           const blockNumber = requireMinedValue(log.blockNumber, 'BLOCK_NUMBER');
           const { key, pool } = log.args;
-          const quoteToken = configuredQuoteToken(
-            key.token0,
-            key.token1,
-            environment.QUOTE_TOKEN_ADDRESS
-          );
+          const quoteToken =
+            graduationQuoteByPool.get(pool.toLowerCase()) ??
+            configuredQuoteToken(key.token0, key.token1, environment.QUOTE_TOKEN_ADDRESS);
           const caps = poolCaps.get(pool.toLowerCase());
           const storedPool = await transaction.pool.upsert({
             where: {
@@ -778,6 +815,7 @@ export async function backfillPoolRegistry(
                       chainId: chain.chainId,
                       positionId: event.positionId.toString(),
                       pool: event.state.pool.toLowerCase(),
+                      transactionHash: event.transactionHash,
                     },
                   },
                   update: { canonical: true },
@@ -1068,6 +1106,10 @@ export async function backfillPoolRegistry(
             data: { inRangeSeconds: clock.inRangeSeconds, openSeconds: clock.openSeconds },
           });
         }
+
+        // Launch persistence runs after pool and position projection so a
+        // graduation can atomically attach its permanently locked LP callout.
+        await persistLaunchEvents(transaction, chain.chainId, launchEvents);
 
         await transaction.canonicalBlock.upsert({
           where: {

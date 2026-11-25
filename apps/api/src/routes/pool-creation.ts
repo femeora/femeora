@@ -1,5 +1,5 @@
 import { poolFactoryAbi, poolRegistryAbi, tryGetFomeoraDeployment } from '@fomeora/contracts-sdk';
-import { prisma } from '@fomeora/database';
+import { Prisma, prisma } from '@fomeora/database';
 import { binForPriceX18, PRICE_SCALE, priceFromBinX18, rawUnitsToDecimal } from '@fomeora/sdk';
 import type { FastifyInstance } from 'fastify';
 import { encodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, parseUnits, toHex, zeroAddress, type Address } from 'viem';
@@ -19,6 +19,35 @@ const requestSchema = z.object({
   initialPrice: z.string().regex(/^\d+(?:\.\d+)?$/).optional(),
   wallet: address,
 }).strict();
+const pairReferenceQuerySchema = z.object({ tokenA: address, tokenB: address }).strict();
+
+type PairPool = {
+  id: string;
+  address: string;
+  type: string;
+  tokenX: string;
+  tokenY: string;
+  quoteToken: string | null;
+  binStep: number;
+  baseFeePips: number;
+};
+
+function decimalString(value: Prisma.Decimal): string {
+  return value.toFixed(18).replace(/\.?0+$/, '') || '0';
+}
+
+export function orientPoolPrice(value: Prisma.Decimal, pool: PairPool, tokenA: Address, tokenB: Address): string | null {
+  if (!pool.quoteToken || value.lte(0)) return null;
+  const a = tokenA.toLowerCase();
+  const b = tokenB.toLowerCase();
+  const quote = pool.quoteToken.toLowerCase();
+  const x = pool.tokenX.toLowerCase();
+  const y = pool.tokenY.toLowerCase();
+  if (!((a === x && b === y) || (a === y && b === x))) return null;
+  if (b === quote) return decimalString(value);
+  if (a === quote) return decimalString(new Prisma.Decimal(1).div(value));
+  return null;
+}
 
 async function metadata(client: ApiChainClient, token: Address) {
   const code = await client.getBytecode({ address: token });
@@ -93,7 +122,7 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
       executable: asset.chainId === chainId, source: 'chain' as const, isin: null,
       tradingStatus: null, currentMultiplier: null,
     }));
-    const byIdentity = new Map([...curatedAssets, ...chainAssets, ...stocks]
+    const byIdentity = new Map([...chainAssets, ...curatedAssets, ...stocks]
       .map(asset => [`${asset.chainId}:${asset.address.toLowerCase()}`, asset]));
     const data = [...byIdentity.values()].map(asset => {
       const display = displayByAddress.get(asset.address.toLowerCase());
@@ -124,6 +153,76 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
     }
     try { return await robinhoodReferencePrice(asset.symbol, asset.currentMultiplier); }
     catch { return reply.status(503).send({ error: 'REFERENCE_PRICE_UNAVAILABLE' }); }
+  });
+
+  app.get('/v1/pools/reference-price', async (request, reply) => {
+    const parsed = pairReferenceQuerySchema.safeParse(request.query);
+    if (!parsed.success || parsed.data.tokenA === parsed.data.tokenB) {
+      return reply.status(400).send({ error: 'INVALID_TOKEN_PAIR' });
+    }
+    const { tokenA, tokenB } = parsed.data;
+    const a = tokenA.toLowerCase();
+    const b = tokenB.toLowerCase();
+    const pools = await prisma.pool.findMany({
+      where: {
+        chainId, canonical: true, visible: true,
+        OR: [{ tokenX: a, tokenY: b }, { tokenX: b, tokenY: a }],
+      },
+      select: { id: true, address: true, type: true, tokenX: true, tokenY: true, quoteToken: true, binStep: true, baseFeePips: true },
+    });
+    const samePairPools = pools.map(pool => ({
+      address: getAddress(pool.address),
+      type: pool.type === 'DAMM' ? 'DAMM' as const : 'DLMM' as const,
+      binStepBps: pool.binStep,
+      feePips: pool.baseFeePips,
+    }));
+    if (pools.length > 0) {
+      const poolIds = pools.map(pool => pool.id);
+      const [reference, candle] = await Promise.all([
+        prisma.referenceCandle.findFirst({
+          where: { poolId: { in: poolIds }, stale: false },
+          orderBy: { sourceUpdatedAt: 'desc' },
+          select: { poolId: true, close: true, sourceUpdatedAt: true },
+        }),
+        prisma.candle.findFirst({
+          where: { poolId: { in: poolIds }, interval: '1h' },
+          orderBy: { bucketStart: 'desc' },
+          select: { poolId: true, close: true, bucketStart: true },
+        }),
+      ]);
+      const market = reference ?? candle;
+      const sourcePool = market ? pools.find(pool => pool.id === market.poolId) : null;
+      const oriented = market && sourcePool ? orientPoolPrice(market.close, sourcePool, tokenA, tokenB) : null;
+      if (oriented && sourcePool) {
+        return {
+          price: oriented,
+          source: reference ? 'reference' as const : 'pool' as const,
+          sourcePool: getAddress(sourcePool.address),
+          generatedAt: (reference?.sourceUpdatedAt ?? candle!.bucketStart).toISOString(),
+          samePairPools,
+        };
+      }
+    }
+
+    const catalog = await prisma.assetCatalog.findMany({
+      where: { chainId, address: { in: [a, b] } },
+    });
+    const first = catalog.find(asset => asset.address === a);
+    const second = catalog.find(asset => asset.address === b);
+    const stock = first?.source === 'robinhood' && first.currentMultiplier ? first
+      : second?.source === 'robinhood' && second.currentMultiplier ? second : null;
+    const quote = stock === first ? second : first;
+    if (stock && quote?.category === 'stablecoin') {
+      try {
+        const result = await robinhoodReferencePrice(stock.symbol, stock.currentMultiplier!);
+        const stockIsTokenA = stock.address === a;
+        const price = stockIsTokenA
+          ? result.priceUsd
+          : decimalString(new Prisma.Decimal(1).div(result.priceUsd));
+        return { price, source: 'robinhood' as const, sourcePool: null, generatedAt: result.generatedAt, samePairPools };
+      } catch { /* A missing external quote becomes an explicit unknown-price response. */ }
+    }
+    return { price: null, source: null, sourcePool: null, generatedAt: null, samePairPools };
   });
 
   app.post('/v1/pools/create-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {

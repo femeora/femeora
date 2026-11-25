@@ -1,6 +1,6 @@
 'use client';
 
-import { ApiAssetReferencePriceSchema, ApiPoolAssetListSchema, ApiPoolCreationPreparationSchema, ApiPoolDetailSchema, type ApiPoolCreationPreparation } from '@fomeora/types';
+import { ApiPoolAssetListSchema, ApiPoolCreationPreparationSchema, ApiPoolDetailSchema, ApiPoolPairReferenceSchema, type ApiPoolCreationPreparation, type ApiPoolPairReference } from '@fomeora/types';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -25,18 +25,25 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
   const [tokenB, setTokenB] = useState(initialTokenB);
   const [fee, setFee] = useState('0.3');
   const [binStep, setBinStep] = useState('25');
-  const [initialPrice, setInitialPrice] = useState('1');
+  const [initialPrice, setInitialPrice] = useState('');
   const [prepared, setPrepared] = useState<ApiPoolCreationPreparation | null>(null);
   const [createdPool, setCreatedPool] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [referencePrice, setReferencePrice] = useState<{ price: string; orientedPrice: string; generatedAt: string; halted: boolean } | null>(null);
+  const [pairReference, setPairReference] = useState<ApiPoolPairReference | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+  const [priceRiskAccepted, setPriceRiskAccepted] = useState(false);
   const indexedPool = useApiResource(createdPool ? `/v1/pools/${createdPool}` : null, ApiPoolDetailSchema, {
     refreshInterval: createdPool ? 5_000 : 0,
   });
 
   const update = (change: () => void) => { change(); setPrepared(null); setError(null); };
   const review = async () => {
+    const deviation = pairReference?.price && Number(pairReference.price) > 0 && Number(initialPrice) > 0
+      ? Math.abs(Number(initialPrice) / Number(pairReference.price) - 1) * 100
+      : null;
+    const riskAcceptanceRequired = pairReference?.price === null || (deviation !== null && deviation > 10);
+    if (model === 'DLMM' && (referenceLoading || Number(initialPrice) <= 0 || (riskAcceptanceRequired && !priceRiskAccepted))) return;
     if (!account) return void connect();
     if (config && chainId !== config.chainId) return void switchNetwork();
     setBusy(true); setError(null);
@@ -69,31 +76,34 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
     ? options.find(asset => asset.address.toLowerCase() === prepared.token1.address.toLowerCase()) ?? prepared.token1
     : null;
   useEffect(() => {
-    const first = options.find(asset => asset.address.toLowerCase() === tokenA.toLowerCase());
-    const second = options.find(asset => asset.address.toLowerCase() === tokenB.toLowerCase());
-    const stock = first?.category === 'stock' || first?.category === 'etf' ? first
-      : second?.category === 'stock' || second?.category === 'etf' ? second : null;
-    const quote = stock === first ? second : first;
-    if (!stock?.executable || quote?.category !== 'stablecoin' || model !== 'DLMM') {
-      setReferencePrice(null);
+    if (!tokenA || !tokenB || tokenA.toLowerCase() === tokenB.toLowerCase() || model !== 'DLMM') {
+      setPairReference(null);
+      setReferenceLoading(false);
       return;
     }
     let active = true;
-    void browserApiRequest(`/v1/pool-assets/${stock.address}/reference-price`, ApiAssetReferencePriceSchema)
+    setReferenceLoading(true);
+    setPriceRiskAccepted(false);
+    void browserApiRequest(`/v1/pools/reference-price?tokenA=${encodeURIComponent(tokenA)}&tokenB=${encodeURIComponent(tokenB)}`, ApiPoolPairReferenceSchema)
       .then(result => {
         if (!active) return;
-        const oriented = stock === first ? result.priceUsd : String(1 / Number(result.priceUsd));
-        setInitialPrice(oriented);
+        setPairReference(result);
+        if (result.price) setInitialPrice(result.price);
         setPrepared(null);
-        setReferencePrice({ price: result.priceUsd, orientedPrice: oriented, generatedAt: result.generatedAt, halted: result.halted });
       })
-      .catch(() => { if (active) setReferencePrice(null); });
+      .catch(() => { if (active) setPairReference({ price: null, source: null, sourcePool: null, generatedAt: null, samePairPools: [] }); })
+      .finally(() => { if (active) setReferenceLoading(false); });
     return () => { active = false; };
-  }, [model, options, tokenA, tokenB]);
-  const referenceDeviation = referencePrice && Number(referencePrice.orientedPrice) > 0
-    ? Math.abs(Number(initialPrice) / Number(referencePrice.orientedPrice) - 1) * 100
+  }, [model, tokenA, tokenB]);
+  const referenceDeviation = pairReference?.price && Number(pairReference.price) > 0 && Number(initialPrice) > 0
+    ? Math.abs(Number(initialPrice) / Number(pairReference.price) - 1) * 100
     : null;
-  const staleReference = referencePrice ? Date.now() - Date.parse(referencePrice.generatedAt) > 60_000 : false;
+  const unknownPrice = model === 'DLMM' && Boolean(tokenA && tokenB) && !referenceLoading && pairReference?.price === null;
+  const requiresRiskAcceptance = unknownPrice || (referenceDeviation !== null && referenceDeviation > 10);
+  const canReview = !busy && Boolean(tokenA && tokenB) && (model !== 'DLMM' || (!referenceLoading && Number(initialPrice) > 0 && (!requiresRiskAcceptance || priceRiskAccepted)));
+  const referenceLabel = pairReference?.source === 'robinhood' ? 'Robinhood market reference'
+    : pairReference?.source === 'reference' ? 'External market reference'
+      : pairReference?.source === 'pool' ? 'Latest indexed pool price' : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
@@ -101,16 +111,18 @@ export function CreatePoolForm({ initialTokenA = '', initialTokenB = '' }: { ini
         <h2 className="text-xl font-medium">Pool configuration</h2>
         <p className="mt-2 text-sm text-muted">Choose two contracts available on the active network. Femeora verifies metadata, duplicates, and simulation before your wallet opens.</p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <PoolAssetSelect label="Token A" value={tokenA} exclude={tokenB} assets={options} onChange={value => update(() => setTokenA(value))} />
-          <PoolAssetSelect label="Token B" value={tokenB} exclude={tokenA} assets={options} onChange={value => update(() => setTokenB(value))} />
-          <label className="t-label text-muted">Pool model<select className={control} value={model} onChange={event => update(() => setModel(event.target.value as 'DLMM' | 'DAMM'))}><option value="DLMM">DLMM · discrete bins</option><option value="DAMM">DAMM · constant product</option></select></label>
+          <PoolAssetSelect label="Token A" value={tokenA} exclude={tokenB} assets={options} onChange={value => update(() => { setTokenA(value); setInitialPrice(''); setPriceRiskAccepted(false); })} />
+          <PoolAssetSelect label="Token B" value={tokenB} exclude={tokenA} assets={options} onChange={value => update(() => { setTokenB(value); setInitialPrice(''); setPriceRiskAccepted(false); })} />
+          <label className="t-label text-muted">Pool model<select className={control} value={model} onChange={event => update(() => { setModel(event.target.value as 'DLMM' | 'DAMM'); setPriceRiskAccepted(false); })}><option value="DLMM">DLMM · discrete bins</option><option value="DAMM">DAMM · constant product</option></select></label>
           <label className="t-label text-muted">Pool fee (%)<input className={control} inputMode="decimal" value={fee} onChange={event => update(() => setFee(event.target.value))} /></label>
           {model === 'DLMM' ? <>
             <label className="t-label text-muted">Bin step (bps)<input className={control} inputMode="numeric" value={binStep} onChange={event => update(() => setBinStep(event.target.value))} /></label>
-            <label className="t-label text-muted">Initial price · Token B per Token A<input className={control} inputMode="decimal" value={initialPrice} onChange={event => update(() => setInitialPrice(event.target.value))} />{referencePrice ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-muted">Robinhood reference · ${referencePrice.price} USD · {referencePrice.halted ? 'trading halt reported' : `generated ${new Date(referencePrice.generatedAt).toLocaleTimeString()}`}</span> : null}{referenceDeviation !== null && referenceDeviation > 5 ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-down">Warning · initial price is {referenceDeviation.toFixed(2)}% away from the current reference.</span> : null}{staleReference ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-signal">Reference price is older than 60 seconds. Refresh before signing.</span> : null}</label>
+            <label className="t-label text-muted">Initial price · Token B per Token A<input className={control} inputMode="decimal" value={initialPrice} onChange={event => update(() => { setInitialPrice(event.target.value); setPriceRiskAccepted(false); })} />{referenceLoading ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-muted">Checking available market references…</span> : null}{pairReference?.price && referenceLabel ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-muted">{referenceLabel} · {pairReference.price} Token B per Token A{pairReference.generatedAt ? ` · ${new Date(pairReference.generatedAt).toLocaleString()}` : ''}</span> : null}{referenceDeviation !== null && referenceDeviation > 10 ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-down">High price deviation · your price is {referenceDeviation.toFixed(2)}% away from the available market reference.</span> : null}{unknownPrice ? <span className="mt-2 block text-[0.625rem] leading-relaxed text-signal">No reliable market price is available for this pair. Verify the initial price independently before creating the pool.</span> : null}</label>
           </> : null}
         </div>
-        <Button variant="primary" block className="mt-6" disabled={busy || !tokenA || !tokenB} onClick={() => void review()}>{busy ? 'Validating on-chain…' : account ? 'Validate & review' : 'Connect wallet'}</Button>
+        {model === 'DLMM' && pairReference?.samePairPools.length ? <div className="mt-5 border border-signal/40 bg-signal/5 p-3 text-sm"><p className="font-medium">This token pair already has {pairReference.samePairPools.length} canonical pool{pairReference.samePairPools.length === 1 ? '' : 's'}.</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{pairReference.samePairPools.map(pool => <Link key={pool.address} className="t-label text-signal underline underline-offset-4" href={`/p/${config?.chainId ?? chainId}/${pool.address}`}>{pool.type} · {pool.feePips / 10_000}% fee{pool.type === 'DLMM' ? ` · ${pool.binStepBps} bps` : ''}</Link>)}</div></div> : null}
+        {model === 'DLMM' && requiresRiskAcceptance ? <label className="mt-5 flex cursor-pointer items-start gap-3 border border-line bg-panel-2 p-3 text-sm"><input className="mt-1 size-4 accent-current" type="checkbox" checked={priceRiskAccepted} onChange={event => { setPriceRiskAccepted(event.target.checked); setPrepared(null); }} /><span>I understand that liquidity added at this initial price may be arbitraged if the price is inaccurate.</span></label> : null}
+        <Button variant="primary" block className="mt-6" disabled={!canReview} onClick={() => void review()}>{busy ? 'Validating on-chain…' : account ? 'Validate & review' : 'Connect wallet'}</Button>
         <p role="alert" className="mt-3 min-h-5 text-sm text-down">{error}</p>
       </section>
 

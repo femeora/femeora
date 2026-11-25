@@ -8,6 +8,7 @@ import {
   apiBinsToLiquidity,
   apiCandlesToChart,
   apiPoolToPool,
+  activeBinPrice,
   type LivePoolStats,
 } from '@/features/pool/model/live';
 import {
@@ -139,10 +140,27 @@ export default async function PoolPage({ params }: PageProps) {
   const latest = reference15m.data.at(-1) ?? pool15m.data.at(-1) ?? reference1h.data.at(-1) ?? pool1h.data.at(-1);
   const pool = apiPoolToPool(detail, latest, stats);
   const liveStats: LivePoolStats = { ...stats, counts: detail.counts };
+  const latestReference = reference15m.data.at(-1) ?? reference1h.data.at(-1);
+  const indexedPoolPrice = pool15m.data.at(-1)?.close ?? pool1h.data.at(-1)?.close;
+  const poolPrice = activeBinPrice(detail) || Number(indexedPoolPrice ?? 0);
+  const referencePrice = latestReference && latestReference.stale !== true ? Number(latestReference.close) : 0;
+  const priceDeviationPct = poolPrice > 0 && referencePrice > 0
+    ? Math.abs(poolPrice / referencePrice - 1) * 100
+    : 0;
+  const priceWarning = priceDeviationPct > 10 && latestReference
+    ? {
+        poolPrice,
+        referencePrice,
+        deviationPct: priceDeviationPct,
+        source: latestReference.sourceType === 'GECKOTERMINAL' ? 'GeckoTerminal external market' : 'Chainlink reference market',
+        updatedAt: latestReference.timestamp,
+      }
+    : null;
   return (
     <PoolTerminal
       pool={pool}
       stats={liveStats}
+      priceWarning={priceWarning}
       candlesBySource={{
         pool: {
           '5m': apiCandlesToChart(pool5m.data), '15m': apiCandlesToChart(pool15m.data),

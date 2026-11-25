@@ -20,6 +20,7 @@ export {
   MessageCircle,
   MessageSquareQuote,
   Repeat2,
+  Rocket,
   Share2,
   Trash2,
   TriangleAlert,

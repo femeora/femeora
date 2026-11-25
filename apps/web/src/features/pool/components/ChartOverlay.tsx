@@ -143,14 +143,14 @@ export function ChartOverlay({
       <>
         <RangeHandle
           bound="maxPct"
-          label={`MAX ${range.maxPct >= 0 ? '+' : ''}${range.maxPct.toFixed(1)}%`}
+          label={`MAX ${range.maxPct >= 0 ? '+' : ''}${Math.round(range.maxPct)}%`}
           y={bandTop}
           plotWidth={plotWidth}
           onDrag={onRangeDrag}
         />
         <RangeHandle
           bound="minPct"
-          label={`MIN ${range.minPct >= 0 ? '+' : ''}${range.minPct.toFixed(1)}%`}
+          label={`MIN ${range.minPct >= 0 ? '+' : ''}${Math.round(range.minPct)}%`}
           y={bandBottom}
           plotWidth={plotWidth}
           onDrag={onRangeDrag}

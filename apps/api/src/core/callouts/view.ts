@@ -131,6 +131,8 @@ export function serializeCallout(
   const { referenceCandles, ...pool } = callout.pool;
   return {
     id: callout.id,
+    kind: callout.kind === 'launch_lp' ? 'launch_lp' as const : 'position' as const,
+    launchId: callout.launchId?.toString() ?? null,
     chainId: callout.chainId,
     positionId: callout.positionId.toString(),
     caption: callout.caption,

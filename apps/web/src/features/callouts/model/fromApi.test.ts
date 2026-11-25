@@ -45,6 +45,8 @@ const candles: ApiCandle[] = [{
 
 const apiCallout: ApiCallout = {
   id: '00000000-0000-4000-8000-000000000001',
+  kind: 'position',
+  launchId: null,
   chainId: 46630,
   positionId: '1',
   caption: 'Canonical range',

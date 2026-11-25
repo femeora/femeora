@@ -12,29 +12,29 @@ generator client {
 // ==========================================
 
 model Pool {
-  id                 String    @id @default(uuid()) @db.Uuid
-  chainId            Int       @map("chain_id")
-  address            String    @db.VarChar(42)
-  type               String    @db.VarChar(10) // 'DLMM' | 'DAMM'
-  tokenX             String    @map("token_x")
-  tokenY             String    @map("token_y")
-  tokenXDecimals     Int?      @map("token_x_decimals")
-  tokenYDecimals     Int?      @map("token_y_decimals")
-  quoteToken         String?   @map("quote_token")
-  binStep            Int       @map("bin_step")
-  baseFeePips        Int       @map("base_fee_pips")
-  reserveCapX        Decimal?  @map("reserve_cap_x") @db.Decimal(78, 0)
-  reserveCapY        Decimal?  @map("reserve_cap_y") @db.Decimal(78, 0)
-  reserveX           Decimal?  @map("reserve_x") @db.Decimal(78, 0)
-  reserveY           Decimal?  @map("reserve_y") @db.Decimal(78, 0)
-  reserveUpdatedBlock BigInt?  @map("reserve_updated_block")
+  id                   String    @id @default(uuid()) @db.Uuid
+  chainId              Int       @map("chain_id")
+  address              String    @db.VarChar(42)
+  type                 String    @db.VarChar(10) // 'DLMM' | 'DAMM'
+  tokenX               String    @map("token_x")
+  tokenY               String    @map("token_y")
+  tokenXDecimals       Int?      @map("token_x_decimals")
+  tokenYDecimals       Int?      @map("token_y_decimals")
+  quoteToken           String?   @map("quote_token")
+  binStep              Int       @map("bin_step")
+  baseFeePips          Int       @map("base_fee_pips")
+  reserveCapX          Decimal?  @map("reserve_cap_x") @db.Decimal(78, 0)
+  reserveCapY          Decimal?  @map("reserve_cap_y") @db.Decimal(78, 0)
+  reserveX             Decimal?  @map("reserve_x") @db.Decimal(78, 0)
+  reserveY             Decimal?  @map("reserve_y") @db.Decimal(78, 0)
+  reserveUpdatedBlock  BigInt?   @map("reserve_updated_block")
   lastReserveRefreshAt DateTime? @map("last_reserve_refresh_at")
-  initialActiveBin   Int?      @map("initial_active_bin")
-  activeBin          Int?      @map("active_bin")
-  lastValueRefreshAt DateTime? @map("last_value_refresh_at")
-  createdBlock       BigInt    @map("created_block")
-  canonical          Boolean   @default(true)
-  visible            Boolean   @default(true)
+  initialActiveBin     Int?      @map("initial_active_bin")
+  activeBin            Int?      @map("active_bin")
+  lastValueRefreshAt   DateTime? @map("last_value_refresh_at")
+  createdBlock         BigInt    @map("created_block")
+  canonical            Boolean   @default(true)
+  visible              Boolean   @default(true)
 
   positions        Position[]
   positionBins     PositionBin[]
@@ -53,24 +53,24 @@ model Pool {
 }
 
 model AssetCatalog {
-  chainId         Int      @map("chain_id")
-  address         String   @db.VarChar(42)
-  source          String   @db.VarChar(20)
-  sourceAssetId   String?  @map("source_asset_id") @db.VarChar(80)
-  symbol          String   @db.VarChar(64)
-  name            String   @db.VarChar(160)
-  decimals        Int
-  logoUrl         String?  @map("logo_url") @db.Text
-  category        String   @db.VarChar(20)
-  isin            String?  @db.VarChar(32)
-  status          String   @db.VarChar(64)
-  currentMultiplier String? @map("current_multiplier") @db.VarChar(80)
-  marketStatus    String?  @map("market_status") @db.VarChar(64)
-  extendedStatus  String?  @map("extended_status") @db.VarChar(64)
-  overnightStatus String?  @map("overnight_status") @db.VarChar(64)
-  sourceUpdatedAt DateTime @map("source_updated_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  chainId           Int      @map("chain_id")
+  address           String   @db.VarChar(42)
+  source            String   @db.VarChar(20)
+  sourceAssetId     String?  @map("source_asset_id") @db.VarChar(80)
+  symbol            String   @db.VarChar(64)
+  name              String   @db.VarChar(160)
+  decimals          Int
+  logoUrl           String?  @map("logo_url") @db.Text
+  category          String   @db.VarChar(20)
+  isin              String?  @db.VarChar(32)
+  status            String   @db.VarChar(64)
+  currentMultiplier String?  @map("current_multiplier") @db.VarChar(80)
+  marketStatus      String?  @map("market_status") @db.VarChar(64)
+  extendedStatus    String?  @map("extended_status") @db.VarChar(64)
+  overnightStatus   String?  @map("overnight_status") @db.VarChar(64)
+  sourceUpdatedAt   DateTime @map("source_updated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@id([chainId, address])
   @@index([chainId, category, status])
@@ -78,14 +78,14 @@ model AssetCatalog {
 }
 
 model AssetDisplayConfig {
-  chainId          Int      @map("chain_id")
-  address          String   @db.VarChar(42)
-  candidateEnabled Boolean  @default(true) @map("candidate_enabled")
-  candidateRank    Int?     @map("candidate_rank")
-  candidateQuoteAddress String? @map("candidate_quote_address") @db.VarChar(42)
-  logoUrl          String?  @map("logo_url") @db.Text
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  chainId               Int      @map("chain_id")
+  address               String   @db.VarChar(42)
+  candidateEnabled      Boolean  @default(true) @map("candidate_enabled")
+  candidateRank         Int?     @map("candidate_rank")
+  candidateQuoteAddress String?  @map("candidate_quote_address") @db.VarChar(42)
+  logoUrl               String?  @map("logo_url") @db.Text
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@id([chainId, address])
   @@index([chainId, candidateEnabled, candidateRank])
@@ -100,6 +100,183 @@ model ChainCursor {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("chain_cursors")
+}
+
+model Launchpad {
+  chainId                 Int      @map("chain_id")
+  launchpadId             BigInt   @map("launchpad_id")
+  owner                   String   @db.VarChar(42)
+  feeRecipient            String   @map("fee_recipient") @db.VarChar(42)
+  admins                  String[] @default([])
+  name                    String   @db.VarChar(120)
+  slug                    String   @db.VarChar(80)
+  metadataUri             String   @map("metadata_uri") @db.Text
+  domain                  String   @db.VarChar(255)
+  xHandle                 String   @map("x_handle") @db.VarChar(64)
+  quoteToken              String   @map("quote_token") @db.VarChar(42)
+  tradeFeePips            Int      @map("trade_fee_pips")
+  creatorSharePips        Int      @map("creator_share_pips")
+  launchpadSharePips      Int      @map("launchpad_share_pips")
+  protocolSharePips       Int      @map("protocol_share_pips")
+  lpCreatorSharePips      Int      @map("lp_creator_share_pips")
+  lpLaunchpadSharePips    Int      @map("lp_launchpad_share_pips")
+  lpProtocolSharePips     Int      @map("lp_protocol_share_pips")
+  graduationThreshold     Decimal  @map("graduation_threshold") @db.Decimal(78, 0)
+  curveTokenSupply        Decimal  @map("curve_token_supply") @db.Decimal(78, 0)
+  graduationTarget        String   @map("graduation_target") @db.VarChar(12)
+  startFeePips            Int      @map("start_fee_pips")
+  endFeePips              Int      @map("end_fee_pips")
+  feeDurationSeconds      Int      @map("fee_duration_seconds")
+  feeCurve                String   @map("fee_curve") @db.VarChar(16)
+  protectionEnabled       Boolean  @map("protection_enabled")
+  xRequired               Boolean  @map("x_required")
+  devBuyCapPips           Int      @map("dev_buy_cap_pips")
+  earlyBuyCapPips         Int      @map("early_buy_cap_pips")
+  earlyBuyDurationSeconds Int      @map("early_buy_duration_seconds")
+  active                  Boolean  @default(true)
+  transactionHash         String   @map("transaction_hash") @db.VarChar(66)
+  blockNumber             BigInt   @map("block_number")
+  createdAt               DateTime @map("created_at")
+  canonical               Boolean  @default(true)
+
+  launches Launch[]
+  statusEvents LaunchpadStatusEvent[]
+
+  @@id([chainId, launchpadId])
+  @@unique([chainId, slug])
+  @@index([chainId, owner, active])
+  @@map("launchpads")
+}
+
+model LaunchpadStatusEvent {
+  chainId         Int      @map("chain_id")
+  transactionHash String   @map("transaction_hash") @db.VarChar(66)
+  logIndex        Int      @map("log_index")
+  launchpadId     BigInt   @map("launchpad_id")
+  active          Boolean
+  blockNumber     BigInt   @map("block_number")
+  timestamp       DateTime
+  canonical       Boolean  @default(true)
+
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@id([chainId, transactionHash, logIndex])
+  @@index([chainId, launchpadId, blockNumber])
+  @@map("launchpad_status_events")
+}
+
+model Launch {
+  chainId         Int      @map("chain_id")
+  launchId        BigInt   @map("launch_id")
+  launchpadId     BigInt   @map("launchpad_id")
+  creator         String   @db.VarChar(42)
+  token           String   @db.VarChar(42)
+  curve           String   @db.VarChar(42)
+  name            String   @db.VarChar(120)
+  symbol          String   @db.VarChar(32)
+  metadataUri     String   @map("metadata_uri") @db.Text
+  totalSupply     Decimal  @map("total_supply") @db.Decimal(78, 0)
+  quoteReserve    Decimal  @default(0) @map("quote_reserve") @db.Decimal(78, 0)
+  tokenInventory  Decimal  @map("token_inventory") @db.Decimal(78, 0)
+  progressPips    Int      @default(0) @map("progress_pips")
+  status          String   @default("curve") @db.VarChar(20)
+  transactionHash String   @map("transaction_hash") @db.VarChar(66)
+  blockNumber     BigInt   @map("block_number")
+  createdAt       DateTime @map("created_at")
+  canonical       Boolean  @default(true)
+
+  launchpad  Launchpad          @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Restrict)
+  trades     CurveTrade[]
+  graduation Graduation?
+  revenue    LaunchpadRevenue[]
+
+  @@id([chainId, launchId])
+  @@unique([chainId, token])
+  @@unique([chainId, curve])
+  @@index([chainId, launchpadId, createdAt])
+  @@index([chainId, status, createdAt])
+  @@map("launches")
+}
+
+model CurveTrade {
+  chainId         Int      @map("chain_id")
+  transactionHash String   @map("transaction_hash") @db.VarChar(66)
+  logIndex        Int      @map("log_index")
+  launchId        BigInt   @map("launch_id")
+  side            String   @db.VarChar(8)
+  trader          String   @db.VarChar(42)
+  recipient       String   @db.VarChar(42)
+  quoteAmount     Decimal  @map("quote_amount") @db.Decimal(78, 0)
+  tokenAmount     Decimal  @map("token_amount") @db.Decimal(78, 0)
+  feeAmount       Decimal  @map("fee_amount") @db.Decimal(78, 0)
+  quoteReserve    Decimal  @map("quote_reserve") @db.Decimal(78, 0)
+  tokenInventory  Decimal  @map("token_inventory") @db.Decimal(78, 0)
+  progressPips    Int      @map("progress_pips")
+  blockNumber     BigInt   @map("block_number")
+  timestamp       DateTime
+  canonical       Boolean  @default(true)
+
+  launch Launch @relation(fields: [chainId, launchId], references: [chainId, launchId], onDelete: Cascade)
+
+  @@id([chainId, transactionHash, logIndex])
+  @@index([chainId, launchId, timestamp])
+  @@map("curve_trades")
+}
+
+model Graduation {
+  chainId         Int      @map("chain_id")
+  launchId        BigInt   @map("launch_id")
+  pool            String   @db.VarChar(42)
+  positionId      BigInt   @map("position_id")
+  tokenAmount     Decimal  @map("token_amount") @db.Decimal(78, 0)
+  quoteAmount     Decimal  @map("quote_amount") @db.Decimal(78, 0)
+  transactionHash String   @map("transaction_hash") @db.VarChar(66)
+  blockNumber     BigInt   @map("block_number")
+  timestamp       DateTime
+  canonical       Boolean  @default(true)
+
+  launch Launch @relation(fields: [chainId, launchId], references: [chainId, launchId], onDelete: Cascade)
+
+  @@id([chainId, launchId])
+  @@unique([chainId, pool])
+  @@unique([chainId, positionId])
+  @@map("graduations")
+}
+
+model LaunchpadRevenue {
+  chainId         Int      @map("chain_id")
+  transactionHash String   @map("transaction_hash") @db.VarChar(66)
+  logIndex        Int      @map("log_index")
+  launchId        BigInt   @map("launch_id")
+  recipient       String   @db.VarChar(42)
+  category        String   @db.VarChar(20)
+  token           String   @db.VarChar(42)
+  amount          Decimal  @db.Decimal(78, 0)
+  blockNumber     BigInt   @map("block_number")
+  timestamp       DateTime
+  canonical       Boolean  @default(true)
+
+  launch Launch @relation(fields: [chainId, launchId], references: [chainId, launchId], onDelete: Cascade)
+
+  @@id([chainId, transactionHash, logIndex, category])
+  @@index([chainId, launchId, timestamp])
+  @@index([chainId, recipient, timestamp])
+  @@map("launchpad_revenue")
+}
+
+model ProtectedTokenIdentity {
+  chainId     Int      @map("chain_id")
+  token       String   @db.VarChar(42)
+  name        String   @db.VarChar(120)
+  symbol      String   @db.VarChar(32)
+  officialXId String   @map("official_x_id")
+  verifiedAt  DateTime @map("verified_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@id([chainId, token])
+  @@index([chainId, symbol])
+  @@index([officialXId])
+  @@map("protected_token_identities")
 }
 
 model IndexerHealth {
@@ -391,16 +568,16 @@ model PositionEvent {
 // ==========================================
 
 model User {
-  id         String   @id @default(uuid()) @db.Uuid
-  xId        String   @unique @map("x_id")
-  handle     String   @unique
-  name       String?
-  avatarUrl  String?  @map("avatar_url")
-  xVerified  Boolean  @default(false) @map("x_verified")
-  xFollowers Int      @default(0) @map("x_followers")
+  id                  String    @id @default(uuid()) @db.Uuid
+  xId                 String    @unique @map("x_id")
+  handle              String    @unique
+  name                String?
+  avatarUrl           String?   @map("avatar_url")
+  xVerified           Boolean   @default(false) @map("x_verified")
+  xFollowers          Int       @default(0) @map("x_followers")
   xProfileRefreshedAt DateTime? @map("x_profile_refreshed_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  banned     Boolean  @default(false)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  banned              Boolean   @default(false)
 
   wallets            Wallet[]
   callouts           Callout[]
@@ -437,6 +614,8 @@ model Wallet {
 model Callout {
   id               String    @id @default(uuid()) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
+  kind             String    @default("position") @db.VarChar(20)
+  launchId         BigInt?   @map("launch_id")
   chainId          Int       @map("chain_id")
   positionId       BigInt    @map("position_id")
   poolId           String    @map("pool_id") @db.Uuid
@@ -474,6 +653,7 @@ model Callout {
   @@unique([chainId, positionId])
   @@index([userId])
   @@index([poolId])
+  @@index([chainId, launchId])
   @@index([createdAt])
   @@map("callouts")
 }

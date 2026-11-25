@@ -33,6 +33,8 @@ export interface CalloutComment {
  */
 export interface Callout {
   id: string;
+  kind?: 'position' | 'launch_lp';
+  launchId?: string | null;
   /** Canonical creation time used for exact chart placement on every interval. */
   createdAt: string;
   caller: Caller;

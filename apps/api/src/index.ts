@@ -8,6 +8,7 @@ import { tryGetFomeoraDeployment } from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import { loadApiEnvironment } from '@fomeora/env';
 import Fastify from 'fastify';
+import type { Address, Hex } from 'viem';
 
 import { SESSION_COOKIE_NAME } from './core/auth/session.js';
 import { createApiChainClient } from './core/chain-client.js';
@@ -15,6 +16,7 @@ import { OutboxWakeup, pruneOutboxEvents } from './core/realtime/outbox.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCalloutRoutes } from './routes/callouts.js';
 import { registerFeedRoutes } from './routes/feed.js';
+import { registerLaunchRoutes } from './routes/launches.js';
 import { registerPoolCreationRoutes } from './routes/pool-creation.js';
 import { registerPoolRoutes } from './routes/pools.js';
 import { registerPositionActionRoutes } from './routes/position-actions.js';
@@ -164,6 +166,13 @@ export async function createServer(environment = loadApiEnvironment()) {
   });
   await registerCalloutRoutes(app, environment.CHAIN_ID);
   await registerFeedRoutes(app, environment.CHAIN_ID);
+  await registerLaunchRoutes(app, environment.CHAIN_ID, chainClient, {
+    ...(environment.LAUNCHPAD_FACTORY_ADDRESS ? { launchpadFactory: environment.LAUNCHPAD_FACTORY_ADDRESS as Address } : {}),
+    ...(environment.LAUNCH_FACTORY_ADDRESS ? { launchFactory: environment.LAUNCH_FACTORY_ADDRESS as Address } : {}),
+    ...(environment.LAUNCH_IDENTITY_VERIFIER_ADDRESS ? { identityVerifier: environment.LAUNCH_IDENTITY_VERIFIER_ADDRESS as Address } : {}),
+    ...(environment.GRADUATOR_ADDRESS ? { graduator: environment.GRADUATOR_ADDRESS as Address } : {}),
+    ...(environment.LAUNCH_IDENTITY_SIGNER_PRIVATE_KEY ? { identitySignerPrivateKey: environment.LAUNCH_IDENTITY_SIGNER_PRIVATE_KEY as Hex } : {}),
+  });
   await registerPoolRoutes(app, environment.CHAIN_ID);
   await registerPoolCreationRoutes(app, environment.CHAIN_ID, chainClient);
   await registerPositionRoutes(app, environment.CHAIN_ID);

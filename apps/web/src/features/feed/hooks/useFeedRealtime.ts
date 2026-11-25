@@ -14,6 +14,9 @@ export function useFeedRealtime(refresh: () => Promise<unknown>) {
         return;
       }
       if (message.topic === 'callout.update' || message.topic === 'callout.stats') void refresh();
+      if (message.topic === 'launch.new' || message.topic === 'launch.progress' || message.topic === 'launch.revenue' || message.topic === 'launch.graduated') {
+        void refresh();
+      }
     },
     onError: error => setStreamError(error.message),
   }), [refresh]);

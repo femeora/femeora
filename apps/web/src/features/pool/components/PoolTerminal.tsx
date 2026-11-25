@@ -11,6 +11,7 @@ import { openApiEventStream } from '@/lib/api/realtime';
 import { usePositionDraft } from '../hooks/usePositionDraft';
 import type { ValueUnit } from '../model/format';
 import type { LiveLp, LivePoolStats, LiveTrade } from '../model/live';
+import { fromContractBinBounds, toContractBinBounds } from '../model/orientation';
 import type { Candle, LiquidityBin, Pool } from '../model/pool';
 import { snapRangeBound } from '../model/range';
 
@@ -24,11 +25,20 @@ import { TradePanel, type PanelTab } from './TradePanel';
 interface PoolTerminalProps {
   pool: Pool;
   stats: LivePoolStats;
-  candlesBySource: Readonly<Record<'pool' | 'reference', Readonly<Record<ChartInterval, readonly Candle[]>>>>;
+  candlesBySource: Readonly<
+    Record<'pool' | 'reference', Readonly<Record<ChartInterval, readonly Candle[]>>>
+  >;
   liquidity: readonly LiquidityBin[];
   trades: readonly LiveTrade[];
   lps: readonly LiveLp[];
   callouts: readonly Callout[];
+  priceWarning: {
+    poolPrice: number;
+    referencePrice: number;
+    deviationPct: number;
+    source: string;
+    updatedAt: string;
+  } | null;
 }
 
 /**
@@ -44,6 +54,7 @@ export function PoolTerminal({
   trades,
   lps,
   callouts,
+  priceWarning,
 }: PoolTerminalProps) {
   const router = useRouter();
   const showToast = useToast(state => state.show);
@@ -68,6 +79,10 @@ export function PoolTerminal({
     let refreshTimer: number | null = null;
     let reconciliationTimer: number | null = null;
     let reconciliationDeadline = 0;
+    let pendingTransactionHash: string | null = null;
+    let pendingPositionIndexed = false;
+    let pendingCalloutIndexed = false;
+    let pendingExpectsCallout = false;
     const queuePoolRefresh = () => {
       if (refreshTimer !== null) return;
       refreshTimer = window.setTimeout(() => {
@@ -79,7 +94,13 @@ export function PoolTerminal({
       if (reconciliationTimer !== null) window.clearInterval(reconciliationTimer);
       reconciliationTimer = null;
       reconciliationDeadline = 0;
+      pendingTransactionHash = null;
+      pendingPositionIndexed = false;
+      pendingCalloutIndexed = false;
+      pendingExpectsCallout = false;
     };
+    const reconciliationComplete = () =>
+      pendingPositionIndexed && (!pendingExpectsCallout || pendingCalloutIndexed);
     const reconcileConfirmedPosition = () => {
       window.dispatchEvent(
         new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } })
@@ -88,44 +109,82 @@ export function PoolTerminal({
       if (Date.now() >= reconciliationDeadline) stopReconciliation();
     };
     const onPositionConfirmed = (event: Event) => {
-      const detail = (event as CustomEvent<{ pool?: string }>).detail;
+      const detail = (event as CustomEvent<{
+        pool?: string;
+        transactionHash?: string;
+        expectsCallout?: boolean;
+      }>).detail;
       if (detail?.pool?.toLowerCase() !== pool.address.toLowerCase()) return;
       stopReconciliation();
+      pendingTransactionHash = detail.transactionHash?.toLowerCase() ?? null;
+      pendingExpectsCallout = detail.expectsCallout === true;
       reconciliationDeadline = Date.now() + 120_000;
       reconcileConfirmedPosition();
       reconciliationTimer = window.setInterval(reconcileConfirmedPosition, 4_000);
     };
     const positionTopics = new Set([
-      'position.created', 'position.increased', 'position.decreased', 'position.closed', 'position.transferred',
+      'position.created',
+      'position.increased',
+      'position.decreased',
+      'position.closed',
+      'position.transferred',
     ]);
     const stop = openApiEventStream(`/v1/pools/${pool.address}/stream`, {
       onMessage: message => {
-        if (message.topic === 'pool.cap') {
-          const payload = message.payload;
-          const record = typeof payload === 'object' && payload !== null && !Array.isArray(payload)
-            ? payload as Record<string, unknown>
+        const payload =
+          typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)
+            ? (message.payload as Record<string, unknown>)
             : null;
-          const status = record && typeof record.status === 'string' ? record.status : 'unavailable';
-          const utilizationBps = record && typeof record.utilizationBps === 'number' ? record.utilizationBps : null;
+        const eventTransactionHash =
+          payload && typeof payload.transactionHash === 'string'
+            ? payload.transactionHash.toLowerCase()
+            : null;
+        const matchesPendingTransaction =
+          pendingTransactionHash === null || eventTransactionHash === pendingTransactionHash;
+        if (message.topic === 'pool.cap') {
+          const record =
+            payload;
+          const status =
+            record && typeof record.status === 'string' ? record.status : 'unavailable';
+          const utilizationBps =
+            record && typeof record.utilizationBps === 'number' ? record.utilizationBps : null;
           const usage = utilizationBps === null ? '' : ` (${(utilizationBps / 100).toFixed(2)}%)`;
           if (status === 'critical') {
-            showToast(`Liquidity reserve usage is critical${usage}. New deposits or swaps may reach the configured safety limit.`, {
-              title: 'Pool reserve limit', tone: 'error', userFacing: true,
-            });
+            showToast(
+              `Liquidity reserve usage is critical${usage}. New deposits or swaps may reach the configured safety limit.`,
+              {
+                title: 'Pool reserve limit',
+                tone: 'error',
+                userFacing: true,
+              }
+            );
           } else if (status === 'warning') {
             showToast(`Liquidity reserve usage is approaching its safety limit${usage}.`, {
-              title: 'Pool reserve warning', tone: 'info',
+              title: 'Pool reserve warning',
+              tone: 'info',
             });
           } else if (status === 'normal') {
             showToast('Liquidity reserve usage has returned to the normal range.', {
-              title: 'Pool reserve recovered', tone: 'success',
+              title: 'Pool reserve recovered',
+              tone: 'success',
             });
           }
         }
         if (positionTopics.has(message.topic)) {
-          if (message.topic === 'position.created') stopReconciliation();
-          window.dispatchEvent(new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } }));
+          if (message.topic === 'position.created' && matchesPendingTransaction) {
+            pendingPositionIndexed = true;
+          }
+          window.dispatchEvent(
+            new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } })
+          );
         }
+        if (message.topic === 'callout.new') {
+          if (matchesPendingTransaction) pendingCalloutIndexed = true;
+          window.dispatchEvent(
+            new CustomEvent('fomeora:pool-update', { detail: { pool: pool.address } })
+          );
+        }
+        if (reconciliationComplete()) stopReconciliation();
         queuePoolRefresh();
       },
     });
@@ -150,10 +209,41 @@ export function PoolTerminal({
   return (
     <div className="flex flex-col gap-4 px-gutter py-5">
       <PoolHeader pool={pool} />
+      {priceWarning ? (
+        <section
+          className="flex flex-col gap-3 border border-down/60 bg-down/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <div>
+            <p className="t-label text-down">Initial pool price warning</p>
+            <p className="mt-1 text-sm text-fg">
+              The on-chain pool price is {priceWarning.deviationPct.toFixed(2)}% away from the
+              independent market reference.
+            </p>
+            <p className="t-label mt-2 text-muted">
+              Pool {priceWarning.poolPrice.toPrecision(8)} · Reference{' '}
+              {priceWarning.referencePrice.toPrecision(8)} · {priceWarning.source} ·{' '}
+              {new Date(priceWarning.updatedAt).toLocaleString()}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="t-label min-h-11 shrink-0 border border-line-strong bg-panel-2 px-4 text-fg hover:border-fg"
+            onClick={() => {
+              setChartSource('reference');
+              document
+                .getElementById('pool-price-chart')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          >
+            View reference chart
+          </button>
+        </section>
+      ) : null}
       <MarketStrips stats={stats} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
-        <section aria-label="Chart" className="min-w-0">
+        <section id="pool-price-chart" aria-label="Chart" className="min-w-0 scroll-mt-24">
           <ChartToolbar
             interval={interval}
             onIntervalChange={setChartInterval}
@@ -182,11 +272,32 @@ export function PoolTerminal({
               liquidity={showBins ? liquidity : []}
               unit={unit}
               range={panelTab === 'create' ? position.draft : null}
-              onRangeChange={(bound, value) => position.dispatch({
-                type: 'range',
-                bound,
-                value: snapRangeBound(position.draft, bound, value, pool.binStepBps),
-              })}
+              onRangeChange={(bound, value) =>
+                position.dispatch({
+                  type: 'range',
+                  ...(() => {
+                    const next = {
+                      ...position.draft,
+                      [bound]: snapRangeBound(position.draft, bound, value, pool.binStepBps),
+                    };
+                    const exact = toContractBinBounds(
+                      pool.baseIsTokenX,
+                      pool.activeBinId,
+                      next,
+                      pool.binStepBps
+                    );
+                    return {
+                      ...fromContractBinBounds(
+                        pool.baseIsTokenX,
+                        pool.activeBinId,
+                        exact,
+                        pool.binStepBps
+                      ),
+                      ...exact,
+                    };
+                  })(),
+                })
+              }
               callouts={own.concat(callouts)}
               showCallouts={showCallouts}
             />

@@ -5,7 +5,11 @@ import {
   ApiBinSchema,
   ApiCalloutSchema,
   ApiCandleSchema,
+  ApiLaunchDetailSchema,
   ApiLpSchema,
+  ApiLaunchpadDetailSchema,
+  ApiLaunchpadSchema,
+  ApiLaunchSchema,
   ApiPoolDetailSchema,
   ApiPoolAssetListSchema,
   ApiPoolSchema,
@@ -21,13 +25,20 @@ const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
 const RETRY_DELAYS_MS = [150, 450] as const;
 
 export class FomeoraApiError extends Error {
-  constructor(readonly status: number, readonly code: string) {
+  constructor(
+    readonly status: number,
+    readonly code: string
+  ) {
     super(code);
     this.name = 'FomeoraApiError';
   }
 }
 
-async function request<T>(path: string, schema: ZodType<T>, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+async function request<T>(
+  path: string,
+  schema: ZodType<T>,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): Promise<T> {
   const { API_BASE_URL } = loadWebEnvironment();
   for (let attempt = 0; ; attempt += 1) {
     try {
@@ -37,7 +48,7 @@ async function request<T>(path: string, schema: ZodType<T>, timeoutMs = REQUEST_
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) {
-        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         if (TRANSIENT_STATUSES.has(response.status) && attempt < RETRY_DELAYS_MS.length) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
           continue;
@@ -67,31 +78,62 @@ export const getPool = (address: string) =>
   request(`/v1/pools/${encodeURIComponent(address)}`, ApiPoolDetailSchema);
 
 export const getPoolStats = (address: string) =>
-  request(`/v1/pools/${encodeURIComponent(address)}/stats`, ApiPoolStatsSchema, SECONDARY_REQUEST_TIMEOUT_MS);
+  request(
+    `/v1/pools/${encodeURIComponent(address)}/stats`,
+    ApiPoolStatsSchema,
+    SECONDARY_REQUEST_TIMEOUT_MS
+  );
 
-export const getPoolCandles = (address: string, interval: string, limit: number, source: 'pool' | 'reference' | 'combined' = 'combined') =>
+export const getPoolCandles = (
+  address: string,
+  interval: string,
+  limit: number,
+  source: 'pool' | 'reference' | 'combined' = 'combined'
+) =>
   request(
     `/v1/pools/${encodeURIComponent(address)}/candles?interval=${encodeURIComponent(interval)}&limit=${limit}&source=${source}`,
-    apiListSchema(ApiCandleSchema), SECONDARY_REQUEST_TIMEOUT_MS,
+    apiListSchema(ApiCandleSchema),
+    SECONDARY_REQUEST_TIMEOUT_MS
   );
 
 export const getPoolBins = (address: string, from: number, to: number) =>
   request(
     `/v1/pools/${encodeURIComponent(address)}/bins?from=${from}&to=${to}`,
-    apiListSchema(ApiBinSchema), SECONDARY_REQUEST_TIMEOUT_MS,
+    apiListSchema(ApiBinSchema),
+    SECONDARY_REQUEST_TIMEOUT_MS
   );
 
 export const getPoolTrades = (address: string, limit = 50) =>
   request(
     `/v1/pools/${encodeURIComponent(address)}/trades?limit=${limit}`,
-    apiListSchema(ApiTradeSchema), SECONDARY_REQUEST_TIMEOUT_MS,
+    apiListSchema(ApiTradeSchema),
+    SECONDARY_REQUEST_TIMEOUT_MS
   );
 
 export const getPoolLps = (address: string, limit = 50) =>
-  request(`/v1/pools/${encodeURIComponent(address)}/lps?limit=${limit}`, apiListSchema(ApiLpSchema), SECONDARY_REQUEST_TIMEOUT_MS);
+  request(
+    `/v1/pools/${encodeURIComponent(address)}/lps?limit=${limit}`,
+    apiListSchema(ApiLpSchema),
+    SECONDARY_REQUEST_TIMEOUT_MS
+  );
 
 export const getPoolCallouts = (address: string, limit = 50) =>
   request(
     `/v1/pools/${encodeURIComponent(address)}/callouts?limit=${limit}`,
-    apiListSchema(ApiCalloutSchema), SECONDARY_REQUEST_TIMEOUT_MS,
+    apiListSchema(ApiCalloutSchema),
+    SECONDARY_REQUEST_TIMEOUT_MS
   );
+
+export const getLaunchpads = () => request('/v1/launchpads', apiListSchema(ApiLaunchpadSchema));
+
+export const getLaunchpad = (slug: string) =>
+  request(`/v1/launchpads/${encodeURIComponent(slug)}`, ApiLaunchpadDetailSchema);
+
+export const getLaunches = (launchpad?: string) =>
+  request(
+    `/v1/launches${launchpad ? `?launchpad=${encodeURIComponent(launchpad)}` : ''}`,
+    apiListSchema(ApiLaunchSchema)
+  );
+
+export const getLaunch = (token: string) =>
+  request(`/v1/launches/${encodeURIComponent(token)}`, ApiLaunchDetailSchema);

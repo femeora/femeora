@@ -80,6 +80,8 @@ export function apiCalloutToCallout(
     .toUpperCase();
   return {
     id: callout.id,
+    kind: callout.kind,
+    launchId: callout.launchId,
     createdAt: callout.createdAt,
     caller: {
       id: callout.user.id,

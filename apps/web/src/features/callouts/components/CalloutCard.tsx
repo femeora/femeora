@@ -88,6 +88,7 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
       </div>
 
       <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
+        {callout.kind === 'launch_lp' ? <Chip tone="up">Launch LP · permanently locked</Chip> : null}
         <Chip tone="signal">{sideLabel(callout)}</Chip>
         <Chip>
           <SpanText value={rangeLabel(callout)} />

@@ -104,9 +104,40 @@ export async function registerRealtimeRoutes(app: FastifyInstance, chainId: numb
   app.get('/v1/feed/stream', async (request, reply) =>
     streamEvents(request, reply, wakeup, {
       chainId,
-      topics: ['callout.new', 'callout.update', 'callout.stats'],
+      topics: ['callout.new', 'callout.update', 'callout.stats', 'launch.new', 'launch.progress', 'launch.revenue', 'launch.graduated'],
     }),
   );
+
+  app.get('/v1/launches/:token/stream', async (request, reply) => {
+    const parsed = z.object({ token: addressSchema }).safeParse(request.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'INVALID_TOKEN_ADDRESS' });
+    const launch = await prisma.launch.findFirst({
+      where: { chainId, token: parsed.data.token, canonical: true },
+      select: { token: true },
+    });
+    if (!launch) return reply.status(404).send({ error: 'LAUNCH_NOT_FOUND' });
+    return streamEvents(request, reply, wakeup, {
+      chainId,
+      topics: ['launch.progress', 'launch.revenue', 'launch.graduated'],
+      aggregateId: launch.token,
+    });
+  });
+
+  app.get('/v1/launchpads/:slug/stream', async (request, reply) => {
+    const parsed = z.object({ slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }).safeParse(request.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_SLUG' });
+    const launchpad = await prisma.launchpad.findFirst({
+      where: { chainId, slug: parsed.data.slug, canonical: true },
+      select: { launchpadId: true },
+    });
+    if (!launchpad) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+    // Launchpad pages subscribe broadly and filter by launchpadId in payload;
+    // aggregate IDs for progress events remain the token for token-page streams.
+    return streamEvents(request, reply, wakeup, {
+      chainId,
+      topics: ['launchpad.update', 'launch.new', 'launch.progress', 'launch.revenue', 'launch.graduated'],
+    });
+  });
 
   app.get('/v1/pools/:pool/stream', async (request, reply) => {
     const parsed = z.object({ pool: addressSchema }).safeParse(request.params);

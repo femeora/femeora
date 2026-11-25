@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { binCount, DEFAULT_POSITION_PRESET_ID, fitRangeToBinLimit, PRESETS, snapRangeBound } from './range';
+import { binCount, DEFAULT_POSITION_PRESET_ID, fitRangeToBinLimit, PRESETS, rangeBinBounds, snapRangeBound } from './range';
 
 test('defaults to a two-sided range around the active price', () => {
   const preset = PRESETS.find(item => item.id === DEFAULT_POSITION_PRESET_ID);
@@ -42,4 +42,10 @@ test('does not allow either handle to cross the opposite handle', () => {
   const range = { minPct: -10, maxPct: 10 };
   assert.ok(snapRangeBound(range, 'minPct', 50, 100) < range.maxPct);
   assert.ok(snapRangeBound(range, 'maxPct', -50, 100) > range.minPct);
+});
+
+test('converts the visible percentage range to exact inclusive contract bins', () => {
+  const bounds = rangeBinBounds(746, { minPct: -7, maxPct: 8 }, 25);
+  assert.deepEqual(bounds, { lowerBin: 717, upperBin: 776 });
+  assert.equal(bounds.upperBin - bounds.lowerBin + 1, binCount({ minPct: -7, maxPct: 8 }, 25));
 });

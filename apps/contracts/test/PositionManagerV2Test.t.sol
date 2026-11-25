@@ -15,6 +15,39 @@ interface VmTest {
     function warp(uint256 timestamp) external;
 }
 
+contract LegacyDammPoolMock {
+    address public immutable token0;
+    address public immutable token1;
+    mapping(address account => uint256 shares) public sharesOf;
+
+    constructor(address token0_, address token1_) {
+        token0 = token0_;
+        token1 = token1_;
+    }
+
+    function addLiquidity(uint256 amount0, uint256 amount1, uint256, address recipient, uint256)
+        external
+        returns (uint256 shares)
+    {
+        MockERC20(token0).transferFrom(msg.sender, address(this), amount0);
+        MockERC20(token1).transferFrom(msg.sender, address(this), amount1);
+        shares = amount0 < amount1 ? amount0 : amount1;
+        sharesOf[recipient] += shares;
+    }
+
+    function removeLiquidity(uint256 shares, uint256, uint256, address recipient, uint256)
+        external
+        returns (uint256 amount0, uint256 amount1)
+    {
+        require(sharesOf[msg.sender] >= shares, "shares");
+        sharesOf[msg.sender] -= shares;
+        amount0 = shares;
+        amount1 = shares;
+        MockERC20(token0).transfer(recipient, amount0);
+        MockERC20(token1).transfer(recipient, amount1);
+    }
+}
+
 contract PositionManagerV2Test {
     VmTest private constant vm = VmTest(address(uint160(uint256(keccak256("hevm cheat code")))));
     PoolRegistry private registry;
@@ -168,6 +201,59 @@ contract PositionManagerV2Test {
         require(tag == p.tag && referrer == p.referrer && open, "damm metadata");
         manager.closeDamm(id, 0, 0, address(this), block.timestamp + 1);
         require(manager.dammShares(id) == 0 && manager.balanceOf(address(this)) == 0, "damm close");
+    }
+
+    function testLegacyDammPositionStillCreatesAndClosesWithoutFeeGrowthGetters() public {
+        PoolKey memory key = PoolKeyLib.normalize(address(token0), address(token1), PoolModel.DAMM, 3_000, 0);
+        LegacyDammPoolMock legacyPool = new LegacyDammPoolMock(key.token0, key.token1);
+        registry.registerPool(PoolKeyLib.id(key), address(legacyPool), key);
+        uint256 id = manager.createDammPosition(
+            IPositionManagerV2.CreateDammParams({
+                pool: address(legacyPool),
+                amountX: 1 ether,
+                amountY: 1 ether,
+                minShares: 1,
+                tag: keccak256("legacy"),
+                referrer: address(0),
+                deadline: block.timestamp + 1
+            })
+        );
+        manager.closeDamm(id, 0, 0, address(this), block.timestamp + 1);
+        (,,,,,, bool open) = manager.positions(id);
+        require(!open, "legacy DAMM remained open");
+    }
+
+    function testLockedDammPositionCannotDecreaseButCanClaimFees() public {
+        PoolKey memory key = PoolKeyLib.normalize(address(token0), address(token1), PoolModel.DAMM, 3_000, 0);
+        DammPool damm = new DammPool(key, address(this));
+        damm.setReserveCaps(type(uint112).max, type(uint112).max);
+        registry.registerPool(PoolKeyLib.id(key), address(damm), key);
+        uint256 id = manager.createDammPosition(
+            IPositionManagerV2.CreateDammParams({
+                pool: address(damm),
+                amountX: 10 ether,
+                amountY: 10 ether,
+                minShares: 0,
+                tag: keccak256("locked-launch"),
+                referrer: address(0),
+                deadline: block.timestamp + 1
+            })
+        );
+        manager.lockPosition(id);
+        (bool decreased,) = address(manager)
+            .call(
+                abi.encodeCall(
+                    PositionManagerV2.decreaseDamm, (id, uint16(1), 0, 0, address(this), block.timestamp + 1)
+                )
+            );
+        require(!decreased, "locked position decreased");
+
+        token0.approve(address(damm), type(uint256).max);
+        damm.swapExactInput(address(token0), 1 ether, 0, address(this), block.timestamp + 1);
+        uint256 before = token0.balanceOf(address(this));
+        (uint256 amount0, uint256 amount1) = manager.claimDammFees(id, address(this));
+        require(amount0 != 0 && amount1 == 0, "fees not claimed");
+        require(token0.balanceOf(address(this)) == before + amount0, "fee transfer");
     }
 
     function _params(bool above, bytes32 tag) private view returns (IPositionManagerV2.CreateParams memory p) {
