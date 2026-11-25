@@ -145,7 +145,7 @@ export function PoolTerminal({
           <div className="mb-2 flex items-center gap-2 text-[0.6875rem] uppercase tracking-[0.12em] text-faint">
             <span className="inline-block size-1.5 rounded-full bg-signal" />
             {candles[0]?.source === 'reference'
-              ? `Reference market · Chainlink${candles.at(-1)?.stale ? ' · delayed' : ''} · pool volume excluded`
+              ? `Reference market · ${candles.at(-1)?.sourceType === 'GECKOTERMINAL' ? `${pool.base}/${pool.quote} external pool · GeckoTerminal` : 'Chainlink'}${candles.at(-1)?.stale ? ' · delayed' : ''} · Femeora pool volume excluded`
               : 'Femeora pool trades · on-chain swaps only'}
           </div>
           <div className="glass h-[320px] rounded-[2px] sm:h-[440px]">

@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "sync:once": "node dist/sync-once.js",
     "backfill:reference": "node dist/backfill-reference.js",
+    "backfill:external-reference": "node dist/backfill-external-reference.js",
     "clean": "rm -rf dist *.tsbuildinfo",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",

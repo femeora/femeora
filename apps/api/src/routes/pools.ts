@@ -22,6 +22,7 @@ interface SerializedCandle {
   swapCount: number;
   synthetic: boolean;
   source?: 'pool' | 'reference';
+  sourceType?: 'CHAINLINK' | 'GECKOTERMINAL';
   sourceUpdatedAt?: string;
   stale?: boolean;
 }
@@ -46,6 +47,7 @@ export function fillCandleGaps(input: readonly SerializedCandle[], interval: key
         timestamp: new Date(timestamp).toISOString(), open: close, high: close, low: close, close,
         volumeX: '0', volumeY: '0', volumeQuote: '0', swapCount: 0, synthetic: true,
         ...(input[0]!.source ? { source: input[0]!.source } : {}),
+        ...(input[0]!.sourceType ? { sourceType: input[0]!.sourceType } : {}),
         ...(input[0]!.sourceUpdatedAt ? { sourceUpdatedAt: input[0]!.sourceUpdatedAt } : {}),
         ...(input[0]!.stale !== undefined ? { stale: input[0]!.stale } : {}),
       });
@@ -464,7 +466,8 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
         timestamp: candle.bucketStart.toISOString(),
         open: candle.open.toString(), high: candle.high.toString(), low: candle.low.toString(), close: candle.close.toString(),
         volumeX: '0', volumeY: '0', volumeQuote: null, swapCount: 0, synthetic: false,
-        source: 'reference', sourceUpdatedAt: candle.sourceUpdatedAt.toISOString(), stale: candle.stale,
+        source: 'reference', sourceType: candle.sourceType as 'CHAINLINK' | 'GECKOTERMINAL',
+        sourceUpdatedAt: candle.sourceUpdatedAt.toISOString(), stale: candle.stale,
       }));
       return { data: fillCandleGaps(serialized, query.data.interval, query.data.limit) };
     }

@@ -43,6 +43,7 @@ export interface Candle {
   volume: number;
   timestamp?: number;
   source: 'pool' | 'reference';
+  sourceType?: 'CHAINLINK' | 'GECKOTERMINAL';
   stale?: boolean;
 }
 

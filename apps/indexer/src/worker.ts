@@ -4,6 +4,7 @@ import type { IndexerEnvironment } from '@fomeora/env';
 
 import { backfillPoolRegistry } from './backfill.js';
 import { createIndexerClient, type IndexerClient, verifyIndexerChain } from './chain-client.js';
+import { refreshExternalReferenceCandles } from './external-reference.js';
 import { reconcilePositionAccounting } from './position-accounting.js';
 import { refreshReferenceCandles } from './reference-prices.js';
 import { rollupUserStats } from './stats-rollup.js';
@@ -103,6 +104,10 @@ export async function runIndexerCycle(
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'REFERENCE_PRICE_REFRESH_FAILED' : code);
   });
+  // External reference history improves charts but must never stop canonical
+  // on-chain indexing when the public market-data provider is unavailable.
+  const externalReferenceRefresh = await refreshExternalReferenceCandles(chain.chainId)
+    .catch(() => ({ pools: 0, candles: 0 }));
   const cursor = await prisma.chainCursor
     .findUniqueOrThrow({ where: { chainId: chain.chainId } })
     .catch(() => {
@@ -156,8 +161,8 @@ export async function runIndexerCycle(
     reservePools: reserveRefresh.pools,
     reserveWarnings: reserveRefresh.warning,
     reserveCritical: reserveRefresh.critical,
-    referencePools: referenceRefresh.pools,
-    referenceCandles: referenceRefresh.candles,
+    referencePools: referenceRefresh.pools + externalReferenceRefresh.pools,
+    referenceCandles: referenceRefresh.candles + externalReferenceRefresh.candles,
     statsUsers: statsRollup.users,
     statsRows: statsRollup.rows,
   };

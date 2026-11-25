@@ -116,6 +116,7 @@ export function apiCandlesToChart(candles: readonly ApiCandle[]) {
       ? [{
           open, high, low, close, volume, timestamp, source: candle.source ?? 'pool',
           ...(candle.stale !== undefined ? { stale: candle.stale } : {}),
+          ...(candle.sourceType !== undefined ? { sourceType: candle.sourceType } : {}),
         }]
       : [];
   });

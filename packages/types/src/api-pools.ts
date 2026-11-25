@@ -135,6 +135,7 @@ export const ApiCandleSchema = z.object({
   swapCount: z.number().int().nonnegative(),
   synthetic: z.boolean().optional(),
   source: z.enum(['pool', 'reference']).optional(),
+  sourceType: z.enum(['CHAINLINK', 'GECKOTERMINAL']).optional(),
   sourceUpdatedAt: z.string().datetime().optional(),
   stale: z.boolean().optional(),
 });
