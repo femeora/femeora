@@ -6,6 +6,7 @@ export type {
   ApiList,
   ApiLp,
   ApiPool,
+  ApiPoolAsset,
   ApiPoolDetail,
   ApiPoolStats,
   ApiTrade,

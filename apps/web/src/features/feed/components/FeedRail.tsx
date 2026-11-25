@@ -44,8 +44,8 @@ export function FeedRail() {
                 <span className="min-w-0 flex-1"><TokenPair
                   tokenX={pool.tokenX}
                   tokenY={tokenYAddress}
-                  tokenXIdentity={tokenX ? { symbol: tokenX.symbol, name: tokenX.name, logoUrl: tokenX.logoUrl } : undefined}
-                  tokenYIdentity={tokenY ? { symbol: tokenY.symbol, name: tokenY.name, logoUrl: tokenY.logoUrl } : undefined}
+                  {...(tokenX ? { tokenXIdentity: { symbol: tokenX.symbol, name: tokenX.name, logoUrl: tokenX.logoUrl } } : {})}
+                  {...(tokenY ? { tokenYIdentity: { symbol: tokenY.symbol, name: tokenY.name, logoUrl: tokenY.logoUrl } } : {})}
                   compact
                 /></span>
                 <span className="t-label text-muted">{pool.callouts24h}</span>
