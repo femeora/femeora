@@ -85,6 +85,12 @@ export interface CalloutViewerState {
 
 const anonymousViewer: CalloutViewerState = { liked: false, reposted: false, following: false };
 
+type DecimalValue = { toString(): string; toFixed?(): string };
+
+function decimalString(value: DecimalValue): string {
+  return value.toFixed ? value.toFixed() : value.toString();
+}
+
 export async function resolveCalloutViewerStates(userId: string | undefined, callouts: readonly CalloutView[]) {
   const states = new Map<string, CalloutViewerState>();
   for (const callout of callouts) states.set(callout.id, { ...anonymousViewer });
@@ -123,9 +129,9 @@ export function serializeCallout(
     caption: callout.caption,
     captionEditedAt: callout.captionEditedAt?.toISOString() ?? null,
     showSize: callout.showSize,
-    mcAtPost: callout.mcAtPost?.toString() ?? null,
-    priceAtPost: callout.priceAtPost?.toString() ?? null,
-    sizeAtPost: callout.sizeAtPost?.toString() ?? null,
+    mcAtPost: callout.mcAtPost ? decimalString(callout.mcAtPost) : null,
+    priceAtPost: callout.priceAtPost ? decimalString(callout.priceAtPost) : null,
+    sizeAtPost: callout.sizeAtPost ? decimalString(callout.sizeAtPost) : null,
     side: callout.side,
     shape: callout.shape,
     lowerBin: callout.lowerBin,
@@ -146,10 +152,10 @@ export function serializeCallout(
     position: {
       owner: callout.position.owner,
       status: callout.position.status,
-      depositedQuote: callout.position.depositedQuote.toString(),
-      withdrawnQuote: callout.position.withdrawnQuote.toString(),
-      earnedQuote: callout.position.earnedQuote.toString(),
-      valueQuote: callout.position.valueQuote?.toString() ?? null,
+      depositedQuote: decimalString(callout.position.depositedQuote),
+      withdrawnQuote: decimalString(callout.position.withdrawnQuote),
+      earnedQuote: decimalString(callout.position.earnedQuote),
+      valueQuote: callout.position.valueQuote ? decimalString(callout.position.valueQuote) : null,
       inRangeSeconds: callout.position.inRangeSeconds.toString(),
       openSeconds: callout.position.openSeconds.toString(),
     },
