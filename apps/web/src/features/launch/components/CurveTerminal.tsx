@@ -210,17 +210,32 @@ export function CurveTerminal({ initial }: { initial: ApiLaunchDetail }) {
           </span>
         </div>
         <div className="mt-8">
-          <div className="h-4 overflow-hidden rounded-full border border-line bg-panel-2">
+          <div
+            className="graduation-progress"
+            role="progressbar"
+            aria-label={`${launch.symbol} graduation progress`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Number(progress.toFixed(2))}
+          >
             <div
-              className="h-full bg-signal transition-[width]"
+              className="graduation-progress__fill"
               style={{ width: `${progress}%` }}
-            />
+            >
+              <span className="graduation-progress__shimmer" aria-hidden="true" />
+              {progress > 0 ? (
+                <span className="graduation-progress__marker" aria-hidden="true" />
+              ) : null}
+            </div>
           </div>
-          <div className="t-label mt-3 flex justify-between text-muted">
+          <div className="t-label mt-3 flex flex-wrap justify-between gap-2 text-muted">
+            <span>
+              <span className="text-fg">{progress.toFixed(2)}%</span> toward {graduationThreshold}{' '}
+              {quoteSymbol} graduation
+            </span>
             <span>
               {quoteReserve} / {graduationThreshold} {quoteSymbol}
             </span>
-            <span>{progress.toFixed(2)}%</span>
           </div>
         </div>
         <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
