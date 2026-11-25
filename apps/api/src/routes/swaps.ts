@@ -44,7 +44,7 @@ class SwapRouteError extends Error {
 
 async function canonicalPool(chainId: number, address: string) {
   return prisma.pool.findFirst({
-    where: { chainId, address, canonical: true },
+    where: { chainId, address, canonical: true, visible: true },
     select: {
       id: true,
       address: true,

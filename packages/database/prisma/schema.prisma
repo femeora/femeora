@@ -34,6 +34,7 @@ model Pool {
   lastValueRefreshAt DateTime? @map("last_value_refresh_at")
   createdBlock       BigInt    @map("created_block")
   canonical          Boolean   @default(true)
+  visible            Boolean   @default(true)
 
   positions        Position[]
   positionBins     PositionBin[]

@@ -60,7 +60,7 @@ async function safeBlock(chainId: number): Promise<bigint> {
 
 async function canonicalPool(chainId: number, address: Address) {
   return prisma.pool.findFirst({
-    where: { chainId, address, canonical: true },
+    where: { chainId, address, canonical: true, visible: true },
     select: { id: true, address: true, type: true, tokenX: true, tokenY: true, tokenXDecimals: true, tokenYDecimals: true, binStep: true },
   });
 }

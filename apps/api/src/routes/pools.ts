@@ -193,7 +193,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     const parsed = z.object({ limit: limitSchema }).safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
     const pools = await prisma.pool.findMany({
-      where: { chainId, canonical: true },
+      where: { chainId, canonical: true, visible: true },
       orderBy: [{ createdBlock: 'desc' }, { address: 'asc' }],
       take: parsed.data.limit,
     });
@@ -204,7 +204,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     const parsed = poolParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(400).send({ error: 'INVALID_POOL_ADDRESS' });
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: parsed.data.pool, canonical: true },
+      where: { chainId, address: parsed.data.pool, canonical: true, visible: true },
       include: {
         _count: {
           select: {
@@ -244,7 +244,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     const parsed = poolParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(400).send({ error: 'INVALID_POOL_ADDRESS' });
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: parsed.data.pool, canonical: true },
+      where: { chainId, address: parsed.data.pool, canonical: true, visible: true },
       select: {
         id: true,
         reserveX: true,
@@ -375,7 +375,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       return reply.status(400).send({ error: 'INVALID_BIN_RANGE' });
     }
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: params.data.pool, canonical: true },
+      where: { chainId, address: params.data.pool, canonical: true, visible: true },
       select: {
         id: true, tokenX: true, tokenY: true, quoteToken: true,
         tokenXDecimals: true, tokenYDecimals: true, binStep: true, activeBin: true,
@@ -407,7 +407,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     const query = z.object({ limit: limitSchema }).safeParse(request.query);
     if (!params.success || !query.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: params.data.pool, canonical: true },
+      where: { chainId, address: params.data.pool, canonical: true, visible: true },
       select: { id: true },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
@@ -447,7 +447,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
       .safeParse(request.query);
     if (!params.success || !query.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: params.data.pool, canonical: true },
+      where: { chainId, address: params.data.pool, canonical: true, visible: true },
       select: { id: true, tokenX: true, tokenY: true, quoteToken: true, tokenXDecimals: true, tokenYDecimals: true },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
@@ -500,7 +500,7 @@ export async function registerPoolRoutes(app: FastifyInstance, chainId: number) 
     const query = z.object({ limit: limitSchema }).safeParse(request.query);
     if (!params.success || !query.success) return reply.status(400).send({ error: 'INVALID_QUERY' });
     const pool = await prisma.pool.findFirst({
-      where: { chainId, address: params.data.pool, canonical: true },
+      where: { chainId, address: params.data.pool, canonical: true, visible: true },
       select: { id: true },
     });
     if (!pool) return reply.status(404).send({ error: 'POOL_NOT_FOUND' });
