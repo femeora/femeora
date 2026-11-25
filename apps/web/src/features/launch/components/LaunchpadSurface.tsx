@@ -2,18 +2,14 @@
 
 import {
   ApiLaunchpadDetailSchema,
-  ApiLaunchpadStatusPreparationSchema,
   ApiGraduationPreparationSchema,
   ApiPoolAssetListSchema,
   type ApiLaunch,
   type ApiLaunchpadDetail,
-  type ApiLaunchpadStatusPreparation,
 } from '@fomeora/types';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { formatUnits } from 'viem';
 
-import { friendlyErrorMessage } from '@/components/feedback/friendlyError';
-import { Button } from '@/components/ui/Button';
 import { TxButton } from '@/features/pool/components/TxButton';
 import { sendPreparedTransaction, waitForWalletReceipt } from '@/features/wallet/adapter';
 import { useWallet } from '@/features/wallet/store';
@@ -27,14 +23,6 @@ import { LaunchTokenForm } from './LaunchTokenForm';
 
 export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
   const wallet = useWallet();
-  const [statusPreparation, setStatusPreparation] = useState<ApiLaunchpadStatusPreparation | null>(
-    null
-  );
-  const [statusError, setStatusError] = useState<string | null>(null);
-  const [confirmedStatus, setConfirmedStatus] = useState<{
-    active: boolean;
-    expiresAt: number;
-  } | null>(null);
   const resource = useApiResource(
     `/v1/launchpads/${encodeURIComponent(initial.slug)}`,
     ApiLaunchpadDetailSchema,
@@ -55,47 +43,6 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
     Number(formatUnits(BigInt(value), decimals)).toLocaleString(undefined, {
       maximumFractionDigits: 6,
     });
-  const canManage = Boolean(
-    wallet.account &&
-    (wallet.account.toLowerCase() === pad.owner.toLowerCase() ||
-      pad.admins.some(admin => admin.toLowerCase() === wallet.account?.toLowerCase()))
-  );
-  const prepareStatus = async () => {
-    if (!wallet.account) return void wallet.connect();
-    if (wallet.config && wallet.chainId !== wallet.config.chainId)
-      return void wallet.switchNetwork();
-    setStatusError(null);
-    try {
-      setStatusPreparation(
-        await browserApiRequest(
-          `/v1/launchpads/${pad.id}/status-prepare`,
-          ApiLaunchpadStatusPreparationSchema,
-          { method: 'POST', body: { walletAddress: wallet.account, active: !pad.active } }
-        )
-      );
-    } catch (cause) {
-      setStatusError(
-        friendlyErrorMessage(
-          cause instanceof Error ? cause.message : 'LAUNCHPAD_STATUS_PREPARATION_FAILED'
-        )
-      );
-    }
-  };
-  const executeStatus = async () => {
-    if (!statusPreparation || !wallet.account)
-      throw new Error('LAUNCHPAD_STATUS_PREPARATION_REQUIRED');
-    if (Date.now() >= Date.parse(statusPreparation.expiresAt))
-      throw new Error('LAUNCHPAD_PREPARATION_EXPIRED');
-    const expectedActive = !pad.active;
-    const hash = await sendPreparedTransaction(statusPreparation.transaction, wallet.account);
-    const receipt = await waitForWalletReceipt(hash);
-    if (receipt.status !== 'success')
-      throw new TransactionExecutionError('LAUNCHPAD_STATUS_REVERTED', hash);
-    setStatusPreparation(null);
-    setConfirmedStatus({ active: expectedActive, expiresAt: Date.now() + 120_000 });
-    void refreshLaunchpad();
-    return hash;
-  };
   const distributeLaunchFees = async (launch: ApiLaunch) => {
     if (!wallet.account) {
       await wallet.connect();
@@ -128,16 +75,6 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
       }),
     [initial.id, initial.slug, refreshLaunchpad]
   );
-
-  useEffect(() => {
-    if (!confirmedStatus) return;
-    if (pad.active === confirmedStatus.active || Date.now() >= confirmedStatus.expiresAt) {
-      setConfirmedStatus(null);
-      return;
-    }
-    const timer = window.setInterval(() => void refreshLaunchpad(), 4_000);
-    return () => window.clearInterval(timer);
-  }, [confirmedStatus, pad.active, refreshLaunchpad]);
 
   return (
     <section className="px-gutter py-8">
@@ -180,20 +117,6 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
           >
             {pad.active ? 'Launchpad active' : 'Launches paused'}
           </span>
-          {canManage ? (
-            statusPreparation ? (
-              <TxButton
-                label={pad.active ? 'Confirm pause' : 'Confirm activation'}
-                error={null}
-                onExecute={executeStatus}
-                pendingLabel="Updating launchpad…"
-              />
-            ) : (
-              <Button onClick={() => void prepareStatus()}>
-                {pad.active ? 'Pause launches' : 'Activate launchpad'}
-              </Button>
-            )
-          ) : null}
         </div>
       </header>
       {pad.active ? (
@@ -207,16 +130,6 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
             xRequired={pad.protection.xRequired}
           />
         </div>
-      ) : null}
-      {statusError ? (
-        <p role="alert" className="mt-3 text-sm text-down">
-          {statusError}
-        </p>
-      ) : null}
-      {confirmedStatus ? (
-        <p role="status" className="t-label mt-3 text-signal">
-          Confirmed on-chain · syncing launchpad status
-        </p>
       ) : null}
       <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Launches" value={String(pad.dashboard.launches)} />
