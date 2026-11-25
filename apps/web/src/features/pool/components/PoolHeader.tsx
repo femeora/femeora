@@ -33,11 +33,11 @@ function PoolPriceNotice({
   return (
     <details className="group relative inline-flex">
       <summary
-        className="grid size-6 cursor-pointer list-none place-items-center rounded-[2px] border border-down/60 bg-down/10 text-down outline-none transition-colors hover:border-down hover:bg-down/15 focus-visible:ring-1 focus-visible:ring-down [&::-webkit-details-marker]:hidden"
+        className="grid size-6 cursor-pointer list-none place-items-center text-down outline-none transition-opacity hover:opacity-75 focus-visible:ring-1 focus-visible:ring-down [&::-webkit-details-marker]:hidden"
         aria-label={summary}
         title={summary}
       >
-        <TriangleAlert aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
+        <TriangleAlert aria-hidden="true" className="size-4" strokeWidth={1.8} />
       </summary>
       <div className="invisible absolute left-0 top-[calc(100%+0.5rem)] z-50 w-80 max-w-[calc(100vw-3rem)] translate-y-1 border border-down/60 bg-panel-1 p-3 opacity-0 shadow-2xl transition-[opacity,transform,visibility] group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100">
         <p className="t-label text-down">Initial pool price warning</p>
