@@ -66,7 +66,7 @@ export function AssetLogo({ asset, className }: { asset: ApiPoolAsset; className
   const logoUrl = candidates[candidate];
 
   return logoUrl
-    ? <span className={cn('relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line-strong bg-white p-1 shadow-[0_3px_14px_rgb(0_0_0/0.32)]', className)}><img src={logoUrl} alt={`${asset.name} logo`} className="size-full object-contain" onError={() => setCandidate(current => current + 1)} /></span>
+    ? <span className={cn('relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line-strong bg-white p-0.5 shadow-[0_3px_14px_rgb(0_0_0/0.32)]', className)}><img src={logoUrl} alt={`${asset.name} logo`} className="size-full rounded-full object-cover" onError={() => setCandidate(current => current + 1)} /></span>
     : <TokenIcon token={asset.address} className={className} />;
 }
 
