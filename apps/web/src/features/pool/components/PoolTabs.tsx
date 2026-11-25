@@ -79,7 +79,7 @@ function PoolPositions({ pool, positions, error, isLoading, refresh }: {
   if (isLoading) return <p className="py-10 text-center text-muted">Loading canonical pool positions…</p>;
   if (error) return <div role="alert" className="py-10 text-center"><p className="text-down">Pool positions are temporarily unavailable.</p><button type="button" onClick={() => void refresh()} className="t-label mt-3 min-h-11 underline underline-offset-4">Retry</button></div>;
   if (positions.length === 0) return <p className="py-10 text-center text-muted">No indexed positions in this pool yet.</p>;
-  return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Actions']}>
+  return <Table head={['Pool', 'Owner', 'Shape', 'Range', 'Value · quote', 'Earned', 'Status', 'Callout', 'Actions']}>
     {positions.map(position => {
       const owned = account?.toLowerCase() === position.owner.toLowerCase();
       const manageable = owned && position.status === 'open';
@@ -92,13 +92,14 @@ function PoolPositions({ pool, positions, error, isLoading, refresh }: {
           <td className={cellClass}>{position.valueQuote ?? 'Unavailable'}</td>
           <td className={cn(cellClass, 'text-up')}>{position.earnedQuote}</td>
           <td className={cn(cellClass, 'capitalize')}>{positionStatus(position)}</td>
+          <td className={cellClass}>{position.calloutId ? 'Posted' : position.poolCanonical ? 'Not posted' : 'Legacy pool'}</td>
           <td className={cellClass}><div className="flex justify-end gap-2">
             {owned && position.status === 'open' && !position.calloutId ? <PostPositionCalloutButton position={position} onPosted={refresh} /> : null}
             {manageable ? <Button className="min-h-9" onClick={() => setManagingId(current => current === position.id ? null : position.id)}>{managingId === position.id ? 'Hide' : 'Manage'}</Button> : null}
             {!manageable && (!owned || Boolean(position.calloutId)) ? <span className="text-faint">—</span> : null}
           </div></td>
         </tr>
-        {managingId === position.id ? <tr><td colSpan={8}><PositionActionPanel position={position} onConfirmed={refresh} /></td></tr> : null}
+        {managingId === position.id ? <tr><td colSpan={9}><PositionActionPanel position={position} onConfirmed={refresh} /></td></tr> : null}
       </Fragment>;
     })}
   </Table>;
