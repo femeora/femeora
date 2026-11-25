@@ -9,7 +9,7 @@ export function friendlyErrorMessage(error: string): string {
     return 'The deposit is too small for the selected range. Narrow the range or increase the token amount, then review again.';
   }
   if (value.includes('TOKEN_DECIMALS_UNAVAILABLE')) {
-    return 'Femeora could not read this token\'s decimal configuration. Refresh the pool and review the position again.';
+    return "Femeora could not read this token's decimal configuration. Refresh the pool and review the position again.";
   }
   if (value.includes('SWAP_POOL_MIGRATION_REQUIRED')) {
     return 'Swaps for this pool are temporarily paused while its USDG/WETH decimal handling is upgraded. Your liquidity positions are unaffected.';
@@ -32,6 +32,15 @@ export function friendlyErrorMessage(error: string): string {
   }
   if (includesAny(value, ['WALLET_PROVIDER_NOT_FOUND', 'WALLET_UNAVAILABLE', 'NO_PROVIDER'])) {
     return 'Femeora could not find a compatible wallet. Open the site in a wallet browser or enable your wallet extension.';
+  }
+  if (value.includes('WALLET_REQUEST_PENDING')) {
+    return 'A wallet request is already open. Open your wallet extension, finish or cancel that request, then try again.';
+  }
+  if (value.includes('WALLET_REQUEST_TIMEOUT')) {
+    return 'The wallet did not respond. Unlock the extension and try again; Femeora has reset the connecting state.';
+  }
+  if (value.includes('WALLET_CONNECTION_FAILED')) {
+    return 'The wallet extension could not open the account request. Unlock or restart the extension, then try again.';
   }
   if (
     includesAny(value, [
