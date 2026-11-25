@@ -33,6 +33,7 @@ import {
   type RangeClockSwap,
 } from './processors/range-clock.js';
 import { ensureCanonicalCursor } from './reorg.js';
+import { collectLaunchEvents, persistLaunchEvents } from './launch-events.js';
 
 interface BackfillResult {
   readonly batches: number;
@@ -43,6 +44,16 @@ interface BackfillResult {
   readonly positionEventsProjected: number;
   readonly fromBlock: bigint;
   readonly toBlock: bigint;
+}
+
+// Accounting is a derived read model and must never prevent the canonical
+// on-chain position (and its callout intent) from being indexed. Decimal(36,18)
+// accepts values whose integer part is smaller than 10^18; anomalous valuation
+// results are left null and can be recomputed by the value refresher.
+function storablePositionCashFlow<T extends { amountQuote: string }>(cashFlow: T | null): T | null {
+  if (!cashFlow) return null;
+  const [integer = '0'] = cashFlow.amountQuote.replace(/^-/, '').split('.');
+  return integer.replace(/^0+/, '').length <= 18 ? cashFlow : null;
 }
 
 const erc20DecimalsAbi = [
@@ -307,10 +318,21 @@ export async function backfillPoolRegistry(
         });
       })
     );
-    const [poolEvents, positionEvents, positionShareEvents] = await Promise.all([
+    const existingLaunches = await prisma.launch.findMany({
+      where: { chainId: chain.chainId, canonical: true },
+      select: { curve: true },
+    });
+    const [poolEvents, positionEvents, positionShareEvents, launchEvents] = await Promise.all([
       collectPoolEvents(client, [...descriptorByAddress.values()], nextBlock, endBlock),
       collectPositionEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
       collectPositionShareEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
+      collectLaunchEvents(
+        client,
+        environment,
+        existingLaunches.map(launch => launch.curve as Address),
+        nextBlock,
+        endBlock,
+      ),
     ]);
     const calloutUpdateTypes = classifyCalloutUpdates(positionEvents);
 
@@ -572,7 +594,7 @@ export async function backfillPoolRegistry(
           const poolId = poolIdByAddress.get(event.state.pool.toLowerCase());
           if (!poolId) throw new Error('POSITION_POOL_ID_MISSING');
           const accountingPool = await transaction.pool.findUniqueOrThrow({ where: { id: poolId } });
-          const cashFlow = positionCashFlow(event, accountingPool);
+          const cashFlow = storablePositionCashFlow(positionCashFlow(event, accountingPool));
           const current = await transaction.position.findUnique({
             where: { chainId_id: { chainId: chain.chainId, id: event.positionId } },
           });
@@ -1058,6 +1080,10 @@ export async function backfillPoolRegistry(
             data: { inRangeSeconds: clock.inRangeSeconds, openSeconds: clock.openSeconds },
           });
         }
+
+        // Launch persistence runs after pool and position projection so a
+        // graduation can atomically attach its permanently locked LP callout.
+        await persistLaunchEvents(transaction, chain.chainId, launchEvents);
 
         await transaction.canonicalBlock.upsert({
           where: {
