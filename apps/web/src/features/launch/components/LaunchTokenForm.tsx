@@ -61,6 +61,7 @@ export function LaunchTokenForm({
     wallet.account &&
     user?.wallets.some(address => address.toLowerCase() === wallet.account?.toLowerCase())
   );
+  const identityLinkRequired = xRequired && !identityLinked;
   useEffect(() => {
     if (!launchedToken) return;
     let stopped = false;
@@ -168,13 +169,14 @@ export function LaunchTokenForm({
     ? `Optional · maximum ${formatUnits(maximumDeveloperAllocation, 18)} tokens under this launchpad's developer cap`
     : `Optional · tokens transferred directly to the creator wallet at launch`;
   return (
-    <section className="glass mt-6 rounded-[2px] p-5 sm:p-6">
+    <section className="glass w-full rounded-[2px] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="t-label text-signal">Creator flow</p>
           <h2 className="mt-2 text-xl font-medium">Launch a token</h2>
-          <p className="mt-2 text-sm text-muted">
-            The curve token allocation is transferred into a fully on-chain market immediately.
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Define the token identity and creator allocation. Review creates the token and opens its
+            fully on-chain bonding curve in one wallet transaction.
           </p>
         </div>
         <Button onClick={() => setOpen(false)}>Close</Button>
@@ -196,7 +198,7 @@ export function LaunchTokenForm({
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <div className="mt-6 grid gap-5 lg:grid-cols-2">
             <Field
               label="Token name"
               value={name}
@@ -242,6 +244,7 @@ export function LaunchTokenForm({
                   ? 'Verified from the X profile linked to this wallet'
                   : 'Connect X to attach a verified handle; wallet-only launches leave this empty'
               }
+              disabled={identityLinked}
             />
             <Field
               label="Creator allocation · optional"
@@ -259,23 +262,24 @@ export function LaunchTokenForm({
             />
           </div>
           {xRequired ? (
-            <p className="mt-5 border border-signal/40 bg-signal/5 p-3 text-sm text-muted">
-              This launchpad requires an X-connected creator. Femeora generates a one-use proof for
-              the connected wallet during review.
-            </p>
-          ) : null}
-          {xRequired &&
-          (!user ||
-            !wallet.account ||
-            !user.wallets.some(
-              address => address.toLowerCase() === wallet.account?.toLowerCase()
-            )) ? (
-            <div className="mt-5 border border-line p-3 text-sm text-muted">
-              This launchpad requires X identity. Connect X and link the creator wallet before
-              launching.
-              <Button className="mt-3" variant="primary" onClick={openSignIn}>
-                Connect identity
-              </Button>
+            <div
+              className={`mt-5 flex flex-wrap items-center justify-between gap-4 border p-4 ${identityLinkRequired ? 'border-signal/50 bg-signal/5' : 'border-up/40 bg-up/5'}`}
+            >
+              <div>
+                <p className={`t-label ${identityLinkRequired ? 'text-signal' : 'text-up'}`}>
+                  {identityLinkRequired ? 'Creator identity required' : 'Creator identity ready'}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {identityLinkRequired
+                    ? 'Connect X and link the active wallet before reviewing this launch.'
+                    : `@${user?.handle ?? xHandle} is linked to the active wallet. A one-use proof will be generated during review.`}
+                </p>
+              </div>
+              {identityLinkRequired ? (
+                <Button variant="primary" onClick={openSignIn}>
+                  Connect identity
+                </Button>
+              ) : null}
             </div>
           ) : null}
           <div className="mt-5">
@@ -325,16 +329,23 @@ function Field({
   value,
   onChange,
   hint,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="t-label text-muted">
       {label}
-      <input className={control} value={value} onChange={event => onChange(event.target.value)} />
+      <input
+        className={control}
+        value={value}
+        disabled={disabled}
+        onChange={event => onChange(event.target.value)}
+      />
       {hint ? (
         <span className="mt-2 block text-[0.625rem] leading-relaxed text-faint">{hint}</span>
       ) : null}

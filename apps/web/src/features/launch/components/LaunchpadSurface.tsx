@@ -142,7 +142,7 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
   return (
     <section className="px-gutter py-8">
       {pad.bannerUrl ? (
-        <div className="mb-5 h-40 overflow-hidden rounded-[2px] border border-line">
+        <div className="mb-5 h-28 overflow-hidden rounded-[2px] border border-line sm:h-36">
           <img
             src={pad.bannerUrl}
             alt={`${pad.name} banner`}
@@ -175,18 +175,11 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {pad.active ? (
-            <LaunchTokenForm
-              launchpadId={pad.id}
-              launchpadSlug={pad.slug}
-              curveTokenSupplyRaw={pad.curveTokenSupplyRaw}
-              protectionEnabled={pad.protection.enabled}
-              devBuyCapPips={pad.protection.devBuyCapPips}
-              xRequired={pad.protection.xRequired}
-            />
-          ) : (
-            <span className="t-label border border-line px-3 py-2 text-muted">Launches paused</span>
-          )}
+          <span
+            className={`t-label border px-3 py-2 ${pad.active ? 'border-up/40 text-up' : 'border-line text-muted'}`}
+          >
+            {pad.active ? 'Launchpad active' : 'Launches paused'}
+          </span>
           {canManage ? (
             statusPreparation ? (
               <TxButton
@@ -203,6 +196,18 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
           ) : null}
         </div>
       </header>
+      {pad.active ? (
+        <div className="mt-5 flex justify-end">
+          <LaunchTokenForm
+            launchpadId={pad.id}
+            launchpadSlug={pad.slug}
+            curveTokenSupplyRaw={pad.curveTokenSupplyRaw}
+            protectionEnabled={pad.protection.enabled}
+            devBuyCapPips={pad.protection.devBuyCapPips}
+            xRequired={pad.protection.xRequired}
+          />
+        </div>
+      ) : null}
       {statusError ? (
         <p role="alert" className="mt-3 text-sm text-down">
           {statusError}
