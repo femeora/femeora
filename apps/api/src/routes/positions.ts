@@ -14,6 +14,12 @@ type PoolIdentity = {
   tokenY: string;
 };
 
+type DecimalValue = { toString(): string; toFixed?(): string };
+
+function decimalString(value: DecimalValue): string {
+  return value.toFixed ? value.toFixed() : value.toString();
+}
+
 function marketKey(pool: Pick<PoolIdentity, 'type' | 'tokenX' | 'tokenY'>): string {
   return `${pool.type}:${[pool.tokenX.toLowerCase(), pool.tokenY.toLowerCase()].sort().join(':')}`;
 }
@@ -32,10 +38,10 @@ export function serializePosition(
   return {
     ...record,
     id: position.id.toString(),
-    depositedQuote: position.depositedQuote.toString(),
-    withdrawnQuote: position.withdrawnQuote.toString(),
-    earnedQuote: position.earnedQuote.toString(),
-    valueQuote: position.valueQuote?.toString() ?? null,
+    depositedQuote: decimalString(position.depositedQuote),
+    withdrawnQuote: decimalString(position.withdrawnQuote),
+    earnedQuote: decimalString(position.earnedQuote),
+    valueQuote: position.valueQuote ? decimalString(position.valueQuote) : null,
     valueQuoteUpdatedAt: position.valueQuoteUpdatedAt?.toISOString() ?? null,
     valueQuoteBlock: position.valueQuoteBlock?.toString() ?? null,
     inRangeSeconds: position.inRangeSeconds.toString(),

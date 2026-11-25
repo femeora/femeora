@@ -9,7 +9,7 @@ test('position serializer converts nested pool bigint values to JSON-safe string
     owner: '0xb5c0ed0252d1906fca50664eb2198aea0679920b', lowerBin: 703, upperBin: 744,
     shape: 2, tag: null, referrer: null, status: 'open',
     depositedQuote: { toString: () => '0.3' }, withdrawnQuote: { toString: () => '0' },
-    earnedQuote: { toString: () => '0' }, valueQuote: null, valueQuoteUpdatedAt: null,
+    earnedQuote: { toString: () => '4.779992258e-9', toFixed: () => '0.000000004779992258' }, valueQuote: null, valueQuoteUpdatedAt: null,
     valueQuoteBlock: null, inRangeSeconds: 0n, openSeconds: 60n,
     openedAt: new Date('2026-11-24T06:50:00.000Z'), closedAt: null, canonical: true,
     bins: [{ binId: 703, shares: { toString: () => '13997' } }], callouts: [],
@@ -32,5 +32,6 @@ test('position serializer converts nested pool bigint values to JSON-safe string
   assert.equal(serialized?.pool.createdBlock, '121919485');
   assert.equal(serialized?.poolCanonical, true);
   assert.equal(serialized?.replacementPoolAddress, null);
+  assert.equal(serialized?.earnedQuote, '0.000000004779992258');
   assert.doesNotThrow(() => JSON.stringify(serialized));
 });
