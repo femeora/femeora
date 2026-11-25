@@ -59,7 +59,7 @@ export default async function PoolsPage() {
   const quote = assets.find(asset => asset.executable && asset.symbol.toUpperCase() === 'USDG' && asset.category === 'stablecoin');
   const candidates = quote
     ? assets
-      .filter(asset => asset.executable && (asset.category === 'stock' || asset.category === 'etf') && !liveTokens.has(asset.address.toLowerCase()))
+      .filter(asset => asset.executable && asset.address.toLowerCase() !== quote.address.toLowerCase() && !liveTokens.has(asset.address.toLowerCase()))
       .filter(asset => asset.candidateEnabled)
       .sort((a, b) => (a.candidateRank ?? Number.MAX_SAFE_INTEGER) - (b.candidateRank ?? Number.MAX_SAFE_INTEGER) || a.symbol.localeCompare(b.symbol))
       .slice(0, 24)

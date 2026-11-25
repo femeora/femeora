@@ -57,9 +57,10 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
   const deployment = tryGetFomeoraDeployment(chainId);
 
   app.get('/v1/pool-assets', async () => {
-    const [pools, displayConfigs] = await Promise.all([
+    const [pools, displayConfigs, curatedCatalog] = await Promise.all([
       prisma.pool.findMany({ where: { chainId, canonical: true }, select: { tokenX: true, tokenY: true } }),
       prisma.assetDisplayConfig.findMany({ where: { chainId } }),
+      prisma.assetCatalog.findMany({ where: { chainId, source: { not: 'robinhood' }, status: 'ASSET_STATUS_ACTIVE' } }),
     ]);
     const displayByAddress = new Map(displayConfigs.map(config => [config.address.toLowerCase(), config]));
     const tokens = [...new Set(pools.flatMap(pool => [pool.tokenX, pool.tokenY]))] as Address[];
@@ -85,7 +86,15 @@ export async function registerPoolCreationRoutes(app: FastifyInstance, chainId: 
         tradingStatus: { market: asset.marketStatus, extended: asset.extendedStatus, overnight: asset.overnightStatus },
       }));
     }
-    const byIdentity = new Map([...chainAssets, ...stocks].map(asset => [`${asset.chainId}:${asset.address.toLowerCase()}`, asset]));
+    const curatedAssets = curatedCatalog.map(asset => ({
+      address: getAddress(asset.address), symbol: asset.symbol, name: asset.name, decimals: asset.decimals,
+      chainId: asset.chainId, logoUrl: asset.logoUrl,
+      category: asset.category === 'stablecoin' ? 'stablecoin' as const : 'crypto' as const,
+      executable: asset.chainId === chainId, source: 'chain' as const, isin: null,
+      tradingStatus: null, currentMultiplier: null,
+    }));
+    const byIdentity = new Map([...curatedAssets, ...chainAssets, ...stocks]
+      .map(asset => [`${asset.chainId}:${asset.address.toLowerCase()}`, asset]));
     const data = [...byIdentity.values()].map(asset => {
       const display = displayByAddress.get(asset.address.toLowerCase());
       return {
