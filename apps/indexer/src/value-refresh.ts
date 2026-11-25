@@ -42,6 +42,10 @@ export async function refreshPoolReserveSnapshots(
     where: {
       chainId,
       canonical: true,
+      // A newly discovered registry event can be ahead of the confirmation
+      // boundary. Calling the pool at an older safe block has no bytecode and
+      // must not make the entire indexer cycle unhealthy.
+      createdBlock: { lte: safeBlock },
       reserveCapX: { not: null },
       reserveCapY: { not: null },
       OR: [
