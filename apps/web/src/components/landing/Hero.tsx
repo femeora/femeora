@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
-
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { Check, Copy, RobinhoodLogo } from '@/components/ui/icons';
 import { hero } from '@/content/landing';
@@ -53,7 +52,10 @@ export function Hero({
       setShapeIndex(0);
       return;
     }
-    const id = window.setInterval(() => setShapeIndex(current => (current + 1) % SHAPES.length), 3600);
+    const id = window.setInterval(
+      () => setShapeIndex(current => (current + 1) % SHAPES.length),
+      3600
+    );
     return () => window.clearInterval(id);
   }, [reducedMotion]);
 
@@ -69,9 +71,18 @@ export function Hero({
         activeIndex={index}
         className="absolute left-1/2 top-[12%] h-[38%] w-[min(86%,34rem)] -translate-x-1/2 opacity-35 md:left-auto md:right-[6%] md:top-[12%] md:h-[52%] md:w-[min(44%,40rem)] md:translate-x-0 md:opacity-100"
       />
-      <div aria-hidden="true" className="t-label absolute right-[6%] top-[calc(12%+min(52vh,25rem)+1.75rem)] z-10 hidden items-center gap-1.5 text-faint md:flex">
+      <div
+        aria-hidden="true"
+        className="t-label absolute right-[6%] top-[calc(12%+min(52vh,25rem)+1.75rem)] z-10 hidden items-center gap-1.5 text-faint md:flex"
+      >
         {SHAPES.map((item, itemIndex) => (
-          <span key={item} className={cn('border border-fg/10 px-2 py-1 transition-colors duration-base', itemIndex === shapeIndex && 'border-fg/35 bg-fg/10 text-fg')}>
+          <span
+            key={item}
+            className={cn(
+              'border border-fg/10 px-2 py-1 transition-colors duration-base',
+              itemIndex === shapeIndex && 'border-fg/35 bg-fg/10 text-fg'
+            )}
+          >
             {SHAPE_LABEL[item]}
           </span>
         ))}
@@ -86,7 +97,15 @@ export function Hero({
                 {cell.value}
               </span>
               {cell.detail ? (
-                <span> · {cell.key === 'Network' ? (network === 'testnet' ? 'Testnet' : 'Mainnet') : cell.detail}</span>
+                <span>
+                  {' '}
+                  ·{' '}
+                  {cell.key === 'Network'
+                    ? network === 'testnet'
+                      ? 'Testnet'
+                      : 'Mainnet'
+                    : cell.detail}
+                </span>
               ) : null}
             </ReadoutCell>
           ))}
@@ -109,7 +128,9 @@ export function Hero({
               ) : (
                 <Copy aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.8} />
               )}
-              <span className="sr-only" aria-live="polite">{copied ? 'Contract address copied' : ''}</span>
+              <span className="sr-only" aria-live="polite">
+                {copied ? 'Contract address copied' : ''}
+              </span>
             </button>
           </div>
         ) : null}

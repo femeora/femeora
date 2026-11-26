@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { PwaBootstrap } from '@/components/pwa/PwaBootstrap';
+import { RouteLoader } from '@/components/transition/RouteLoader';
 import { site } from '@/content/landing';
 
 import './globals.css';
@@ -27,10 +28,15 @@ export const viewport: Viewport = {
 
 /**
  * Flags the document as scripted before paint so reveal styles never hide content
- * for no-JS visitors. Because it mutates `<html>` before hydration, the element
- * opts out of the className hydration check.
+ * for no-JS visitors, and marks it `booted` when the terminal boot log already
+ * played this session (or motion is reduced) so the loader stays hidden. Because
+ * it mutates `<html>` before hydration, the element opts out of the className
+ * hydration check.
  */
-const JS_FLAG = "document.documentElement.classList.add('js')";
+const JS_FLAG = [
+  'var r=document.documentElement;r.classList.add("js");',
+  'try{if(sessionStorage.getItem("femeora:booted")||matchMedia("(prefers-reduced-motion: reduce)").matches)r.classList.add("booted")}catch(e){r.classList.add("booted")}',
+].join('');
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const { APP_NETWORK: network } = loadWebEnvironment();
@@ -41,6 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG }} />
       </head>
       <body>
+        <RouteLoader />
         {children}
         <PwaBootstrap />
         <SiteFooter network={network} />

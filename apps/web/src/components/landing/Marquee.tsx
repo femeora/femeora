@@ -1,3 +1,4 @@
+import { ScrollScene } from '@/components/motion/ScrollScene';
 import { cn } from '@/lib/cn';
 
 interface MarqueeProps {
@@ -7,7 +8,8 @@ interface MarqueeProps {
 
 /**
  * Infinite ticker of shapes and presets. The list is rendered twice and slid by
- * half its width; the copy is hidden from assistive tech. Pauses on hover.
+ * half its width; the copy is hidden from assistive tech. Pauses on hover, and
+ * the whole row drifts with the page scroll on top of its own loop.
  */
 export function Marquee({ items, label }: MarqueeProps) {
   const list = (hidden: boolean) => (
@@ -31,10 +33,12 @@ export function Marquee({ items, label }: MarqueeProps) {
       aria-label={label}
       className="group overflow-hidden border-y border-line py-10 [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)] md:py-14"
     >
-      <div className="flex w-max animate-marquee group-hover:[animation-play-state:paused]">
-        {list(false)}
-        {list(true)}
-      </div>
+      <ScrollScene mode="cross" settled={0.5} className="scroll-drift">
+        <div className="flex w-max animate-marquee group-hover:[animation-play-state:paused]">
+          {list(false)}
+          {list(true)}
+        </div>
+      </ScrollScene>
     </section>
   );
 }

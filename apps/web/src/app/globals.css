@@ -9,8 +9,8 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --font-sans: "Arial Narrow", "Helvetica Neue", Arial;
-    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono";
+    --font-sans: 'Arial Narrow', 'Helvetica Neue', Arial;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono';
     --bg: 8 9 11;
     --panel: 14 16 19;
     --panel-2: 20 23 27;
@@ -216,11 +216,7 @@
     height: 100%;
     min-width: 0;
     overflow: visible;
-    background: linear-gradient(
-      90deg,
-      rgb(var(--signal) / 0.45),
-      rgb(var(--metal-hi) / 0.95)
-    );
+    background: linear-gradient(90deg, rgb(var(--signal) / 0.45), rgb(var(--metal-hi) / 0.95));
     box-shadow:
       0 0 10px rgb(var(--signal) / 0.4),
       0 0 22px rgb(var(--signal) / 0.18);
@@ -239,12 +235,7 @@
     inset-block: 0;
     left: -45%;
     width: 40%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgb(var(--metal-hi) / 0.8),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, rgb(var(--metal-hi) / 0.8), transparent);
     animation: graduation-progress-sweep 2.2s ease-in-out infinite;
   }
 
@@ -303,6 +294,389 @@ html.js [data-reveal]:not([data-shown]) {
   transition-delay: var(--reveal-delay, 0ms);
 }
 
+/*
+ * Liquid glass: the landing's hero surface. A clear tinted body, a rim light
+ * drawn as a masked gradient border, and a specular sheen that follows the
+ * pointer (`--mx`/`--my`, set by `components/ui/LiquidGlass`). Monochrome only.
+ */
+.liquid-glass {
+  position: relative;
+  isolation: isolate;
+  border-radius: 2px;
+  background: linear-gradient(
+    160deg,
+    rgb(var(--fg) / 0.085),
+    rgb(var(--fg) / 0.018) 42%,
+    rgb(var(--fg) / 0.045)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 rgb(0 0 0 / 0.45),
+    inset 0 0 32px rgb(var(--fg) / 0.025),
+    0 32px 64px -32px rgb(0 0 0 / 0.85);
+  -webkit-backdrop-filter: blur(22px) saturate(170%) brightness(1.06);
+  backdrop-filter: blur(22px) saturate(170%) brightness(1.06);
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    520px circle at var(--mx, 18%) var(--my, -10%),
+    rgb(255 255 255 / 0.11),
+    transparent 46%
+  );
+  transition: background-position 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.42),
+    rgb(255 255 255 / 0.05) 28%,
+    rgb(255 255 255 / 0) 55%,
+    rgb(255 255 255 / 0.16)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Brushed-metal type for display lines. */
+.text-metal {
+  background-image: linear-gradient(
+    180deg,
+    rgb(var(--metal-hi)) 0%,
+    rgb(var(--signal)) 46%,
+    rgb(var(--metal-lo)) 54%,
+    rgb(var(--signal)) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/*
+ * Scroll-linked motion. `--progress` (0..1) is written by `useScrollProgress`;
+ * every rule falls back to the settled state when it is missing.
+ */
+.scroll-words .w {
+  opacity: clamp(0.14, calc(var(--progress, 1) * (var(--n) + 2) - var(--i)), 1);
+  transition: opacity 140ms linear;
+}
+
+.scroll-rule {
+  position: relative;
+}
+
+.scroll-rule::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: rgb(var(--fg) / 0.28);
+  transform: scaleX(var(--progress, 1));
+  transform-origin: left;
+}
+
+.scroll-depth {
+  transform: translate3d(0, calc((0.5 - var(--progress, 0.5)) * var(--depth, 48px)), 0);
+  will-change: transform;
+}
+
+.hero-exit {
+  transform: translate3d(0, calc(var(--progress, 0) * -14vh), 0);
+  opacity: calc(1 - var(--progress, 0) * 1.25);
+}
+
+.scroll-scale {
+  transform: scale(calc(0.9 + var(--progress, 1) * 0.1));
+  transform-origin: left bottom;
+  opacity: calc(0.25 + var(--progress, 1) * 0.75);
+}
+
+.scroll-drift {
+  transform: translate3d(calc(var(--progress, 0.5) * -18%), 0, 0);
+}
+
+/* Statement figure: the screenshot recedes, the callout comes forward. */
+.proof-figure {
+  perspective: 1600px;
+}
+
+.proof-before {
+  transform: rotateY(calc(var(--progress, 1) * 8deg)) scale(calc(1 - var(--progress, 1) * 0.04));
+  transform-origin: right center;
+  opacity: calc(1 - var(--progress, 1) * 0.45);
+}
+
+.proof-after {
+  transform: translate3d(0, calc((1 - var(--progress, 1)) * 56px), 0);
+}
+
+.proof-bin {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transform: scaleY(clamp(0.04, calc(var(--progress, 1) * 24 - var(--i) * 0.9), 1));
+}
+
+.proof-price {
+  animation: proof-walk 7s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+
+@keyframes proof-walk {
+  from {
+    transform: translateX(82px);
+  }
+  to {
+    transform: translateX(200px);
+  }
+}
+
+/* System diagram: a packet rides the rail, nodes switch on as it arrives. */
+.system-rail-fill {
+  transform: scaleX(var(--progress, 1));
+  transform-origin: left;
+}
+
+.system-packet {
+  left: calc(10% + var(--progress, 1) * 80%);
+}
+
+.system-stop {
+  --on: clamp(0, calc(var(--progress, 1) * var(--last) - var(--i) + 1), 1);
+  background-color: rgb(var(--fg) / calc(var(--on) * 0.9));
+}
+
+.system-node {
+  --on: clamp(0, calc(var(--progress, 1) * (var(--last) + 0.6) - var(--i) + 0.4), 1);
+  opacity: calc(0.35 + var(--on) * 0.65);
+  transform: translate3d(0, calc((1 - var(--on)) * 14px), 0);
+  transition:
+    opacity 240ms linear,
+    transform 240ms linear;
+}
+
+/* Callout specimen: lies back, stands up with scroll, tilts toward the pointer. */
+.specimen-stage {
+  perspective: 1400px;
+  --tx: 0;
+  --ty: 0;
+}
+
+.specimen-card {
+  transform: rotateX(calc((1 - var(--progress, 1)) * 38deg + var(--ty) * -8deg))
+    rotateY(calc(var(--tx) * 10deg)) rotateZ(calc((1 - var(--progress, 1)) * -6deg));
+  transform-origin: center bottom;
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.specimen-shadow {
+  opacity: calc(0.3 + var(--progress, 1) * 0.5);
+}
+
+.specimen-bin {
+  transform-origin: bottom;
+  transform: scaleY(clamp(0.06, calc(var(--progress, 1) * 36 - var(--i)), 1));
+}
+
+.specimen-price {
+  left: 30%;
+  animation: specimen-walk 9s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+
+@keyframes specimen-walk {
+  0% {
+    left: 22%;
+  }
+  50% {
+    left: 41%;
+  }
+  100% {
+    left: 31%;
+  }
+}
+
+.specimen-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--fg) / 0.5);
+  background: rgb(var(--bg) / 0.8);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  color: rgb(var(--fg));
+  box-shadow: 0 0 0 4px rgb(var(--fg) / 0.06);
+  opacity: clamp(0, calc(var(--progress, 1) * 4 - 2.4 - var(--pin) * 0.3), 1);
+}
+
+/* Tail mirror: caller bins copy into yours, beams light while they copy. */
+.tail-copy {
+  transform-origin: top;
+  transform: scaleY(clamp(0, calc(var(--progress, 1) * (var(--n) + 8) - var(--i)), 1));
+}
+
+.tail-beam {
+  --d: calc(var(--progress, 1) * (var(--n) + 8) - var(--i) - 0.5);
+  --copying: clamp(0, calc(1 - max(var(--d), calc(var(--d) * -1)) / 3), 1);
+  background: linear-gradient(180deg, rgb(var(--fg) / 0.5), rgb(var(--fg) / 0.02));
+  opacity: calc(0.04 + var(--copying) * 0.9);
+}
+
+/* Integrity glyphs trace in when their card reveals. */
+.glyph-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+html.js [data-reveal]:not([data-shown]) .glyph-draw {
+  stroke-dashoffset: 1;
+}
+
+[data-reveal] .glyph-draw {
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.65, 0, 0.35, 1) 200ms;
+}
+
+.glyph-grow {
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+[data-shown] .glyph-grow {
+  animation: glyph-grow 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.glyph-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+[data-shown] .glyph-pop {
+  animation: glyph-pop 2.4s ease-out 1.2s infinite;
+}
+
+@keyframes glyph-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes glyph-pop {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  60%,
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* Safety stack: isometric glass plates that fan apart with scroll. */
+.safety-stack__scene {
+  perspective: 1800px;
+  transform-style: preserve-3d;
+}
+
+.safety-plate {
+  position: absolute;
+  left: 14%;
+  top: 30%;
+  width: 72%;
+  height: 46%;
+  display: flex;
+  align-items: flex-end;
+  padding: 1rem 1.125rem;
+  transform-style: preserve-3d;
+  transform: rotateX(58deg) rotateZ(-38deg)
+    translate3d(0, 0, calc(var(--i) * (18px + var(--progress, 1) * 34px) - 40px));
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.safety-plate.metal {
+  border-radius: 2px;
+}
+
+/* Page scroll indicator under the header. */
+.page-progress {
+  transform: scaleX(var(--page-progress, 0));
+  transform-origin: left;
+}
+
+/*
+ * Route loader. Hidden before paint for returning visits (`html.booted`) and
+ * whenever scripts are off. Exits by wiping upward.
+ */
+html:not(.js) .route-loader,
+html.booted .route-loader[data-phase='boot'] {
+  display: none;
+}
+
+.route-loader {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 560ms cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.route-loader--exit {
+  clip-path: inset(0 0 100% 0);
+}
+
+.route-loader__scan {
+  background: repeating-linear-gradient(180deg, rgb(var(--fg) / 0.025) 0 1px, transparent 1px 3px);
+}
+
+.route-loader__line {
+  animation: loader-line 220ms steps(6, end) both;
+}
+
+.route-loader__caret {
+  animation: loader-caret 1s steps(1, end) infinite;
+}
+
+@keyframes loader-line {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes loader-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6vw, -4vh, 0) scale(1.08);
+  }
+}
+
 /* Solid fallbacks when blur is unavailable or the viewer asks for less transparency. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
@@ -330,6 +704,12 @@ html.js [data-reveal]:not([data-shown]) {
 
   .glass-raised {
     background-color: rgb(var(--panel-2));
+  }
+
+  .liquid-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(var(--panel));
   }
 }
 

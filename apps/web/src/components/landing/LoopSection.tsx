@@ -6,6 +6,7 @@ import { StatusDot } from '@/components/ui/StatusDot';
 import { loop } from '@/content/landing';
 
 import { Pipeline } from './Pipeline';
+import { TailMirror } from './TailMirror';
 
 export function LoopSection() {
   return (
@@ -16,6 +17,10 @@ export function LoopSection() {
         <Reveal className="mt-12 border-t border-line pt-8 md:mt-16">
           <Pipeline steps={loop.steps} />
         </Reveal>
+
+        <div className="mt-12 md:mt-16">
+          <TailMirror />
+        </div>
 
         <div className="grid-12 mt-12 gap-y-12 md:mt-16">
           <div className="col-span-12 flex flex-col gap-10 lg:col-span-8">

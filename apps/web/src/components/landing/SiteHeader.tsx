@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { PageProgress } from '@/components/motion/PageProgress';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { ChainBadge } from '@/components/ui/ChainBadge';
@@ -81,6 +82,8 @@ export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
           </button>
         </div>
       </div>
+
+      <PageProgress />
 
       <nav
         id="mobile-menu"

@@ -80,6 +80,14 @@ export const hero = {
 export const statement = {
   title: 'LP strategies spread as screenshots. Here the strategy is the post.',
   body: 'Today ranges travel with no proof and no one-tap copy. In Femeora a callout is attached to one real on-chain position owned by the poster, every number on the card is read from chain, and anyone can tail it instantly.',
+  before: {
+    label: 'Screenshot',
+    notes: ['No proof of ownership', 'Range copied by hand', 'Exits stay hidden'],
+  },
+  after: {
+    label: 'Callout',
+    notes: ['Bound to one on-chain position', 'Every number read from chain', 'Tail in one tap'],
+  },
 } as const;
 
 export const appPreview = {
@@ -125,6 +133,17 @@ export const callouts = {
   label: 'The callout',
   title: 'Every number is read from chain.',
   more: { label: 'All callouts', href: '/feed' },
+  specimen: {
+    caller: 'caller',
+    pair: 'BASE / QUOTE',
+    caption: 'Buying the dip into the curve. Range sits under spot.',
+    rows: [
+      { key: 'Shape', value: 'Curve · 14 bins' },
+      { key: 'Range', value: 'Below active bin' },
+      { key: 'Status', value: 'In range' },
+    ],
+    tail: 'Tail',
+  },
   facts: [
     {
       title: 'Bound to a position',
@@ -159,6 +178,11 @@ export const loop = {
   news: 'Position state and feed updates are delivered from the canonical indexer through the API.',
   disclaimer: 'Tailing copies a range, not a result. LP positions can lose value.',
   more: { label: 'Open the feed', href: '/feed' },
+  mirror: {
+    caller: 'Caller range',
+    you: 'Your range',
+    note: 'Same bins, your size, your signature',
+  },
 } as const;
 
 export const marquee: readonly { label: string; ours?: boolean }[] = [
@@ -308,4 +332,22 @@ export const footer = {
   columns: footerColumns,
   legal: ['Femeora', 'Built on Robinhood Chain', '2026'],
   disclaimer: 'No guaranteed yield. LP positions can lose value.',
+} as const;
+
+/** Terminal log shown by the full-screen route loader (`components/transition/RouteLoader`). */
+export const loader = {
+  prompt: 'femeora',
+  boot: [
+    { label: 'mount interface', status: 'ok' },
+    { label: 'load bin engine · dlmm v2', status: 'ok' },
+    { label: 'attach robinhood chain', status: 'ok' },
+    { label: 'open realtime feed', status: 'ok' },
+    { label: 'verify callout proofs', status: 'ok' },
+  ],
+  navigate: [
+    { label: 'resolve route', status: 'ok' },
+    { label: 'stream view', status: 'ok' },
+    { label: 'hydrate interface', status: 'ok' },
+  ],
+  ready: 'ready',
 } as const;
