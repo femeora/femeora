@@ -11,20 +11,23 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useId, useMemo, useState } from 'react';
 
+import { useFeedRealtime } from '../hooks/useFeedRealtime';
+import { filterBySide, SIDE_FILTERS, type FeedTab, type SideFilter } from '../model/feed';
+
+import { FeedRail } from './FeedRail';
+import { NewCalloutsPill } from './NewCalloutsPill';
+
 import { ArrowRight } from '@/components/ui/icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
 import { QuoteCalloutPost } from '@/features/callouts/components/QuoteCalloutPost';
 import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
 import { LaunchCard } from '@/features/launch/components/LaunchCard';
+import { LaunchpadCreatedPost } from '@/features/launch/components/LaunchpadCreatedPost';
 import { useSession } from '@/features/session/store';
 import { useApiResource } from '@/lib/api/useApiResource';
 
-import { useFeedRealtime } from '../hooks/useFeedRealtime';
-import { filterBySide, SIDE_FILTERS, type FeedTab, type SideFilter } from '../model/feed';
 
-import { FeedRail } from './FeedRail';
-import { NewCalloutsPill } from './NewCalloutsPill';
 
 const tabItems: readonly { value: FeedTab; label: string }[] = [
   { value: 'callouts', label: 'Callouts' },
@@ -104,14 +107,15 @@ export function FeedScreen() {
   );
   const mutateLaunches = launches.mutate;
   const launchpads = useApiResource('/v1/launchpads', apiListSchema(ApiLaunchpadSchema));
+  const mutateLaunchpads = launchpads.mutate;
   const assets = useApiResource('/v1/pool-assets', ApiPoolAssetListSchema);
   const assetsByAddress = useMemo(
     () => new Map((assets.data?.data ?? []).map(asset => [asset.address.toLowerCase(), asset])),
     [assets.data]
   );
   const refresh = useCallback(async () => {
-    await Promise.all([mutate(), mutateLaunches()]);
-  }, [mutate, mutateLaunches]);
+    await Promise.all([mutate(), mutateLaunches(), mutateLaunchpads()]);
+  }, [mutate, mutateLaunches, mutateLaunchpads]);
   const { pendingCount, streamError, release } = useFeedRealtime(refresh);
   const visible = useMemo(
     () =>
@@ -127,22 +131,34 @@ export function FeedScreen() {
     () =>
       [
         ...(side === 'all'
-          ? (launches.data?.data ?? []).flatMap(launch => [
-              {
-                kind: 'launch' as const,
-                id: launch.id,
-                createdAt: launch.createdAt,
-                launch,
-              },
-              ...(launch.graduation
-                ? [{
-                    kind: 'graduation' as const,
-                    id: launch.id,
-                    createdAt: launch.graduation.timestamp,
-                    launch,
-                  }]
-                : []),
-            ])
+          ? [
+              ...(launchpads.data?.data ?? [])
+                .filter(launchpad => !launchpadFilter || launchpad.slug === launchpadFilter)
+                .map(launchpad => ({
+                  kind: 'launchpad' as const,
+                  id: launchpad.id,
+                  createdAt: launchpad.createdAt,
+                  launchpad,
+                })),
+              ...(launches.data?.data ?? []).flatMap(launch => [
+                {
+                  kind: 'launch' as const,
+                  id: launch.id,
+                  createdAt: launch.createdAt,
+                  launch,
+                },
+                ...(launch.graduation
+                  ? [
+                      {
+                        kind: 'graduation' as const,
+                        id: launch.id,
+                        createdAt: launch.graduation.timestamp,
+                        launch,
+                      },
+                    ]
+                  : []),
+              ]),
+            ]
           : []),
         ...visible.flatMap(callout => [
           { kind: 'callout' as const, id: callout.id, createdAt: callout.createdAt, callout },
@@ -159,7 +175,7 @@ export function FeedScreen() {
       ].sort(
         (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
       ),
-    [launches.data, side, visible]
+    [launches.data, launchpadFilter, launchpads.data, side, visible]
   );
   const ownIds = new Set(
     (data?.data ?? []).filter(callout => callout.user.id === user?.id).map(callout => callout.id)
@@ -256,7 +272,13 @@ export function FeedScreen() {
           ) : null}
           {path && !isLoading && !error
             ? feedItems.map(item =>
-                item.kind === 'launch' || item.kind === 'graduation' ? (
+                item.kind === 'launchpad' ? (
+                  <LaunchpadCreatedPost
+                    key={`launchpad:${item.id}`}
+                    launchpad={item.launchpad}
+                    quoteAsset={assetsByAddress.get(item.launchpad.quoteToken.toLowerCase())}
+                  />
+                ) : item.kind === 'launch' || item.kind === 'graduation' ? (
                   <div key={`${item.kind}:${item.id}`} className="border-b border-line p-4">
                     <LaunchCard launch={item.launch} variant={item.kind} />
                   </div>

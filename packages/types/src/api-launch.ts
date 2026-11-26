@@ -26,6 +26,14 @@ export const ApiLaunchpadSchema = z.object({
   bannerUrl: z.string().nullable(),
   domain: z.string(),
   xHandle: z.string(),
+  ownerProfile: z
+    .object({
+      handle: z.string(),
+      name: z.string().nullable(),
+      avatarUrl: z.string().nullable(),
+      xVerified: z.boolean(),
+    })
+    .nullable(),
   quoteToken: Address,
   tradeFeePips: z.number().int().nonnegative(),
   creatorSharePips: z.number().int().nonnegative(),

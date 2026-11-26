@@ -222,7 +222,10 @@ function requireDeployment(config: LaunchRouteConfig) {
   };
 }
 
-function launchpadJson(record: Awaited<ReturnType<typeof findLaunchpad>>) {
+function launchpadJson(
+  record: Awaited<ReturnType<typeof findLaunchpad>>,
+  profiles: ReadonlyMap<string, CreatorProfile> = new Map()
+) {
   if (!record) return null;
   const metadata = decodeLaunchpadMetadata(record.metadataUri);
   return {
@@ -237,6 +240,7 @@ function launchpadJson(record: Awaited<ReturnType<typeof findLaunchpad>>) {
     bannerUrl: metadata.bannerUrl,
     domain: record.domain,
     xHandle: record.xHandle,
+    ownerProfile: profiles.get(record.owner.toLowerCase()) ?? null,
     quoteToken: getAddress(record.quoteToken),
     tradeFeePips: record.tradeFeePips,
     creatorSharePips: record.creatorSharePips,
@@ -496,7 +500,8 @@ export async function registerLaunchRoutes(
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return { data: records.map(record => launchpadJson(record)) };
+    const profiles = await creatorProfiles(records.map(record => record.owner));
+    return { data: records.map(record => launchpadJson(record, profiles)) };
   });
 
   app.get('/v1/launchpads/:slug', async (request, reply) => {
@@ -504,6 +509,7 @@ export async function registerLaunchRoutes(
     if (!params.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_SLUG' });
     const record = await findLaunchpad(chainId, { slug: params.data.slug });
     if (!record) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+    const ownerProfiles = await creatorProfiles([record.owner]);
     const launches = await prisma.launch.findMany({
       where: { chainId, launchpadId: record.launchpadId, canonical: true },
       include: { launchpad: true, graduation: true },
@@ -542,7 +548,7 @@ export async function registerLaunchRoutes(
       protocol: 0n,
     };
     return {
-      ...launchpadJson(record),
+      ...launchpadJson(record, ownerProfiles),
       launches: launches.map(item => launchJson(item, profiles)),
       dashboard: {
         launches: launches.length,
