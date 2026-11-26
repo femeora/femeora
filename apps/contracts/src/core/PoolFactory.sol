@@ -174,6 +174,37 @@ contract PoolFactory is ProtocolAccess, UUPSUpgradeable {
         uint16 binStepBps,
         int24 initialActiveBin
     ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (address pool) {
+        return _replaceDlmmPool(expectedPool, tokenA, tokenB, feePips, binStepBps, initialActiveBin);
+    }
+
+    /// @notice Replaces a canonical DLMM pool at its final live active bin.
+    /// @dev Avoids a stale off-chain price snapshot between scheduling and execution.
+    function replaceDlmmPoolAtCurrentBin(
+        address expectedPool,
+        address tokenA,
+        address tokenB,
+        uint24 feePips,
+        uint16 binStepBps
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (address pool) {
+        if (expectedPool == address(0)) revert InvalidConfiguration();
+        return _replaceDlmmPool(
+            expectedPool,
+            tokenA,
+            tokenB,
+            feePips,
+            binStepBps,
+            DlmmPoolV2(expectedPool).activeBin()
+        );
+    }
+
+    function _replaceDlmmPool(
+        address expectedPool,
+        address tokenA,
+        address tokenB,
+        uint24 feePips,
+        uint16 binStepBps,
+        int24 initialActiveBin
+    ) private returns (address pool) {
         if (expectedPool == address(0) || tokenA.code.length == 0 || tokenB.code.length == 0) {
             revert InvalidConfiguration();
         }

@@ -103,4 +103,18 @@ contract PoolFactoryTest {
         require(DlmmPoolV2(replacement).administrator() == address(this), "replacement administrator");
         require(DlmmPoolV2(replacement).protocolFeeRecipient() == TREASURY, "replacement treasury");
     }
+
+    function testReplacementReadsFinalActiveBinAtExecution() public {
+        int24 liveActiveBin = 37;
+        address previousPool =
+            factory.createDlmmPool(address(tokenA), address(tokenB), 3_000, 10, liveActiveBin);
+        DlmmPoolV2(previousPool).setPaused(true);
+        factory.setPoolDeployers(factory.dammDeployer(), new DlmmPoolV2Deployer(address(factory)));
+
+        address replacement = factory.replaceDlmmPoolAtCurrentBin(
+            previousPool, address(tokenA), address(tokenB), 3_000, 10
+        );
+
+        require(DlmmPoolV2(replacement).activeBin() == liveActiveBin, "stale replacement price");
+    }
 }

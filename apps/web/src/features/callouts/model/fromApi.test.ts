@@ -32,16 +32,18 @@ const pool: ApiPoolDetail = {
   counts: { positions: 1, swaps: 1, callouts: 1 },
 };
 
-const candles: ApiCandle[] = [{
-  timestamp: '2026-11-23T11:45:00.000Z',
-  open: '0.95',
-  high: '1.01',
-  low: '0.94',
-  close: '1',
-  volumeX: '1',
-  volumeY: '1',
-  swapCount: 1,
-}];
+const candles: ApiCandle[] = [
+  {
+    timestamp: '2026-11-23T11:45:00.000Z',
+    open: '0.95',
+    high: '1.01',
+    low: '0.94',
+    close: '1',
+    volumeX: '1',
+    volumeY: '1',
+    swapCount: 1,
+  },
+];
 
 const apiCallout: ApiCallout = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -98,20 +100,32 @@ const apiCallout: ApiCallout = {
     inRangeSeconds: '5400',
     openSeconds: '7200',
   },
-  stats: { likes: 2, reposts: 1, replies: 3, quotes: 1, views: 7, tails: 4 },
+  stats: {
+    likes: 2,
+    reposts: 1,
+    replies: 3,
+    quotes: 1,
+    views: 7,
+    tails: 4,
+    tailedValueQuote: '25',
+    rewardsActive: false,
+    rewards: [],
+  },
   viewer: { liked: true, reposted: false, following: true },
-  updates: [{
-    id: '00000000-0000-4000-8000-000000000003',
-    type: 'Added',
-    caption: null,
-    positionId: '10',
-    lowerBin: null,
-    upperBin: null,
-    transactionHash: `0x${'1'.repeat(64)}`,
-    blockNumber: '2',
-    timestamp: '2026-11-23T11:40:00.000Z',
-    createdAt: '2026-11-23T11:40:00.000Z',
-  }],
+  updates: [
+    {
+      id: '00000000-0000-4000-8000-000000000003',
+      type: 'Added',
+      caption: null,
+      positionId: '10',
+      lowerBin: null,
+      upperBin: null,
+      transactionHash: `0x${'1'.repeat(64)}`,
+      blockNumber: '2',
+      timestamp: '2026-11-23T11:40:00.000Z',
+      createdAt: '2026-11-23T11:40:00.000Z',
+    },
+  ],
   comments: [],
 };
 
@@ -120,7 +134,7 @@ test('maps canonical API callouts without fabricating USD or unknown integrity s
     apiCallout,
     pool,
     candles,
-    new Date('2026-11-23T12:00:00.000Z'),
+    new Date('2026-11-23T12:00:00.000Z')
   );
   assert.equal(callout.valuation, 'quote');
   assert.equal(callout.caller.avatarUrl, 'https://pbs.twimg.com/profile_images/canonical.jpg');

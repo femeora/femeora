@@ -22,6 +22,26 @@ const LaunchpadSocialUser = z.object({
   xVerified: z.boolean(),
 });
 
+export const ApiLaunchpadReputationSchema = z.object({
+  window: z.enum(['7d', 'all']),
+  launches: z.number().int().nonnegative(),
+  eligibleLaunches: z.number().int().nonnegative(),
+  graduations: z.number().int().nonnegative(),
+  survivedGraduations: z.number().int().nonnegative(),
+  graduationRate: Decimal,
+  survivalRate: Decimal,
+  medianTimeToGraduateSeconds: Integer.nullable(),
+  devExitRate: Decimal,
+  sniperShare: Decimal,
+  volumeQuote: Decimal,
+  revenueQuote: Decimal,
+  protectionScore: Decimal,
+  score: Decimal,
+  tier: z.enum(['Unrated', 'Bronze', 'Silver', 'Gold', 'Verified']),
+  computedAt: z.string().datetime(),
+});
+export type ApiLaunchpadReputation = z.infer<typeof ApiLaunchpadReputationSchema>;
+
 export const ApiLaunchpadReplySchema = z.object({
   id: z.string().uuid(),
   launchpadId: Integer,
@@ -89,6 +109,7 @@ export const ApiLaunchpadSchema = z.object({
   }),
   active: z.boolean(),
   launchCount: z.number().int().nonnegative(),
+  reputation: ApiLaunchpadReputationSchema.nullable(),
   createdAt: z.string().datetime(),
 });
 export type ApiLaunchpad = z.infer<typeof ApiLaunchpadSchema>;
@@ -179,6 +200,24 @@ export const ApiLaunchpadDetailSchema = ApiLaunchpadSchema.extend({
   dashboard: ApiLaunchpadDashboardSchema,
 });
 export type ApiLaunchpadDetail = z.infer<typeof ApiLaunchpadDetailSchema>;
+export const ApiLaunchpadReputationDetailSchema = z.object({
+  launchpadId: Integer,
+  quoteToken: Address,
+  data: z.array(ApiLaunchpadReputationSchema),
+});
+export type ApiLaunchpadReputationDetail = z.infer<typeof ApiLaunchpadReputationDetailSchema>;
+export const ApiLaunchpadReputationLeaderboardSchema = z.object({
+  data: z.array(
+    z.object({
+      launchpad: ApiLaunchpadSchema,
+      reputation: ApiLaunchpadReputationSchema,
+    })
+  ),
+  nextCursor: Integer.nullable(),
+});
+export type ApiLaunchpadReputationLeaderboard = z.infer<
+  typeof ApiLaunchpadReputationLeaderboardSchema
+>;
 export const ApiLaunchDetailSchema = ApiLaunchSchema.extend({
   trades: z.array(ApiCurveTradeSchema),
 });

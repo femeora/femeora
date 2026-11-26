@@ -20,6 +20,7 @@ contract DlmmPoolV2 is ReentrancyGuard {
     uint256 public constant MAX_BATCH_BINS = 61;
     uint16 public constant MAX_SWAP_BIN_CROSSINGS = 256;
     uint256 private constant FEE_DENOMINATOR = 1_000_000;
+    uint256 private constant Q128 = 1 << 128;
     uint24 public constant MAX_TOTAL_FEE_PIPS = 100_000;
     uint24 public constant VARIABLE_FEE_CONTROL_PIPS = 100;
     uint32 public constant VOLATILITY_DECAY_PERIOD = 86_400;
@@ -93,6 +94,8 @@ contract DlmmPoolV2 is ReentrancyGuard {
     mapping(int24 => Bin) private _bins;
     mapping(int24 => mapping(address => uint256)) public sharesOf;
     mapping(uint256 => uint256) private _nonEmptyBins;
+    mapping(int24 => uint256) public protocolFeeGrowth0X128;
+    mapping(int24 => uint256) public protocolFeeGrowth1X128;
 
     event BatchLiquidityAdded(
         bytes32 indexed operationId,
@@ -132,6 +135,13 @@ contract DlmmPoolV2 is ReentrancyGuard {
     /// @notice Exact LP fee denominator for off-chain per-position accounting.
     /// @dev Emitted once for every bin consumed by a swap. `lpFee` excludes protocol fees.
     event BinFeeAccrued(int24 indexed binId, bool token0ToToken1, uint256 lpFee, uint256 totalShares);
+    event BinProtocolFeeAccrued(
+        int24 indexed binId,
+        bool token0ToToken1,
+        uint256 protocolFee,
+        uint256 totalShares,
+        uint256 feeGrowthX128
+    );
     event PauseUpdated(bool paused);
     event AdministratorUpdated(address indexed previousAdministrator, address indexed administrator);
     event Swap(
@@ -554,6 +564,7 @@ contract DlmmPoolV2 is ReentrancyGuard {
             consumed = availableInput;
         }
         protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, FEE_DENOMINATOR);
+        _accrueProtocolFeeGrowth(binId, token0ToToken1, protocolFee, bin.totalShares);
         if (token0ToToken1) {
             protocolFees0 += _toUint128(protocolFee);
             _setReserves(bin, uint256(bin.reserve0) + consumed - protocolFee, outputReserve - output);
@@ -562,6 +573,13 @@ contract DlmmPoolV2 is ReentrancyGuard {
             _setReserves(bin, outputReserve - output, uint256(bin.reserve1) + consumed - protocolFee);
         }
         emit BinFeeAccrued(binId, token0ToToken1, totalFee - protocolFee, bin.totalShares);
+        emit BinProtocolFeeAccrued(
+            binId,
+            token0ToToken1,
+            protocolFee,
+            bin.totalShares,
+            token0ToToken1 ? protocolFeeGrowth0X128[binId] : protocolFeeGrowth1X128[binId]
+        );
         if (bin.reserve0 == 0 && bin.reserve1 == 0) _nonEmptyBins.clear(binId);
     }
 
@@ -580,6 +598,7 @@ contract DlmmPoolV2 is ReentrancyGuard {
         input = FullMath.mulDivRoundingUp(netInput, FEE_DENOMINATOR, FEE_DENOMINATOR - effectiveFeePips);
         totalFee = input - netInput;
         protocolFee = FullMath.mulDiv(totalFee, protocolFeeSharePips, FEE_DENOMINATOR);
+        _accrueProtocolFeeGrowth(binId, token0ToToken1, protocolFee, bin.totalShares);
         if (token0ToToken1) {
             protocolFees0 += _toUint128(protocolFee);
             _setReserves(bin, uint256(bin.reserve0) + input - protocolFee, outputReserve - output);
@@ -588,7 +607,23 @@ contract DlmmPoolV2 is ReentrancyGuard {
             _setReserves(bin, outputReserve - output, uint256(bin.reserve1) + input - protocolFee);
         }
         emit BinFeeAccrued(binId, token0ToToken1, totalFee - protocolFee, bin.totalShares);
+        emit BinProtocolFeeAccrued(
+            binId,
+            token0ToToken1,
+            protocolFee,
+            bin.totalShares,
+            token0ToToken1 ? protocolFeeGrowth0X128[binId] : protocolFeeGrowth1X128[binId]
+        );
         if (bin.reserve0 == 0 && bin.reserve1 == 0) _nonEmptyBins.clear(binId);
+    }
+
+    function _accrueProtocolFeeGrowth(int24 binId, bool token0ToToken1, uint256 protocolFee, uint256 totalShares)
+        private
+    {
+        if (protocolFee == 0 || totalShares == 0) return;
+        uint256 growth = FullMath.mulDiv(protocolFee, Q128, totalShares);
+        if (token0ToToken1) protocolFeeGrowth0X128[binId] += growth;
+        else protocolFeeGrowth1X128[binId] += growth;
     }
 
     function _setReserves(Bin storage bin, uint256 reserve0, uint256 reserve1) private {

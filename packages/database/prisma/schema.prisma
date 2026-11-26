@@ -145,6 +145,7 @@ model Launchpad {
   reposts      LaunchpadRepost[]
   replies      LaunchpadReply[]
   views        LaunchpadViewDaily[]
+  reputations  LaunchpadReputation[]
 
   @@id([chainId, launchpadId])
   @@unique([chainId, slug])
@@ -268,6 +269,34 @@ model LaunchpadRevenue {
   @@map("launchpad_revenue")
 }
 
+model LaunchpadReputation {
+  chainId              Int      @map("chain_id")
+  launchpadId          BigInt   @map("launchpad_id")
+  window               String   @db.VarChar(10)
+  launches             Int      @default(0)
+  eligibleLaunches     Int      @default(0) @map("eligible_launches")
+  graduations          Int      @default(0)
+  survivedGraduations  Int      @default(0) @map("survived_graduations")
+  graduationRate       Decimal  @default(0) @map("graduation_rate") @db.Decimal(5, 2)
+  survivalRate         Decimal  @default(0) @map("survival_rate") @db.Decimal(5, 2)
+  medianTimeToGraduate BigInt?  @map("median_time_to_graduate")
+  devExitRate          Decimal  @default(0) @map("dev_exit_rate") @db.Decimal(5, 2)
+  sniperShare          Decimal  @default(0) @map("sniper_share") @db.Decimal(5, 2)
+  volumeQuote          Decimal  @default(0) @map("volume_quote") @db.Decimal(36, 18)
+  revenueQuote         Decimal  @default(0) @map("revenue_quote") @db.Decimal(36, 18)
+  protectionScore      Decimal  @default(0) @map("protection_score") @db.Decimal(5, 2)
+  score                Decimal  @default(0) @db.Decimal(5, 2)
+  tier                 String   @default("Unrated") @db.VarChar(12)
+  computedAt           DateTime @map("computed_at")
+
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@id([chainId, launchpadId, window])
+  @@index([chainId, window, score])
+  @@index([chainId, window, revenueQuote])
+  @@map("launchpad_reputations")
+}
+
 model ProtectedTokenIdentity {
   chainId     Int      @map("chain_id")
   token       String   @db.VarChar(42)
@@ -284,16 +313,17 @@ model ProtectedTokenIdentity {
 }
 
 model IndexerHealth {
-  chainId           Int       @id @map("chain_id")
-  status            String    @db.VarChar(20)
-  latestBlock       BigInt    @map("latest_block")
-  safeBlock         BigInt    @map("safe_block")
-  lastIndexedBlock  BigInt?   @map("last_indexed_block")
-  lagBlocks         BigInt    @map("lag_blocks")
-  lastSuccessAt     DateTime? @map("last_success_at")
-  lastStatsRollupAt DateTime? @map("last_stats_rollup_at")
-  lastErrorCode     String?   @map("last_error_code") @db.VarChar(80)
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  chainId                Int       @id @map("chain_id")
+  status                 String    @db.VarChar(20)
+  latestBlock            BigInt    @map("latest_block")
+  safeBlock              BigInt    @map("safe_block")
+  lastIndexedBlock       BigInt?   @map("last_indexed_block")
+  lagBlocks              BigInt    @map("lag_blocks")
+  lastSuccessAt          DateTime? @map("last_success_at")
+  lastStatsRollupAt      DateTime? @map("last_stats_rollup_at")
+  lastReputationRollupAt DateTime? @map("last_reputation_rollup_at")
+  lastErrorCode          String?   @map("last_error_code") @db.VarChar(80)
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
   @@map("indexer_health")
 }
@@ -847,6 +877,27 @@ model Tail {
   @@id([chainId, positionId])
   @@index([calloutId])
   @@map("tails")
+}
+
+model TailReward {
+  chainId             Int      @map("chain_id")
+  transactionHash     String   @map("transaction_hash") @db.VarChar(66)
+  logIndex            Int      @map("log_index")
+  blockNumber         BigInt   @map("block_number")
+  timestamp           DateTime
+  token               String   @db.VarChar(42)
+  referrer            String   @db.VarChar(42)
+  referrerPositionId  BigInt   @map("referrer_position_id")
+  treasuryAmount      Decimal  @map("treasury_amount") @db.Decimal(78, 0)
+  rewardAmount        Decimal  @map("reward_amount") @db.Decimal(78, 0)
+  eligible            Boolean
+  canonical           Boolean  @default(true)
+
+  @@id([chainId, transactionHash, logIndex])
+  @@index([chainId, referrerPositionId, canonical])
+  @@index([chainId, referrer, canonical])
+  @@index([chainId, blockNumber, canonical])
+  @@map("tail_rewards")
 }
 
 model Like {

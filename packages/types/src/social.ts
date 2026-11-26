@@ -67,12 +67,14 @@ export const ApiNotificationSchema = z.object({
   entityType: z.string().nullable(),
   entityId: z.string().nullable(),
   payload: z.record(z.unknown()),
-  actor: z.object({
-    handle: z.string(),
-    name: z.string().nullable(),
-    avatarUrl: z.string().url().nullable(),
-    xVerified: z.boolean(),
-  }).nullable(),
+  actor: z
+    .object({
+      handle: z.string(),
+      name: z.string().nullable(),
+      avatarUrl: z.string().url().nullable(),
+      xVerified: z.boolean(),
+    })
+    .nullable(),
   createdAt: z.string().datetime(),
   readAt: z.string().datetime().nullable(),
 });
@@ -87,22 +89,43 @@ export const ApiNotificationReadSchema = z.object({ read: z.literal(true) });
 
 export const ApiUserProfileSchema = z.object({
   user: z.object({
-    id: z.string().uuid(), handle: z.string(), name: z.string().nullable(),
-    avatarUrl: z.string().url().nullable(), xVerified: z.boolean(),
-    xFollowers: z.number().int().nonnegative().nullable(), createdAt: z.string().datetime(),
-    followers: z.number().int().nonnegative(), following: z.number().int().nonnegative(),
-    callouts: z.number().int().nonnegative(), followedByMe: z.boolean(),
+    id: z.string().uuid(),
+    handle: z.string(),
+    name: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    xVerified: z.boolean(),
+    xFollowers: z.number().int().nonnegative().nullable(),
+    createdAt: z.string().datetime(),
+    followers: z.number().int().nonnegative(),
+    following: z.number().int().nonnegative(),
+    callouts: z.number().int().nonnegative(),
+    followedByMe: z.boolean(),
   }),
-  stats: z.array(z.object({
-    window: z.string(), callouts: z.number().int().nonnegative(), earnedQuote: z.string(),
-    avgInRange: z.string(), tailers: z.number().int().nonnegative(),
-    quickExits: z.number().int().nonnegative(), score: z.string(),
-    rank: z.number().int().nonnegative(), updatedAt: z.string().datetime(),
-  })),
+  stats: z.array(
+    z.object({
+      window: z.string(),
+      callouts: z.number().int().nonnegative(),
+      earnedQuote: z.string(),
+      avgInRange: z.string(),
+      tailers: z.number().int().nonnegative(),
+      quickExits: z.number().int().nonnegative(),
+      score: z.string(),
+      rank: z.number().int().nonnegative(),
+      updatedAt: z.string().datetime(),
+    })
+  ),
   trackRecord: z.object({
-    openCallouts: z.number().int().nonnegative(), closedCallouts: z.number().int().nonnegative(),
-    averageHoldSeconds: z.number().int().nonnegative(), quickExits: z.number().int().nonnegative(),
+    openCallouts: z.number().int().nonnegative(),
+    closedCallouts: z.number().int().nonnegative(),
+    averageHoldSeconds: z.number().int().nonnegative(),
+    quickExits: z.number().int().nonnegative(),
     medianInRange: z.number().min(0).max(100),
+  }),
+  tailing: z.object({
+    tails: z.number().int().nonnegative(),
+    tailedValueQuote: z.string(),
+    rewardsActive: z.boolean(),
+    rewards: z.array(z.object({ token: z.string(), amount: z.string() })),
   }),
   callouts: z.array(ApiCalloutSchema),
 });

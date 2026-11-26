@@ -1,4 +1,4 @@
-import { dammPoolAbi, dlmmPoolV2Abi, getFomeoraDeployment, positionManagerV2Abi } from '@fomeora/contracts-sdk';
+import { dammPoolAbi, dlmmPoolV2Abi, feeSplitterAbi, getFomeoraDeployment, positionManagerV2Abi } from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { encodeFunctionData, parseAbi, parseUnits, toHex, type Address, type Hex } from 'viem';
@@ -19,6 +19,7 @@ const bodySchema = z.object({
   amountY: z.string().regex(/^\d+(?:\.\d+)?$/).max(80),
   slippageBps: z.number().int().min(1).max(1_000).default(50),
 });
+const rewardClaimBodySchema = z.object({ walletAddress: addressSchema });
 const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
@@ -75,7 +76,7 @@ export async function registerTailPrepareRoutes(
         where: { id: params.data.id, chainId, ...visibleCalloutWhere },
         select: {
           id: true, poolId: true,
-          position: { select: { owner: true, status: true, lowerBin: true, upperBin: true, shape: true } },
+          position: { select: { id: true, owner: true, status: true, lowerBin: true, upperBin: true, shape: true } },
           pool: { select: { address: true, type: true, tokenX: true, tokenY: true, tokenXDecimals: true, tokenYDecimals: true, binStep: true, canonical: true } },
         },
       });
@@ -100,6 +101,22 @@ export async function registerTailPrepareRoutes(
       const manager = getFomeoraDeployment(chainId).positionManagerV2 as Address;
       const poolAddress = source.pool.address as Address;
       const deadline = BigInt(Math.floor(Date.now() / 1_000) + DEADLINE_SECONDS);
+      // Keep tailing available during the governance upgrade window. The existing
+      // implementation has no referrerPosition selector; the upgraded implementation
+      // exposes it and receives the canonical source id atomically at creation.
+      let supportsReferrerPosition = false;
+      try {
+        await client.readContract({
+          address: manager,
+          abi: positionManagerV2Abi,
+          functionName: 'referrerPosition',
+          args: [source.position.id],
+          blockNumber,
+        });
+        supportsReferrerPosition = true;
+      } catch {
+        supportsReferrerPosition = false;
+      }
       let data: Hex;
       let quote: Record<string, unknown>;
       if (source.pool.type === 'DLMM') {
@@ -119,10 +136,13 @@ export async function registerTailPrepareRoutes(
           amount0: bin.amount0, amount1: bin.amount1, binStepBps: source.pool.binStep,
           decimals0: source.pool.tokenXDecimals!, decimals1: source.pool.tokenYDecimals!, slippageBps: body.data.slippageBps,
         }));
-        data = encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createRangePosition', args: [{
+        const createParams = {
           pool: poolAddress, shape: source.position.shape, tag: intent.tag as Hex, referrer: intent.referrer as Address,
           expectedActiveBin: activeBin, bins: selected.map(bin => bin.binId), amountsX: selected.map(bin => bin.amount0), amountsY: selected.map(bin => bin.amount1), minShares: mins, deadline,
-        }] });
+        };
+        data = supportsReferrerPosition
+          ? encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createRangePositionForTail', args: [createParams, source.position.id] })
+          : encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createRangePosition', args: [createParams] });
         quote = { mode: body.data.mode, pool: source.pool.address, poolType: 'DLMM', expectedActiveBin: activeBin, lowerBin: target.lower, upperBin: target.upper, shape: source.position.shape, requiresTokenX: target.upper >= activeBin, requiresTokenY: target.lower < activeBin, warnings: [], amountXRaw: amount0.toString(), amountYRaw: amount1.toString(), blockNumber: blockNumber.toString() };
       } else {
         if (amount0 === 0n || amount1 === 0n) throw new TailPrepareError(400, 'DAMM_REQUIRES_BOTH_TOKENS');
@@ -135,9 +155,12 @@ export async function registerTailPrepareRoutes(
         const share0 = amount0 * totalShares / reserve0;
         const share1 = amount1 * totalShares / reserve1;
         const minShares = (share0 < share1 ? share0 : share1) * BigInt(10_000 - body.data.slippageBps) / 10_000n;
-        data = encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createDammPosition', args: [{
+        const createParams = {
           pool: poolAddress, amountX: amount0, amountY: amount1, minShares, tag: intent.tag as Hex, referrer: intent.referrer as Address, deadline,
-        }] });
+        };
+        data = supportsReferrerPosition
+          ? encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createDammPositionForTail', args: [createParams, source.position.id] })
+          : encodeFunctionData({ abi: positionManagerV2Abi, functionName: 'createDammPosition', args: [createParams] });
         quote = { mode: body.data.mode, pool: source.pool.address, poolType: 'DAMM', expectedActiveBin: null, lowerBin: null, upperBin: null, shape: source.position.shape, requiresTokenX: true, requiresTokenY: true, warnings: [], amountXRaw: amount0.toString(), amountYRaw: amount1.toString(), blockNumber: blockNumber.toString() };
       }
       const tokens = [source.pool.tokenX as Address, source.pool.tokenY as Address] as const;
@@ -157,5 +180,58 @@ export async function registerTailPrepareRoutes(
       }
       return { quote, approvals, create: { chainId, to: manager, data, value: '0x0', ...(gas === null ? {} : { gas: toHex(gas) }) } };
     } catch (error) { return sendError(reply, error); }
+  });
+
+  app.post('/v1/callouts/:id/reward-claim-prepare', { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (request, reply) => {
+    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
+    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
+    const params = paramsSchema.safeParse(request.params);
+    const body = rewardClaimBodySchema.safeParse(request.body);
+    if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_REWARD_CLAIM' });
+    if (!session.user.wallets.some(wallet => wallet.address.toLowerCase() === body.data.walletAddress))
+      return reply.status(403).send({ error: 'LINKED_WALLET_REQUIRED' });
+
+    try {
+      const source = await prisma.callout.findFirst({
+        where: { id: params.data.id, chainId, ...visibleCalloutWhere },
+        select: {
+          position: { select: { owner: true, status: true } },
+          tails: { select: { positionId: true }, orderBy: { createdAt: 'asc' }, take: 50 },
+        },
+      });
+      if (!source) throw new TailPrepareError(404, 'CALLOUT_NOT_FOUND');
+      if (source.position.owner.toLowerCase() !== body.data.walletAddress)
+        throw new TailPrepareError(403, 'CALLOUT_OWNER_REQUIRED');
+      if (source.position.status !== 'open') throw new TailPrepareError(409, 'SOURCE_POSITION_NOT_OPEN');
+      if (source.tails.length === 0) throw new TailPrepareError(409, 'NO_TAIL_POSITIONS');
+
+      const blockNumber = await blockProvider(chainId);
+      const deployment = getFomeoraDeployment(chainId);
+      const splitter = deployment.feeSplitter as Address;
+      const [manager, rewardBps] = await Promise.all([
+        client.readContract({ address: splitter, abi: feeSplitterAbi, functionName: 'positionManager', blockNumber }),
+        client.readContract({ address: splitter, abi: feeSplitterAbi, functionName: 'tailRewardBps', blockNumber }),
+      ]);
+      if (manager === '0x0000000000000000000000000000000000000000' || rewardBps === 0)
+        throw new TailPrepareError(409, 'TAIL_REWARDS_NOT_ACTIVE');
+
+      const data = encodeFunctionData({
+        abi: feeSplitterAbi,
+        functionName: 'claimTailRewardsBatch',
+        args: [source.tails.map(tail => tail.positionId)],
+      });
+      let gas: bigint;
+      try {
+        gas = await client.estimateGas({ account: body.data.walletAddress, to: splitter, data, value: 0n });
+      } catch {
+        throw new TailPrepareError(409, 'TAIL_REWARD_SIMULATION_FAILED');
+      }
+      return {
+        transaction: { chainId, to: splitter, data, value: '0x0', gas: toHex(gas) },
+        expiresAt: new Date(Date.now() + DEADLINE_SECONDS * 1_000).toISOString(),
+      };
+    } catch (error) {
+      return sendError(reply, error);
+    }
   });
 }

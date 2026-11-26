@@ -43,6 +43,7 @@ async function tailSource(id: string, chainId: number) {
       poolId: true,
       position: {
         select: {
+          id: true,
           owner: true,
           status: true,
           lowerBin: true,
@@ -184,6 +185,7 @@ export async function registerTailRoutes(app: FastifyInstance, chainId: number) 
         intentId: intent.id,
         tag,
         referrer: source.position.owner,
+        referrerPositionId: source.position.id.toString(),
         expiresAt: expiresAt.toISOString(),
         quote,
       });

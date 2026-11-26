@@ -8,6 +8,15 @@ export function friendlyErrorMessage(error: string): string {
   if (value.includes('DEPOSIT_TOO_SMALL')) {
     return 'The deposit is too small for the selected range. Narrow the range or increase the token amount, then review again.';
   }
+  if (value.includes('TAIL_REWARDS_NOT_ACTIVE')) {
+    return 'Caller rewards are prepared but are not active on this network yet.';
+  }
+  if (value.includes('NO_TAIL_POSITIONS')) {
+    return 'No tail positions are attached to this callout yet, so there are no caller rewards to claim.';
+  }
+  if (value.includes('TAIL_REWARD_SIMULATION_FAILED')) {
+    return 'No caller reward can be settled from the current indexed pool fees yet. Try again after more pool activity is indexed.';
+  }
   if (value.includes('SMART_RANGE_REQUIRES_DLMM')) {
     return 'Smart Range currently supports DLMM positions. DAMM positions remain manageable with the standard increase, decrease, and close actions.';
   }

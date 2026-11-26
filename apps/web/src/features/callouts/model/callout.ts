@@ -33,6 +33,8 @@ export interface CalloutComment {
  */
 export interface Callout {
   id: string;
+  /** Wallet that owns the proof-backed source position. */
+  owner: string;
   kind?: 'position' | 'launch_lp';
   launchId?: string | null;
   /** Canonical creation time used for exact chart placement on every interval. */
@@ -70,6 +72,11 @@ export interface Callout {
   inRangePct: number;
   heldHours: number;
   tailers: number;
+  /** Current indexed value of canonical positions created through Tail. */
+  tailedValueQuote: number;
+  /** True only after position-attributed reward distribution is live on-chain. */
+  rewardsActive: boolean;
+  rewards: readonly { token: string; symbol: string; amount: number }[];
   likes: number;
   reposts: number;
   replies: number;
@@ -107,8 +114,8 @@ export function calloutStatus(callout: Callout): RangeStatus {
   if (callout.closed) return 'closed';
   if (callout.pool.type === 'DAMM') return 'in-range';
   if (callout.rangeBins) {
-    return callout.rangeBins.active >= callout.rangeBins.lower
-      && callout.rangeBins.active <= callout.rangeBins.upper
+    return callout.rangeBins.active >= callout.rangeBins.lower &&
+      callout.rangeBins.active <= callout.rangeBins.upper
       ? 'in-range'
       : 'out-of-range';
   }
@@ -130,7 +137,8 @@ export function sideLabel(callout: Callout): string {
 /** `$3.18M → $4.84M MC` for DLMM, `Full range` for DAMM. */
 export function rangeLabel(callout: Callout): Span {
   if (callout.pool.type === 'DAMM') return 'Full range';
-  if (callout.rangeBins) return [`Bin ${callout.rangeBins.lower}`, `Bin ${callout.rangeBins.upper}`];
+  if (callout.rangeBins)
+    return [`Bin ${callout.rangeBins.lower}`, `Bin ${callout.rangeBins.upper}`];
   const [low, high] = rangeMc(callout);
   return [formatCompactUsd(low), `${formatCompactUsd(high)} MC`];
 }

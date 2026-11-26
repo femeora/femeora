@@ -20,6 +20,7 @@ import {
   type Callout,
 } from '../model/callout';
 import { useCallouts } from '../store';
+import { ClaimTailRewardsButton } from './ClaimTailRewardsButton';
 
 const STATUS = {
   'in-range': { label: 'In range', tone: 'up' },
@@ -66,8 +67,16 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
           <TokenPair
             tokenX={callout.pool.baseAddress}
             tokenY={callout.pool.quoteAddress}
-            tokenXIdentity={{ symbol: callout.pool.base, name: callout.pool.baseName, logoUrl: callout.pool.baseLogoUrl }}
-            tokenYIdentity={{ symbol: callout.pool.quote, name: callout.pool.quoteName, logoUrl: callout.pool.quoteLogoUrl }}
+            tokenXIdentity={{
+              symbol: callout.pool.base,
+              name: callout.pool.baseName,
+              logoUrl: callout.pool.baseLogoUrl,
+            }}
+            tokenYIdentity={{
+              symbol: callout.pool.quote,
+              name: callout.pool.quoteName,
+              logoUrl: callout.pool.quoteLogoUrl,
+            }}
             compact
           />
           <p className="t-label whitespace-nowrap text-muted">
@@ -81,14 +90,18 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
           <dt className="t-label text-muted">Position</dt>
           <dt className="t-label text-muted">Earned</dt>
           <dd className="font-mono text-sm tabular-nums">
-            {callout.showSize ? formatCalloutValue(callout, callout.closed ? 0 : callout.sizeUsd) : 'Hidden'}
+            {callout.showSize
+              ? formatCalloutValue(callout, callout.closed ? 0 : callout.sizeUsd)
+              : 'Hidden'}
           </dd>
           <dd className="font-mono text-sm tabular-nums text-up">{earned}</dd>
         </dl>
       </div>
 
       <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
-        {callout.kind === 'launch_lp' ? <Chip tone="up">Launch LP · permanently locked</Chip> : null}
+        {callout.kind === 'launch_lp' ? (
+          <Chip tone="up">Launch LP · permanently locked</Chip>
+        ) : null}
         <Chip tone="signal">{sideLabel(callout)}</Chip>
         <Chip>
           <SpanText value={rangeLabel(callout)} />
@@ -112,8 +125,29 @@ export function CalloutCard({ callout, preview = false }: CalloutCardProps) {
       </div>
 
       <div className="t-label flex items-center justify-between gap-3 border-t border-line px-3.5 py-2 text-muted">
-        <span>
-          {callout.tailers} tailers · in range {callout.inRangePct}% of {heldLabel(callout.heldHours)}
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span>{callout.tailers} tails</span>
+          <span aria-hidden="true">·</span>
+          <span>{formatCalloutValue(callout, callout.tailedValueQuote)} tailed TVL</span>
+          {callout.rewardsActive ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                caller earned{' '}
+                {callout.rewards.length === 0
+                  ? '0'
+                  : callout.rewards
+                      .map(reward => `${reward.amount.toLocaleString(undefined, { maximumSignificantDigits: 6 })} ${reward.symbol}`)
+                      .join(' + ')}{' '}
+                · historical
+              </span>
+            </>
+          ) : null}
+          <span aria-hidden="true">·</span>
+          <span>
+            in range {callout.inRangePct}% of {heldLabel(callout.heldHours)}
+          </span>
+          {preview ? null : <ClaimTailRewardsButton callout={callout} />}
         </span>
         {preview ? null : (
           <button

@@ -145,6 +145,50 @@ contract PositionManagerV2Test {
         require(!success, "self referrer accepted");
     }
 
+    function testTailPositionLinksCanonicalOpenSourceWithoutChangingLegacyAbi() public {
+        uint256 sourceId = manager.createRangePosition(_params(false, keccak256("source")));
+        address referrer = address(0xCA11);
+        manager.transferFrom(address(this), referrer, sourceId);
+
+        IPositionManagerV2.CreateParams memory tail = _params(true, keccak256("tail"));
+        tail.referrer = referrer;
+        uint256 tailId = manager.createRangePositionForTail(tail, sourceId);
+
+        require(manager.referrerPosition(tailId) == sourceId, "source link");
+        (,,,,, address storedReferrer, bool open) = manager.positions(tailId);
+        require(storedReferrer == referrer && open, "tail metadata");
+    }
+
+    function testTailPositionRejectsSourceNotOwnedByReferrer() public {
+        uint256 sourceId = manager.createRangePosition(_params(false, keccak256("source")));
+        IPositionManagerV2.CreateParams memory tail = _params(true, keccak256("tail"));
+        tail.referrer = address(0xCA11);
+        (bool success,) = address(manager).call(
+            abi.encodeCall(PositionManagerV2.createRangePositionForTail, (tail, sourceId))
+        );
+        require(!success, "foreign source accepted");
+    }
+
+    function testTailPositionAccruesItsExactDlmmProtocolFeeBasis() public {
+        pool.setProtocolFeeConfiguration(address(this), 100_000);
+
+        uint256 sourceId = manager.createRangePosition(_params(false, keccak256("source")));
+        address referrer = address(0xCA11);
+        manager.transferFrom(address(this), referrer, sourceId);
+
+        IPositionManagerV2.CreateParams memory tail = _params(false, keccak256("tail"));
+        tail.referrer = referrer;
+        uint256 tailId = manager.createRangePositionForTail(tail, sourceId);
+        require(manager.tailFeeGrowthSupported(tailId), "fee growth unsupported");
+
+        token0.approve(address(pool), type(uint256).max);
+        pool.swapExactOutput(true, 2 ether, 3 ether, 4, address(this), block.timestamp + 1);
+        manager.decreaseRange(tailId, 1, 0, 0, address(this), block.timestamp + 1);
+
+        require(manager.tailProtocolFeesOwed0(tailId) != 0, "protocol fee basis missing");
+        require(manager.tailProtocolFeesOwed1(tailId) == 0, "wrong fee token");
+    }
+
     function testDlmmExactOutputCrossesBinsWithBoundedInput() public {
         manager.createRangePosition(_params(false, bytes32(0)));
         token0.approve(address(pool), type(uint256).max);

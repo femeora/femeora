@@ -1,10 +1,11 @@
-import { prisma, type Prisma } from '@fomeora/database';
+import { prisma, Prisma } from '@fomeora/database';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import {
   calloutInclude,
+  resolveCalloutTailStats,
   resolveCalloutViewerStates,
   serializeCallout,
   visibleCalloutWhere,
@@ -138,7 +139,30 @@ export async function registerSocialRoutes(app: FastifyInstance, chainId: number
           : (inRangeRatios[inRangeRatios.length / 2 - 1]! +
               inRangeRatios[inRangeRatios.length / 2]!) /
             2;
-    const viewer = await resolveCalloutViewerStates(session?.userId, callouts);
+    const [viewer, tailStats] = await Promise.all([
+      resolveCalloutViewerStates(session?.userId, callouts),
+      resolveCalloutTailStats(callouts),
+    ]);
+    const tailing = [...tailStats.values()].reduce(
+      (summary, item) => ({
+        tails: summary.tails + item.tails,
+        tailedValueQuote: summary.tailedValueQuote.add(item.tailedValueQuote),
+        rewardsActive: summary.rewardsActive || item.rewardsActive,
+        rewards: item.rewards.reduce((rewards, reward) => {
+          rewards.set(
+            reward.token,
+            (rewards.get(reward.token) ?? new Prisma.Decimal(0)).add(reward.amount)
+          );
+          return rewards;
+        }, summary.rewards),
+      }),
+      {
+        tails: 0,
+        tailedValueQuote: new Prisma.Decimal(0),
+        rewardsActive: false,
+        rewards: new Map<string, Prisma.Decimal>(),
+      }
+    );
     return {
       user: {
         id: user.id,
@@ -171,7 +195,15 @@ export async function registerSocialRoutes(app: FastifyInstance, chainId: number
         medianInRange,
         quickExits: trackRows.filter(row => row.quickExitMinutes !== null).length,
       },
-      callouts: callouts.map(callout => serializeCallout(callout, null, viewer.get(callout.id))),
+      tailing: {
+        tails: tailing.tails,
+        tailedValueQuote: tailing.tailedValueQuote.toFixed(),
+        rewardsActive: tailing.rewardsActive,
+        rewards: [...tailing.rewards].map(([token, amount]) => ({ token, amount: amount.toFixed(0) })),
+      },
+      callouts: callouts.map(callout =>
+        serializeCallout(callout, null, viewer.get(callout.id), tailStats.get(callout.id))
+      ),
     };
   });
 

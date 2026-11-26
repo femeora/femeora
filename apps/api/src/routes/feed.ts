@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import {
   calloutInclude,
+  resolveCalloutTailStats,
   resolveCalloutViewerStates,
   serializeCallout,
   visibleCalloutWhere,
@@ -218,10 +219,18 @@ export async function registerFeedRoutes(app: FastifyInstance, chainId: number) 
         );
       });
       const page = afterCursor(candidates, parsed.data.cursor).slice(0, parsed.data.limit);
-      const viewer = await resolveCalloutViewerStates(session?.userId, page);
+      const [viewer, tailStats] = await Promise.all([
+        resolveCalloutViewerStates(session?.userId, page),
+        resolveCalloutTailStats(page),
+      ]);
       return {
         data: page.map(callout =>
-          serializeCallout(callout, scores.get(callout.userId) ?? '0', viewer.get(callout.id))
+          serializeCallout(
+            callout,
+            scores.get(callout.userId) ?? '0',
+            viewer.get(callout.id),
+            tailStats.get(callout.id)
+          )
         ),
         nextCursor: page.length === parsed.data.limit ? (page.at(-1)?.id ?? null) : null,
       };
@@ -238,9 +247,14 @@ export async function registerFeedRoutes(app: FastifyInstance, chainId: number) 
       ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
       take: parsed.data.limit,
     });
-    const viewer = await resolveCalloutViewerStates(session?.userId, callouts);
+    const [viewer, tailStats] = await Promise.all([
+      resolveCalloutViewerStates(session?.userId, callouts),
+      resolveCalloutTailStats(callouts),
+    ]);
     return {
-      data: callouts.map(callout => serializeCallout(callout, null, viewer.get(callout.id))),
+      data: callouts.map(callout =>
+        serializeCallout(callout, null, viewer.get(callout.id), tailStats.get(callout.id))
+      ),
       nextCursor: callouts.length === parsed.data.limit ? (callouts.at(-1)?.id ?? null) : null,
     };
   });

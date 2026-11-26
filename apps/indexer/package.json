@@ -18,6 +18,7 @@
     "verify:callout-updates": "tsx scripts/verify-callout-updates.ts",
     "verify:candles": "tsx scripts/verify-candles.ts",
     "verify:stats-rollup": "tsx scripts/verify-stats-rollup.ts",
+    "verify:reputation": "tsx scripts/verify-reputation.ts",
     "verify:reorg-social": "tsx scripts/verify-reorg-social.ts",
     "verify:intent-linking": "tsx scripts/verify-intent-linking.ts"
   },

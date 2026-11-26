@@ -13,7 +13,11 @@ export function useFeedRealtime(refresh: () => Promise<unknown>) {
         setPendingIds(current => current.includes(message.aggregateId!) ? current : [message.aggregateId!, ...current]);
         return;
       }
-      if (message.topic === 'callout.update' || message.topic === 'callout.stats') void refresh();
+      if (
+        message.topic === 'callout.update' ||
+        message.topic === 'callout.stats' ||
+        message.topic === 'callout.reward'
+      ) void refresh();
       if (message.topic === 'launch.new' || message.topic === 'launch.progress' || message.topic === 'launch.revenue' || message.topic === 'launch.graduated') {
         void refresh();
       }

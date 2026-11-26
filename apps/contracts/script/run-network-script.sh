@@ -4,10 +4,10 @@ set -euo pipefail
 network="${1:-}"
 operation="${2:-}"
 if [[ "$network" != "testnet" && "$network" != "mainnet" ]]; then
-  echo "usage: ./script/run-network-script.sh <testnet|mainnet> <deploy|safe|timelock|prepare-handover|verify-handover|prepare-accounting|prepare-accounting-schedule|create-initial-pool|prepare-swap-migration|prepare-swap-migration-schedule|verify-swap-migration>" >&2
+  echo "usage: ./script/run-network-script.sh <testnet|mainnet> <deploy|safe|timelock|prepare-handover|verify-handover|prepare-accounting|prepare-accounting-schedule|create-initial-pool|prepare-swap-migration|prepare-swap-migration-schedule|verify-swap-migration|prepare-tail-fee-migration|prepare-tail-fee-schedule|verify-tail-fee-migration>" >&2
   exit 1
 fi
-if [[ "$operation" != "deploy" && "$operation" != "safe" && "$operation" != "timelock" && "$operation" != "prepare-handover" && "$operation" != "verify-handover" && "$operation" != "prepare-accounting" && "$operation" != "prepare-accounting-schedule" && "$operation" != "create-initial-pool" && "$operation" != "prepare-swap-migration" && "$operation" != "prepare-swap-migration-schedule" && "$operation" != "verify-swap-migration" ]]; then
+if [[ "$operation" != "deploy" && "$operation" != "safe" && "$operation" != "timelock" && "$operation" != "prepare-handover" && "$operation" != "verify-handover" && "$operation" != "prepare-accounting" && "$operation" != "prepare-accounting-schedule" && "$operation" != "create-initial-pool" && "$operation" != "prepare-swap-migration" && "$operation" != "prepare-swap-migration-schedule" && "$operation" != "verify-swap-migration" && "$operation" != "prepare-tail-fee-migration" && "$operation" != "prepare-tail-fee-schedule" && "$operation" != "verify-tail-fee-migration" ]]; then
   echo "unsupported deployment operation" >&2
   exit 1
 fi
@@ -69,5 +69,17 @@ case "$operation" in
     ;;
   verify-swap-migration)
     forge script script/VerifySwapMigration.s.sol:VerifySwapMigration
+    ;;
+  prepare-tail-fee-migration)
+    [[ "$network" == "mainnet" ]] || { echo "tail fee migration is mainnet-only" >&2; exit 1; }
+    WRITE_TAIL_FEE_MIGRATION_MANIFEST=true forge script script/PrepareTailFeeMigration.s.sol:PrepareTailFeeMigration --sender "$DEPLOYER_ADDRESS" --broadcast
+    ;;
+  prepare-tail-fee-schedule)
+    [[ "$network" == "mainnet" ]] || { echo "tail fee migration is mainnet-only" >&2; exit 1; }
+    WRITE_TAIL_FEE_MIGRATION_SCHEDULE=true forge script script/PrepareTailFeeMigrationSchedule.s.sol:PrepareTailFeeMigrationSchedule
+    ;;
+  verify-tail-fee-migration)
+    [[ "$network" == "mainnet" ]] || { echo "tail fee migration is mainnet-only" >&2; exit 1; }
+    forge script script/VerifyTailFeeMigration.s.sol:VerifyTailFeeMigration
     ;;
 esac

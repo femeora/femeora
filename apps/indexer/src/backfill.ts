@@ -34,6 +34,7 @@ import {
 } from './processors/range-clock.js';
 import { ensureCanonicalCursor } from './reorg.js';
 import { collectLaunchEvents, persistLaunchEvents } from './launch-events.js';
+import { collectTailRewardEvents } from './tail-reward-events.js';
 
 interface BackfillResult {
   readonly batches: number;
@@ -42,6 +43,7 @@ interface BackfillResult {
   readonly binFeesProjected: number;
   readonly swapsProjected: number;
   readonly positionEventsProjected: number;
+  readonly tailRewardsProjected: number;
   readonly fromBlock: bigint;
   readonly toBlock: bigint;
 }
@@ -185,6 +187,7 @@ export async function backfillPoolRegistry(
   let binFeesProjected = 0;
   let swapsProjected = 0;
   let positionEventsProjected = 0;
+  let tailRewardsProjected = 0;
 
   while (nextBlock <= chain.safeBlock) {
     const configuredEnd = nextBlock + BigInt(environment.INDEXER_BATCH_SIZE) - 1n;
@@ -322,7 +325,7 @@ export async function backfillPoolRegistry(
       where: { chainId: chain.chainId, canonical: true },
       select: { curve: true, launchpad: { select: { quoteToken: true } } },
     });
-    const [poolEvents, positionEvents, positionShareEvents, launchEvents] = await Promise.all([
+    const [poolEvents, positionEvents, positionShareEvents, launchEvents, tailRewardEvents] = await Promise.all([
       collectPoolEvents(client, [...descriptorByAddress.values()], nextBlock, endBlock),
       collectPositionEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
       collectPositionShareEvents(client, deployment.positionManagerV2, nextBlock, endBlock),
@@ -333,6 +336,7 @@ export async function backfillPoolRegistry(
         nextBlock,
         endBlock,
       ),
+      collectTailRewardEvents(client, deployment.feeSplitter, nextBlock, endBlock),
     ]);
     const calloutUpdateTypes = classifyCalloutUpdates(positionEvents);
     const persistedLaunchpadQuotes = await prisma.launchpad.findMany({
@@ -647,6 +651,68 @@ export async function backfillPoolRegistry(
             transactionIndex: fee.transactionIndex,
             logIndex: fee.logIndex,
           });
+        }
+
+        for (const reward of tailRewardEvents) {
+          await transaction.tailReward.upsert({
+            where: {
+              chainId_transactionHash_logIndex: {
+                chainId: chain.chainId,
+                transactionHash: reward.transactionHash,
+                logIndex: reward.logIndex,
+              },
+            },
+            create: {
+              chainId: chain.chainId,
+              transactionHash: reward.transactionHash,
+              logIndex: reward.logIndex,
+              blockNumber: reward.blockNumber,
+              timestamp: reward.timestamp,
+              token: reward.token.toLowerCase(),
+              referrer: reward.referrer.toLowerCase(),
+              referrerPositionId: reward.referrerPositionId,
+              treasuryAmount: reward.treasuryAmount.toString(),
+              rewardAmount: reward.rewardAmount.toString(),
+              eligible: reward.eligible,
+            },
+            update: {
+              blockNumber: reward.blockNumber,
+              timestamp: reward.timestamp,
+              treasuryAmount: reward.treasuryAmount.toString(),
+              rewardAmount: reward.rewardAmount.toString(),
+              eligible: reward.eligible,
+              canonical: true,
+            },
+          });
+          const sourceCallout = await transaction.callout.findFirst({
+            where: {
+              chainId: chain.chainId,
+              positionId: reward.referrerPositionId,
+              canonical: true,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (sourceCallout) {
+            const dedupKey = `${chain.chainId}:${reward.transactionHash}:${reward.logIndex}:callout.reward`;
+            await transaction.outboxEvent.upsert({
+              where: { dedupKey },
+              create: {
+                dedupKey,
+                topic: 'callout.reward',
+                aggregateId: sourceCallout.id,
+                chainId: chain.chainId,
+                blockNumber: reward.blockNumber,
+                payload: {
+                  id: sourceCallout.id,
+                  token: reward.token.toLowerCase(),
+                  amount: reward.rewardAmount.toString(),
+                  eligible: reward.eligible,
+                },
+              },
+              update: { canonical: true },
+            });
+          }
         }
 
         const accountingPositionIds = new Set<bigint>();
@@ -1261,6 +1327,7 @@ export async function backfillPoolRegistry(
     binFeesProjected += poolEvents.binFees.length;
     swapsProjected += poolEvents.swaps.length;
     positionEventsProjected += positionEvents.length;
+    tailRewardsProjected += tailRewardEvents.length;
     batches += 1;
     nextBlock = endBlock + 1n;
   }
@@ -1272,6 +1339,7 @@ export async function backfillPoolRegistry(
     binFeesProjected,
     swapsProjected,
     positionEventsProjected,
+    tailRewardsProjected,
     fromBlock: firstBlock,
     toBlock: nextBlock > firstBlock ? nextBlock - 1n : firstBlock - 1n,
   };

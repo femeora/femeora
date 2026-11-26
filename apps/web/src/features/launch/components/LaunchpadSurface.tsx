@@ -20,6 +20,7 @@ import { useApiResource } from '@/lib/api/useApiResource';
 
 import { LaunchCard } from './LaunchCard';
 import { LaunchTokenForm } from './LaunchTokenForm';
+import { ReputationBadge } from './ReputationBadge';
 
 export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
   const wallet = useWallet();
@@ -112,6 +113,11 @@ export function LaunchpadSurface({ initial }: { initial: ApiLaunchpadDetail }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ReputationBadge
+            reputation={pad.reputation}
+            quoteSymbol={quoteSymbol || 'quote'}
+            interactive
+          />
           <span
             className={`t-label border px-3 py-2 ${pad.active ? 'border-up/40 text-up' : 'border-line text-muted'}`}
           >

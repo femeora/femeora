@@ -45,10 +45,18 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     mapping(uint256 id => uint256 growthX128) public dammFeeGrowth1Last;
     mapping(uint256 id => uint256 amount) public dammFeesOwed0;
     mapping(uint256 id => uint256 amount) public dammFeesOwed1;
+    // Appended storage. Links a tailed position to the caller's canonical source position.
+    mapping(uint256 tailPositionId => uint256 sourcePositionId) public referrerPosition;
+    mapping(uint256 positionId => mapping(int24 binId => uint256 growthX128)) public protocolFeeGrowth0Last;
+    mapping(uint256 positionId => mapping(int24 binId => uint256 growthX128)) public protocolFeeGrowth1Last;
+    mapping(uint256 positionId => uint256 amount) public tailProtocolFeesOwed0;
+    mapping(uint256 positionId => uint256 amount) public tailProtocolFeesOwed1;
+    mapping(uint256 positionId => bool supported) public tailFeeGrowthSupported;
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+    event TailProtocolFeesAccrued(uint256 indexed id, uint256 amount0, uint256 amount1);
 
     constructor() {
         _disableInitializers();
@@ -62,6 +70,22 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     }
 
     function createRangePosition(CreateParams calldata p) external nonReentrant returns (uint256 id) {
+        return _createRangePosition(p, 0);
+    }
+
+    function createRangePositionForTail(CreateParams calldata p, uint256 referrerPositionId)
+        external
+        nonReentrant
+        returns (uint256 id)
+    {
+        _validateReferrerPosition(p.pool, p.referrer, referrerPositionId);
+        return _createRangePosition(p, referrerPositionId);
+    }
+
+    function _createRangePosition(CreateParams calldata p, uint256 referrerPositionId)
+        private
+        returns (uint256 id)
+    {
         _validateCreate(p);
         DlmmPoolV2 pool = DlmmPoolV2(p.pool);
         DlmmPoolV2.AddBin[] memory adds = _additions(p.bins, p.amountsX, p.amountsY, p.minShares);
@@ -82,6 +106,11 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
             positionShares[i] = minted;
         }
         _mint(msg.sender, id);
+        if (referrerPositionId != 0) {
+            referrerPosition[id] = referrerPositionId;
+            _initializeTailFeeGrowth(id, pool);
+            emit ReferrerPositionLinked(id, referrerPositionId, p.referrer);
+        }
         emit PositionSharesUpdated(id, p.bins, positionShares);
         emit RangePositionCreated(
             id, msg.sender, p.pool, p.bins[0], p.bins[p.bins.length - 1], p.shape, p.tag, p.referrer
@@ -89,6 +118,22 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
     }
 
     function createDammPosition(CreateDammParams calldata p) external nonReentrant returns (uint256 id) {
+        return _createDammPosition(p, 0);
+    }
+
+    function createDammPositionForTail(CreateDammParams calldata p, uint256 referrerPositionId)
+        external
+        nonReentrant
+        returns (uint256 id)
+    {
+        _validateReferrerPosition(p.pool, p.referrer, referrerPositionId);
+        return _createDammPosition(p, referrerPositionId);
+    }
+
+    function _createDammPosition(CreateDammParams calldata p, uint256 referrerPositionId)
+        private
+        returns (uint256 id)
+    {
         if (!registry.isRegisteredPool(p.pool)) revert InvalidPool();
         if (p.referrer == msg.sender || p.amountX == 0 || p.amountY == 0) revert InvalidRange();
         DammPool pool = DammPool(p.pool);
@@ -112,6 +157,10 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
             dammFeeGrowth1Last[id] = growth1;
         }
         _mint(msg.sender, id);
+        if (referrerPositionId != 0) {
+            referrerPosition[id] = referrerPositionId;
+            emit ReferrerPositionLinked(id, referrerPositionId, p.referrer);
+        }
         emit DammPositionCreated(id, msg.sender, p.pool, shares, p.tag, p.referrer);
     }
 
@@ -133,6 +182,7 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
             }
         }
         DlmmPoolV2 pool = DlmmPoolV2(position.pool);
+        _accrueRangeTailProtocolFees(id, pool);
         DlmmPoolV2.AddBin[] memory adds = _additions(bins, amountsX, amountsY, minShares);
         _fund(pool, amountsX, amountsY);
         uint256[] memory beforeShares = _sharesBefore(pool, bins);
@@ -156,6 +206,7 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         if (bps == 0 || bps > BPS_DENOMINATOR) revert InvalidRange();
         if (recipient == address(0)) revert InvalidRecipient();
         RangePosition storage position = positions[id];
+        _accrueRangeTailProtocolFees(id, DlmmPoolV2(position.pool));
         (amountX, amountY) = DlmmPoolV2(position.pool)
             .removeLiquidityBatch(_operationId(), _removals(id, bps), minX, minY, recipient, deadline);
         int24[] memory bins = _positionBins[id];
@@ -177,6 +228,14 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         returns (uint256 amountX, uint256 amountY)
     {
         return decreaseRange(id, BPS_DENOMINATOR, minX, minY, recipient, deadline);
+    }
+
+    /// @notice Permissionless checkpoint used by FeeSplitter before settling an
+    /// attributed tail reward. It cannot move liquidity or change ownership.
+    function checkpointTailProtocolFees(uint256 id) external override nonReentrant {
+        RangePosition storage position = positions[id];
+        if (position.pool == address(0) || referrerPosition[id] == 0) revert InvalidPosition();
+        _accrueRangeTailProtocolFees(id, DlmmPoolV2(position.pool));
     }
 
     function increaseDamm(uint256 id, uint256 amountX, uint256 amountY, uint256 minShares, uint256 deadline)
@@ -320,6 +379,14 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         _validateArrays(p.bins, p.amountsX, p.amountsY, p.minShares);
     }
 
+    function _validateReferrerPosition(address pool, address referrer, uint256 referrerPositionId) private view {
+        if (referrer == address(0) || referrerPositionId == 0 || ownerOf(referrerPositionId) != referrer) {
+            revert InvalidPosition();
+        }
+        RangePosition storage source = positions[referrerPositionId];
+        if (!source.open || source.pool != pool) revert InvalidPosition();
+    }
+
     function _validateArrays(
         int24[] calldata bins,
         uint256[] calldata ax,
@@ -416,6 +483,59 @@ contract PositionManagerV2 is IPositionManagerV2, ProtocolAccess, UUPSUpgradeabl
         shares = new uint256[](bins.length);
         for (uint256 i; i < bins.length; ++i) {
             shares[i] = pool.sharesOf(bins[i], address(this));
+        }
+    }
+
+    function _initializeTailFeeGrowth(uint256 id, DlmmPoolV2 pool) private {
+        int24[] storage bins = _positionBins[id];
+        if (bins.length == 0) return;
+        (bool supported,,) = _protocolFeeGrowth(pool, bins[0]);
+        tailFeeGrowthSupported[id] = supported;
+        if (!supported) return;
+        for (uint256 i; i < bins.length; ++i) {
+            (, uint256 growth0, uint256 growth1) = _protocolFeeGrowth(pool, bins[i]);
+            protocolFeeGrowth0Last[id][bins[i]] = growth0;
+            protocolFeeGrowth1Last[id][bins[i]] = growth1;
+        }
+    }
+
+    function _accrueRangeTailProtocolFees(uint256 id, DlmmPoolV2 pool) private {
+        if (!tailFeeGrowthSupported[id]) return;
+        int24[] storage bins = _positionBins[id];
+        uint256 accrued0;
+        uint256 accrued1;
+        for (uint256 i; i < bins.length; ++i) {
+            int24 bin = bins[i];
+            (bool supported, uint256 growth0, uint256 growth1) = _protocolFeeGrowth(pool, bin);
+            if (!supported) revert InvalidPool();
+            uint256 shares = binShares[id][bin];
+            uint256 previous0 = protocolFeeGrowth0Last[id][bin];
+            uint256 previous1 = protocolFeeGrowth1Last[id][bin];
+            if (growth0 > previous0) accrued0 += FullMath.mulDiv(shares, growth0 - previous0, 1 << 128);
+            if (growth1 > previous1) accrued1 += FullMath.mulDiv(shares, growth1 - previous1, 1 << 128);
+            protocolFeeGrowth0Last[id][bin] = growth0;
+            protocolFeeGrowth1Last[id][bin] = growth1;
+        }
+        if (accrued0 != 0) tailProtocolFeesOwed0[id] += accrued0;
+        if (accrued1 != 0) tailProtocolFeesOwed1[id] += accrued1;
+        if (accrued0 != 0 || accrued1 != 0) emit TailProtocolFeesAccrued(id, accrued0, accrued1);
+    }
+
+    function _protocolFeeGrowth(DlmmPoolV2 pool, int24 bin)
+        private
+        view
+        returns (bool supported, uint256 growth0, uint256 growth1)
+    {
+        (bool success0, bytes memory data0) = address(pool).staticcall(
+            abi.encodeWithSignature("protocolFeeGrowth0X128(int24)", bin)
+        );
+        (bool success1, bytes memory data1) = address(pool).staticcall(
+            abi.encodeWithSignature("protocolFeeGrowth1X128(int24)", bin)
+        );
+        supported = success0 && data0.length == 32 && success1 && data1.length == 32;
+        if (supported) {
+            growth0 = abi.decode(data0, (uint256));
+            growth1 = abi.decode(data1, (uint256));
         }
     }
 

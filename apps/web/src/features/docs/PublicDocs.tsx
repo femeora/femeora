@@ -12,6 +12,7 @@ const navigation = [
   ['Overview', 'overview'],
   ['Getting started', 'getting-started'],
   ['User guides', 'guides'],
+  ['Reputation', 'reputation'],
   ['Safety', 'security'],
   ['Terms', 'terms'],
   ['Privacy', 'privacy'],
@@ -222,6 +223,36 @@ export function PublicDocs() {
               </section>
             ))}
           </div>
+        </section>
+
+        <section id="reputation" className="scroll-mt-24 border-b border-line py-12">
+          <SectionHeading
+            eyebrow="Launchpad reputation"
+            title="Historical launchpad activity, summarized from canonical events."
+            body="Femeora scores launchpads from indexed on-chain launches, trades, graduations, post-graduation activity, revenue and protection configuration. It is context—not a promise, endorsement or forecast."
+          />
+          <div className="mt-8 grid gap-3 md:grid-cols-2">
+            <div className="glass rounded-[2px] p-5">
+              <h3 className="font-medium">What the badge means</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                New launchpads remain unrated until five canonical launches. Bronze, Silver and Gold
+                reflect the calculated score. Verified additionally requires at least 20 launches, a
+                score of 80 or higher and every configured protection signal.
+              </p>
+            </div>
+            <div className="glass rounded-[2px] p-5">
+              <h3 className="font-medium">What is measured</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                The breakdown includes graduation and seven-day survival rates, median graduation
+                time, developer exits, early top-wallet concentration, canonical volume, launchpad
+                revenue and protection settings for rolling seven-day and all-time windows.
+              </p>
+            </div>
+          </div>
+          <p className="mt-5 text-sm text-muted">
+            Scores refresh from indexed chain events and can change as launches mature. A high
+            historical score does not eliminate token, liquidity, smart-contract or market risk.
+          </p>
         </section>
 
         <section id="security" className="scroll-mt-24 border-b border-line py-12">

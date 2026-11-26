@@ -56,18 +56,22 @@ export function apiCalloutToCallout(
   pool: Pick<ApiPoolDetail, 'activeBin' | 'binStep' | 'quoteToken' | 'tokenX' | 'tokenY' | 'type'>,
   candles: readonly ApiCandle[],
   now = new Date(),
-  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map(),
+  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map()
 ): Callout {
   const active = pool.activeBin ?? 0;
-  const currentPrice = number(candles.at(-1)?.close ?? null, number(callout.pool.currentPrice, number(callout.priceAtPost, 0)));
+  const currentPrice = number(
+    candles.at(-1)?.close ?? null,
+    number(callout.pool.currentPrice, number(callout.priceAtPost, 0))
+  );
   const priceAtPost = number(callout.priceAtPost, currentPrice);
-  const lowerPct = pool.type === 'DAMM' ? -100 : percentFromActive(callout.lowerBin, active, pool.binStep);
-  const upperPct = pool.type === 'DAMM' ? 100 : percentFromActive(callout.upperBin, active, pool.binStep);
+  const lowerPct =
+    pool.type === 'DAMM' ? -100 : percentFromActive(callout.lowerBin, active, pool.binStep);
+  const upperPct =
+    pool.type === 'DAMM' ? 100 : percentFromActive(callout.upperBin, active, pool.binStep);
   const handle = callout.user.handle.replace(/^@/, '');
   const quoteAddress = pool.quoteToken ?? pool.tokenY;
-  const baseAddress = quoteAddress.toLowerCase() === pool.tokenX.toLowerCase()
-    ? pool.tokenY
-    : pool.tokenX;
+  const baseAddress =
+    quoteAddress.toLowerCase() === pool.tokenX.toLowerCase() ? pool.tokenY : pool.tokenX;
   const baseAsset = assetsByAddress.get(baseAddress.toLowerCase());
   const quoteAsset = assetsByAddress.get(quoteAddress.toLowerCase());
   const baseMeta = tokenMeta(baseAddress);
@@ -80,6 +84,7 @@ export function apiCalloutToCallout(
     .toUpperCase();
   return {
     id: callout.id,
+    owner: callout.position.owner,
     kind: callout.kind,
     launchId: callout.launchId,
     createdAt: callout.createdAt,
@@ -121,6 +126,17 @@ export function apiCalloutToCallout(
     inRangePct: callout.antiShill.inRangePercentage,
     heldHours: number(callout.antiShill.heldDurationSeconds) / 3_600,
     tailers: callout.stats.tails,
+    tailedValueQuote: number(callout.stats.tailedValueQuote),
+    rewardsActive: callout.stats.rewardsActive,
+    rewards: callout.stats.rewards.map(reward => {
+      const asset = assetsByAddress.get(reward.token.toLowerCase());
+      const decimals = asset?.decimals ?? 18;
+      return {
+        token: reward.token,
+        symbol: asset?.symbol ?? tokenSymbol(reward.token),
+        amount: number(reward.amount) / 10 ** decimals,
+      };
+    }),
     likes: callout.stats.likes,
     reposts: callout.stats.reposts,
     replies: callout.stats.replies,
@@ -151,9 +167,11 @@ export function apiCalloutToCallout(
     isDevOrTopHolder: callout.antiShill.isDevOrTopHolder,
     isFreshWallet: callout.antiShill.isFreshWallet,
     updates: callout.updates.map(update => ({
-      text: update.caption ?? (update.type === 'Rebalanced' && update.lowerBin !== null && update.upperBin !== null
-        ? `Rebalanced into Position #${update.positionId} · bins ${update.lowerBin}–${update.upperBin}`
-        : update.type),
+      text:
+        update.caption ??
+        (update.type === 'Rebalanced' && update.lowerBin !== null && update.upperBin !== null
+          ? `Rebalanced into Position #${update.positionId} · bins ${update.lowerBin}–${update.upperBin}`
+          : update.type),
       ago: elapsedLabel(update.timestamp, now),
     })),
     candlesAgo: candleDistance(callout.createdAt, candles),
@@ -163,14 +181,20 @@ export function apiCalloutToCallout(
 export function apiFeedCalloutToCallout(
   callout: ApiCallout,
   now = new Date(),
-  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map(),
+  assetsByAddress: ReadonlyMap<string, ApiPoolAsset> = new Map()
 ): Callout {
-  return apiCalloutToCallout(callout, {
-    activeBin: callout.pool.activeBin,
-    binStep: callout.pool.binStep,
-    quoteToken: callout.pool.quoteToken,
-    tokenX: callout.pool.tokenX,
-    tokenY: callout.pool.tokenY,
-    type: callout.pool.type,
-  }, [], now, assetsByAddress);
+  return apiCalloutToCallout(
+    callout,
+    {
+      activeBin: callout.pool.activeBin,
+      binStep: callout.pool.binStep,
+      quoteToken: callout.pool.quoteToken,
+      tokenX: callout.pool.tokenX,
+      tokenY: callout.pool.tokenY,
+      type: callout.pool.type,
+    },
+    [],
+    now,
+    assetsByAddress
+  );
 }

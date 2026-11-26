@@ -7,6 +7,7 @@ import { createIndexerClient, type IndexerClient, verifyIndexerChain } from './c
 import { refreshExternalReferenceCandles } from './external-reference.js';
 import { reconcilePositionAccounting } from './position-accounting.js';
 import { refreshReferenceCandles } from './reference-prices.js';
+import { rollupLaunchpadReputation } from './reputation-rollup.js';
 import { rollupUserStats } from './stats-rollup.js';
 import { refreshPoolReserveSnapshots, refreshPositionValues } from './value-refresh.js';
 
@@ -25,6 +26,7 @@ export interface IndexerCycleResult {
   readonly binFees: number;
   readonly swaps: number;
   readonly positionEvents: number;
+  readonly tailRewards: number;
   readonly valuePools: number;
   readonly valuePositions: number;
   readonly reservePools: number;
@@ -34,6 +36,8 @@ export interface IndexerCycleResult {
   readonly referenceCandles: number;
   readonly statsUsers: number;
   readonly statsRows: number;
+  readonly reputationLaunchpads: number;
+  readonly reputationRows: number;
 }
 
 export function safeIndexerErrorCode(error: unknown): string {
@@ -65,16 +69,18 @@ export function safeIndexerErrorCode(error: unknown): string {
 
 export async function runIndexerCycle(
   environment: IndexerEnvironment,
-  client: IndexerClient,
+  client: IndexerClient
 ): Promise<IndexerCycleResult> {
   const chain = await verifyIndexerChain(client, environment).catch(() => {
     throw new Error('INDEXER_CHAIN_VERIFICATION_FAILED');
   });
   const deployment = getFomeoraDeployment(environment.CHAIN_ID);
-  const backfill = await backfillPoolRegistry(client, environment, chain, deployment).catch(error => {
-    const code = safeIndexerErrorCode(error);
-    throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'INDEXER_BACKFILL_FAILED' : code);
-  });
+  const backfill = await backfillPoolRegistry(client, environment, chain, deployment).catch(
+    error => {
+      const code = safeIndexerErrorCode(error);
+      throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'INDEXER_BACKFILL_FAILED' : code);
+    }
+  );
   await reconcilePositionAccounting(chain.chainId).catch(error => {
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POSITION_ACCOUNTING_FAILED' : code);
@@ -83,7 +89,7 @@ export async function runIndexerCycle(
     client,
     chain.chainId,
     chain.safeBlock,
-    deployment,
+    deployment
   ).catch(error => {
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POSITION_VALUE_REFRESH_FAILED' : code);
@@ -91,7 +97,7 @@ export async function runIndexerCycle(
   const reserveRefresh = await refreshPoolReserveSnapshots(
     client,
     chain.chainId,
-    chain.safeBlock,
+    chain.safeBlock
   ).catch(error => {
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'POOL_RESERVE_REFRESH_FAILED' : code);
@@ -99,15 +105,16 @@ export async function runIndexerCycle(
   const referenceRefresh = await refreshReferenceCandles(
     client,
     chain.chainId,
-    chain.safeBlock,
+    chain.safeBlock
   ).catch(error => {
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'REFERENCE_PRICE_REFRESH_FAILED' : code);
   });
   // External reference history improves charts but must never stop canonical
   // on-chain indexing when the public market-data provider is unavailable.
-  const externalReferenceRefresh = await refreshExternalReferenceCandles(chain.chainId)
-    .catch(() => ({ pools: 0, candles: 0 }));
+  const externalReferenceRefresh = await refreshExternalReferenceCandles(chain.chainId).catch(
+    () => ({ pools: 0, candles: 0 })
+  );
   const cursor = await prisma.chainCursor
     .findUniqueOrThrow({ where: { chainId: chain.chainId } })
     .catch(() => {
@@ -143,6 +150,10 @@ export async function runIndexerCycle(
     const code = safeIndexerErrorCode(error);
     throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'USER_STATS_ROLLUP_FAILED' : code);
   });
+  const reputationRollup = await rollupLaunchpadReputation(chain.chainId).catch(error => {
+    const code = safeIndexerErrorCode(error);
+    throw new Error(code === 'INDEXER_CYCLE_FAILED' ? 'LAUNCHPAD_REPUTATION_ROLLUP_FAILED' : code);
+  });
   return {
     chainId: chain.chainId,
     fromBlock: backfill.fromBlock,
@@ -156,6 +167,7 @@ export async function runIndexerCycle(
     binFees: backfill.binFeesProjected,
     swaps: backfill.swapsProjected,
     positionEvents: backfill.positionEventsProjected,
+    tailRewards: backfill.tailRewardsProjected,
     valuePools: valueRefresh.pools,
     valuePositions: valueRefresh.positions,
     reservePools: reserveRefresh.pools,
@@ -165,6 +177,8 @@ export async function runIndexerCycle(
     referenceCandles: referenceRefresh.candles + externalReferenceRefresh.candles,
     statsUsers: statsRollup.users,
     statsRows: statsRollup.rows,
+    reputationLaunchpads: reputationRollup.launchpads,
+    reputationRows: reputationRollup.rows,
   };
 }
 
@@ -193,14 +207,14 @@ function waitForNextCycle(milliseconds: number, signal: AbortSignal): Promise<vo
         clearTimeout(timer);
         resolve();
       },
-      { once: true },
+      { once: true }
     );
   });
 }
 
 export async function runIndexerWorker(
   environment: IndexerEnvironment,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<void> {
   const client = createIndexerClient(environment);
   let failures = 0;
@@ -211,7 +225,7 @@ export async function runIndexerWorker(
       // Contains public chain metrics only; no URLs, headers or credentials.
       // eslint-disable-next-line no-console
       console.info(
-        `Fomeora Indexer healthy chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} valuePools=${result.valuePools} valuePositions=${result.valuePositions} reservePools=${result.reservePools} reserveWarnings=${result.reserveWarnings} reserveCritical=${result.reserveCritical} referencePools=${result.referencePools} referenceCandles=${result.referenceCandles} statsUsers=${result.statsUsers} statsRows=${result.statsRows}`,
+        `Fomeora Indexer healthy chain=${result.chainId} indexed=${result.toBlock} safe=${result.safeBlock} lag=${result.lagBlocks} batches=${result.batches} pools=${result.pools} bins=${result.bins} binFees=${result.binFees} swaps=${result.swaps} positions=${result.positionEvents} tailRewards=${result.tailRewards} valuePools=${result.valuePools} valuePositions=${result.valuePositions} reservePools=${result.reservePools} reserveWarnings=${result.reserveWarnings} reserveCritical=${result.reserveCritical} referencePools=${result.referencePools} referenceCandles=${result.referenceCandles} statsUsers=${result.statsUsers} statsRows=${result.statsRows} reputationLaunchpads=${result.reputationLaunchpads} reputationRows=${result.reputationRows}`
       );
       await waitForNextCycle(environment.INDEXER_POLL_INTERVAL_MS, signal);
     } catch (error) {
@@ -226,7 +240,7 @@ export async function runIndexerWorker(
       console.error(`Fomeora Indexer cycle failed code=${code}`);
       const delay = Math.min(
         environment.INDEXER_POLL_INTERVAL_MS * 2 ** Math.min(failures, 6),
-        MAX_RETRY_DELAY_MS,
+        MAX_RETRY_DELAY_MS
       );
       await waitForNextCycle(delay, signal);
     }

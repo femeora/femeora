@@ -63,10 +63,19 @@ interface IPositionManagerV2 {
     event DammPositionDecreased(uint256 indexed id, uint16 bps, uint256 amountX, uint256 amountY);
     event DammPositionClosed(uint256 indexed id);
     event PositionLocked(uint256 indexed id, address indexed owner);
+    event ReferrerPositionLinked(
+        uint256 indexed tailPositionId, uint256 indexed referrerPositionId, address indexed referrer
+    );
     event DammFeesClaimed(uint256 indexed id, address indexed recipient, uint256 amountX, uint256 amountY);
 
     function createRangePosition(CreateParams calldata params) external returns (uint256 positionId);
     function createDammPosition(CreateDammParams calldata params) external returns (uint256 positionId);
+    function createRangePositionForTail(CreateParams calldata params, uint256 referrerPositionId)
+        external
+        returns (uint256 positionId);
+    function createDammPositionForTail(CreateDammParams calldata params, uint256 referrerPositionId)
+        external
+        returns (uint256 positionId);
     function increaseRange(
         uint256 id,
         int24 expectedActiveBin,
@@ -82,6 +91,7 @@ interface IPositionManagerV2 {
     function closeRange(uint256 id, uint256 minX, uint256 minY, address recipient, uint256 deadline)
         external
         returns (uint256 amountX, uint256 amountY);
+    function checkpointTailProtocolFees(uint256 id) external;
     function increaseDamm(uint256 id, uint256 amountX, uint256 amountY, uint256 minShares, uint256 deadline)
         external
         returns (uint256 sharesAdded);

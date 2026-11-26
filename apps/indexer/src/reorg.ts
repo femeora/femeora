@@ -1,4 +1,8 @@
-import { dlmmPoolV2Abi, positionManagerV2Abi, type FomeoraDeployment } from '@fomeora/contracts-sdk';
+import {
+  dlmmPoolV2Abi,
+  positionManagerV2Abi,
+  type FomeoraDeployment,
+} from '@fomeora/contracts-sdk';
 import { prisma, type Prisma } from '@fomeora/database';
 import type { Address } from 'viem';
 
@@ -35,7 +39,7 @@ export async function rollbackOrphanSocialDerivations(
   transaction: Prisma.TransactionClient,
   chainId: number,
   positionIds: readonly bigint[],
-  tags: readonly string[],
+  tags: readonly string[]
 ): Promise<void> {
   if (positionIds.length === 0) return;
   await transaction.tail.deleteMany({
@@ -62,7 +66,7 @@ async function loadPositionTimeline(
   chainId: number,
   positionId: bigint,
   commonBlock: bigint,
-  open: boolean,
+  open: boolean
 ): Promise<{ openedAt: Date; closedAt: Date | null }> {
   const createdEvent = await transaction.positionEvent.findFirst({
     where: {
@@ -115,7 +119,7 @@ async function restoreBins(
     poolId: string;
     binId: number;
     pool: { address: string; type: string; createdBlock: bigint };
-  }[],
+  }[]
 ): Promise<readonly RestoredBin[]> {
   return Promise.all(
     bins
@@ -135,7 +139,7 @@ async function restoreBins(
           reserveY: state[1].toString(),
           totalShares: state[2].toString(),
         };
-      }),
+      })
   );
 }
 
@@ -143,7 +147,7 @@ async function restorePositions(
   client: IndexerClient,
   manager: Address,
   blockNumber: bigint,
-  positions: readonly { id: bigint; poolId: string; owner: string }[],
+  positions: readonly { id: bigint; poolId: string; owner: string }[]
 ): Promise<readonly RestoredPosition[]> {
   return Promise.all(
     positions.map(async position => {
@@ -173,7 +177,7 @@ async function restorePositions(
               blockNumber,
             })
           ).toString(),
-        })),
+        }))
       );
       let owner = position.owner;
       if (state[6]) {
@@ -203,14 +207,14 @@ async function restorePositions(
         open: state[6],
         bins,
       };
-    }),
+    })
   );
 }
 
 async function restorePoolActiveBins(
   client: IndexerClient,
   blockNumber: bigint,
-  pools: readonly { id: string; address: string }[],
+  pools: readonly { id: string; address: string }[]
 ): Promise<readonly RestoredPoolActiveBin[]> {
   return Promise.all(
     pools.map(async pool => ({
@@ -221,7 +225,7 @@ async function restorePoolActiveBins(
         functionName: 'activeBin',
         blockNumber,
       }),
-    })),
+    }))
   );
 }
 
@@ -229,7 +233,7 @@ export async function ensureCanonicalCursor(
   client: IndexerClient,
   chainId: number,
   deploymentStartBlock: bigint,
-  deployment: FomeoraDeployment,
+  deployment: FomeoraDeployment
 ): Promise<boolean> {
   const cursor = await prisma.chainCursor.findUnique({ where: { chainId } });
   if (cursor?.lastProcessedBlock === null || cursor?.lastProcessedBlock === undefined) return false;
@@ -252,7 +256,9 @@ export async function ensureCanonicalCursor(
     where: {
       chainId,
       id: { in: affectedPositionIds },
-      events: { some: { eventType: 'created', canonical: true, blockNumber: { lte: commonBlock } } },
+      events: {
+        some: { eventType: 'created', canonical: true, blockNumber: { lte: commonBlock } },
+      },
     },
     select: { id: true, poolId: true, owner: true },
   });
@@ -277,21 +283,17 @@ export async function ensureCanonicalCursor(
     ? await restorePoolActiveBins(client, commonBlock, restorablePools)
     : [];
   const restoredPositions = common
-    ? await restorePositions(
-        client,
-        deployment.positionManagerV2,
-        commonBlock,
-        restorablePositions,
-      )
+    ? await restorePositions(client, deployment.positionManagerV2, commonBlock, restorablePositions)
     : [];
   const restorableIds = new Set(restoredPositions.map(position => position.id));
   const orphanPositionIds = affectedPositionIds.filter(id => !restorableIds.has(id));
-  const orphanSocialPositions = orphanPositionIds.length === 0
-    ? []
-    : await prisma.position.findMany({
-        where: { chainId, id: { in: orphanPositionIds } },
-        select: { id: true, tag: true },
-      });
+  const orphanSocialPositions =
+    orphanPositionIds.length === 0
+      ? []
+      : await prisma.position.findMany({
+          where: { chainId, id: { in: orphanPositionIds } },
+          select: { id: true, tag: true },
+        });
 
   // Reorg repair deliberately keeps every derived mutation and cursor rewind atomic.
   // eslint-disable-next-line complexity
@@ -306,6 +308,10 @@ export async function ensureCanonicalCursor(
       data: { canonical: false },
     });
     await transaction.binFeeAccrual.updateMany({
+      where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
+      data: { canonical: false },
+    });
+    await transaction.tailReward.updateMany({
       where: { chainId, canonical: true, blockNumber: { gt: commonBlock } },
       data: { canonical: false },
     });
@@ -431,11 +437,21 @@ export async function ensureCanonicalCursor(
     for (const launch of survivingLaunches) {
       const [latestTrade, graduation] = await Promise.all([
         transaction.curveTrade.findFirst({
-          where: { chainId, launchId: launch.launchId, canonical: true, blockNumber: { lte: commonBlock } },
+          where: {
+            chainId,
+            launchId: launch.launchId,
+            canonical: true,
+            blockNumber: { lte: commonBlock },
+          },
           orderBy: [{ blockNumber: 'desc' }, { logIndex: 'desc' }],
         }),
         transaction.graduation.findFirst({
-          where: { chainId, launchId: launch.launchId, canonical: true, blockNumber: { lte: commonBlock } },
+          where: {
+            chainId,
+            launchId: launch.launchId,
+            canonical: true,
+            blockNumber: { lte: commonBlock },
+          },
         }),
       ]);
       await transaction.launch.update({
@@ -445,7 +461,9 @@ export async function ensureCanonicalCursor(
           : {
               status: 'curve',
               quoteReserve: latestTrade?.quoteReserve.toFixed(0) ?? '0',
-              tokenInventory: latestTrade?.tokenInventory.toFixed(0) ?? launch.launchpad.curveTokenSupply.toFixed(0),
+              tokenInventory:
+                latestTrade?.tokenInventory.toFixed(0) ??
+                launch.launchpad.curveTokenSupply.toFixed(0),
               progressPips: latestTrade?.progressPips ?? 0,
             },
       });
@@ -468,15 +486,10 @@ export async function ensureCanonicalCursor(
         ...new Set(
           orphanSocialPositions
             .map(position => position.tag)
-            .filter((tag): tag is string => tag !== null),
+            .filter((tag): tag is string => tag !== null)
         ),
       ];
-      await rollbackOrphanSocialDerivations(
-        transaction,
-        chainId,
-        orphanPositionIds,
-        orphanTags,
-      );
+      await rollbackOrphanSocialDerivations(transaction, chainId, orphanPositionIds, orphanTags);
     }
     for (const bin of restoredBins) {
       await transaction.bin.update({
@@ -501,7 +514,7 @@ export async function ensureCanonicalCursor(
         chainId,
         position.id,
         commonBlock,
-        position.open,
+        position.open
       );
       await transaction.position.update({
         where: { chainId_id: { chainId, id: position.id } },
@@ -545,7 +558,7 @@ export async function ensureCanonicalCursor(
     });
     await transaction.indexerHealth.updateMany({
       where: { chainId },
-      data: { lastStatsRollupAt: null },
+      data: { lastStatsRollupAt: null, lastReputationRollupAt: null },
     });
   });
   return true;

@@ -269,6 +269,9 @@ export const ApiCalloutSchema = z.object({
     quotes: z.number().int().nonnegative(),
     views: z.number().int().nonnegative(),
     tails: z.number().int().nonnegative(),
+    tailedValueQuote: DecimalStringSchema,
+    rewardsActive: z.boolean(),
+    rewards: z.array(z.object({ token: AddressSchema, amount: DecimalStringSchema })),
   }),
   viewer: z.object({
     liked: z.boolean(),
@@ -645,3 +648,9 @@ export const ApiTailPreparationSchema = z.object({
   create: ApiPreparedTransactionSchema,
 });
 export type ApiTailPreparation = z.infer<typeof ApiTailPreparationSchema>;
+
+export const ApiTailRewardClaimPreparationSchema = z.object({
+  transaction: ApiPreparedTransactionSchema,
+  expiresAt: z.string().datetime(),
+});
+export type ApiTailRewardClaimPreparation = z.infer<typeof ApiTailRewardClaimPreparationSchema>;

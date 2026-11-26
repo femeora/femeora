@@ -15,7 +15,7 @@ export const fomeoraDeployments = {
     "poolRegistry": "0xF0D70f849Ce71748643e95fDC8F8aDCd73e1dD3C",
     "poolFactory": "0x9250b27a4116D031d932251B44EC67c1F8390c20",
     "dammPoolDeployer": "0xd74dE83c5900C6526b3A206ee0063Ff0e53FbF6C",
-    "dlmmPoolV2Deployer": "0x514bf0b69ADCABe39A82C79220ace8686F15D46E",
+    "dlmmPoolV2Deployer": "0xAdD8BaA724340f48526391Dc1C2D2E456c893aB8",
     "positionManagerV2": "0x873573a41E0a8cBde1C773065fEe27c30b743777",
     "swapRouter": "0xC9798a7F38FEeB0A98A8739ee3921D5759ccf54f",
     "feeSplitter": "0xa477AC4712C5847218768D42127ac5a8287A7FaD",

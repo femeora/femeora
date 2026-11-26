@@ -48,6 +48,14 @@ const launchpadReplyBody = z.object({
   body: z.string().trim().min(1).max(280),
   parentId: z.string().uuid().nullable().optional(),
 });
+const launchpadReputationQuery = z.object({
+  window: z.enum(['7d', 'all']).default('7d'),
+});
+const launchpadReputationLeaderboardQuery = launchpadReputationQuery.extend({
+  sort: z.enum(['score', 'revenue', 'graduationRate']).default('score'),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.coerce.number().int().nonnegative().default(0),
+});
 const createLaunchpadRequest = walletRequest
   .extend({
     feeRecipient: address,
@@ -244,6 +252,7 @@ function launchpadJson(
 ) {
   if (!record) return null;
   const metadata = decodeLaunchpadMetadata(record.metadataUri);
+  const reputation = record.reputations.find(item => item.window === '7d') ?? null;
   return {
     id: record.launchpadId.toString(),
     owner: getAddress(record.owner),
@@ -301,7 +310,46 @@ function launchpadJson(
     },
     active: record.active,
     launchCount: record._count.launches,
+    reputation: reputation ? reputationJson(reputation) : null,
     createdAt: record.createdAt.toISOString(),
+  };
+}
+
+function reputationJson(record: {
+  window: string;
+  launches: number;
+  eligibleLaunches: number;
+  graduations: number;
+  survivedGraduations: number;
+  graduationRate: { toFixed(): string };
+  survivalRate: { toFixed(): string };
+  medianTimeToGraduate: bigint | null;
+  devExitRate: { toFixed(): string };
+  sniperShare: { toFixed(): string };
+  volumeQuote: { toFixed(): string };
+  revenueQuote: { toFixed(): string };
+  protectionScore: { toFixed(): string };
+  score: { toFixed(): string };
+  tier: string;
+  computedAt: Date;
+}) {
+  return {
+    window: record.window === 'all' ? ('all' as const) : ('7d' as const),
+    launches: record.launches,
+    eligibleLaunches: record.eligibleLaunches,
+    graduations: record.graduations,
+    survivedGraduations: record.survivedGraduations,
+    graduationRate: record.graduationRate.toFixed(),
+    survivalRate: record.survivalRate.toFixed(),
+    medianTimeToGraduateSeconds: record.medianTimeToGraduate?.toString() ?? null,
+    devExitRate: record.devExitRate.toFixed(),
+    sniperShare: record.sniperShare.toFixed(),
+    volumeQuote: record.volumeQuote.toFixed(),
+    revenueQuote: record.revenueQuote.toFixed(),
+    protectionScore: record.protectionScore.toFixed(),
+    score: record.score.toFixed(),
+    tier: record.tier as 'Unrated' | 'Bronze' | 'Silver' | 'Gold' | 'Verified',
+    computedAt: record.computedAt.toISOString(),
   };
 }
 
@@ -352,6 +400,7 @@ const launchpadInclude = {
     orderBy: { createdAt: 'asc' },
     take: 50,
   },
+  reputations: { orderBy: { computedAt: 'desc' as const }, take: 2 },
 } as const;
 async function findLaunchpad(chainId: number, selector: { slug: string } | { id: bigint }) {
   return prisma.launchpad.findFirst({
@@ -584,6 +633,62 @@ export async function registerLaunchRoutes(
     };
   });
 
+  app.get('/v1/launchpads/leaderboard', async (request, reply) => {
+    const query = launchpadReputationLeaderboardQuery.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: 'INVALID_REPUTATION_QUERY' });
+    const orderBy =
+      query.data.sort === 'revenue'
+        ? [{ revenueQuote: 'desc' as const }, { score: 'desc' as const }]
+        : query.data.sort === 'graduationRate'
+          ? [{ graduationRate: 'desc' as const }, { score: 'desc' as const }]
+          : [{ score: 'desc' as const }, { revenueQuote: 'desc' as const }];
+    const rows = await prisma.launchpadReputation.findMany({
+      where: { chainId, window: query.data.window, launchpad: { canonical: true } },
+      include: { launchpad: { include: launchpadInclude } },
+      orderBy: [...orderBy, { launchpadId: 'asc' as const }],
+      skip: query.data.cursor,
+      take: query.data.limit + 1,
+    });
+    const hasNextPage = rows.length > query.data.limit;
+    const page = rows.slice(0, query.data.limit);
+    const profiles = await creatorProfiles(page.map(row => row.launchpad.owner));
+    reply.header('cache-control', 'public, max-age=60, stale-while-revalidate=540');
+    return {
+      data: page.map(row => ({
+        launchpad: launchpadJson(row.launchpad, profiles),
+        reputation: reputationJson(row),
+      })),
+      nextCursor: hasNextPage ? String(query.data.cursor + page.length) : null,
+    };
+  });
+
+  app.get('/v1/launchpads/:id/reputation', async (request, reply) => {
+    const params = launchpadSocialParams.safeParse(request.params);
+    const query = launchpadReputationQuery.safeParse(request.query);
+    if (!params.success || !query.success) {
+      return reply.status(400).send({ error: 'INVALID_REPUTATION_QUERY' });
+    }
+    const launchpad = await prisma.launchpad.findFirst({
+      where: { chainId, launchpadId: params.data.id, canonical: true },
+      select: { launchpadId: true, quoteToken: true },
+    });
+    if (!launchpad) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+    const reputations = await prisma.launchpadReputation.findMany({
+      where: {
+        chainId,
+        launchpadId: launchpad.launchpadId,
+        window: query.data.window,
+      },
+      orderBy: { window: 'desc' },
+    });
+    reply.header('cache-control', 'public, max-age=60, stale-while-revalidate=540');
+    return {
+      launchpadId: launchpad.launchpadId.toString(),
+      quoteToken: getAddress(launchpad.quoteToken),
+      data: reputations.map(reputationJson),
+    };
+  });
+
   app.get('/v1/launchpads/:slug', async (request, reply) => {
     const params = z.object({ slug }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_SLUG' });
@@ -653,7 +758,10 @@ export async function registerLaunchRoutes(
       protocol: 0n,
     };
     return {
-      ...launchpadJson(record, ownerProfiles, { liked: Boolean(liked), reposted: Boolean(reposted) }),
+      ...launchpadJson(record, ownerProfiles, {
+        liked: Boolean(liked),
+        reposted: Boolean(reposted),
+      }),
       launches: launches.map(item => launchJson(item, profiles)),
       dashboard: {
         launches: launches.length,
