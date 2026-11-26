@@ -1,4 +1,12 @@
-import { CandlestickChart, LayoutList, Rocket, Trophy, Wallet, type Icon } from '@/components/ui/icons';
+import {
+  BookOpen,
+  CandlestickChart,
+  LayoutList,
+  Rocket,
+  Trophy,
+  Wallet,
+  type Icon,
+} from '@/components/ui/icons';
 
 export interface AppNavItem {
   label: string;
@@ -15,4 +23,5 @@ export const appNav: readonly AppNavItem[] = [
   { label: 'Launch', shortLabel: 'Launch', href: '/launchpads', icon: Rocket },
   { label: 'Leaderboard', shortLabel: 'Ranks', href: '/leaderboard', icon: Trophy },
   { label: 'Portfolio', shortLabel: 'Wallet', href: '/portfolio', icon: Wallet },
+  { label: 'Docs', shortLabel: 'Docs', href: '/docs', icon: BookOpen },
 ];

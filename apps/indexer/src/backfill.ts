@@ -25,7 +25,7 @@ import {
   type FeeAccrualEvent,
   type PositionShareChange,
 } from './processors/fee-credits.js';
-import { resolveCalloutIntent, resolveTailIntent } from './processors/intent-linking.js';
+import { resolveCalloutIntent, resolveRebalanceIntent, resolveTailIntent } from './processors/intent-linking.js';
 import { positionCashFlow } from './processors/position-accounting.js';
 import {
   calculateAlwaysInRangeClock,
@@ -881,6 +881,32 @@ export async function backfillPoolRegistry(
                     },
                   });
                 }
+              }
+            }
+
+            const rebalanceLink = await resolveRebalanceIntent(transaction, {
+              chainId: chain.chainId,
+              poolId,
+              tag: event.state.tag,
+              owner,
+              eventTimestamp: event.timestamp,
+            });
+            if (rebalanceLink) {
+              const consumed = await transaction.calloutIntent.updateMany({
+                where: { id: rebalanceLink.intent.id, consumedAt: null },
+                data: { consumedAt: event.timestamp },
+              });
+              if (consumed.count === 1) {
+                await persistCalloutUpdate(transaction, {
+                  chainId: chain.chainId,
+                  positionId: event.positionId,
+                  positionEventId: storedEvent.id,
+                  transactionHash: event.transactionHash,
+                  logIndex: event.logIndex,
+                  blockNumber: event.blockNumber,
+                  type: 'Rebalanced',
+                  calloutId: rebalanceLink.sourceCallout.id,
+                });
               }
             }
 

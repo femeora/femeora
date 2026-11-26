@@ -31,6 +31,10 @@ const existingPositionSchema = z.object({
   caption: captionSchema.optional(),
   showSize: z.boolean().default(true),
 });
+const rebalanceIntentSchema = z.object({
+  chainId: z.number().int().positive(),
+  positionId: positionIdSchema,
+});
 const captionBodySchema = z.object({ caption: captionSchema.nullable() });
 const replyBodySchema = z.object({
   body: captionSchema,
@@ -135,6 +139,50 @@ export async function registerCalloutRoutes(app: FastifyInstance, chainId: numbe
           caption,
           showSize: parsed.data.showSize,
           tag,
+          expiresAt,
+        },
+      });
+      return reply.status(201).send({ intentId: intent.id, tag, expiresAt: expiresAt.toISOString() });
+    },
+  );
+
+  app.post(
+    '/v1/callouts/rebalance-intent',
+    { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const session = await requireSession(request, reply);
+      if (!session) return;
+      const parsed = rebalanceIntentSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.chainId !== chainId) {
+        return reply.status(400).send({ error: 'INVALID_REBALANCE_INTENT' });
+      }
+      const source = await prisma.callout.findFirst({
+        where: {
+          chainId,
+          positionId: parsed.data.positionId,
+          userId: session.userId,
+          canonical: true,
+          hidden: false,
+          deletedAt: null,
+        },
+        select: { id: true, poolId: true, position: { select: { owner: true, status: true } } },
+      });
+      if (!source) return reply.status(404).send({ error: 'SOURCE_CALLOUT_NOT_FOUND' });
+      if (source.position.status !== 'open') return reply.status(409).send({ error: 'OPEN_POSITION_NOT_FOUND' });
+      if (!session.user.wallets.some(wallet => wallet.address === source.position.owner.toLowerCase())) {
+        return reply.status(403).send({ error: 'POSITION_OWNERSHIP_REQUIRED' });
+      }
+      const tag = createBytes32Tag();
+      const expiresAt = new Date(Date.now() + INTENT_TTL_SECONDS * 1_000);
+      const intent = await prisma.calloutIntent.create({
+        data: {
+          userId: session.userId,
+          chainId,
+          poolId: source.poolId,
+          tag,
+          kind: 'rebalance',
+          sourceCalloutId: source.id,
+          mode: 'smart-range',
           expiresAt,
         },
       });

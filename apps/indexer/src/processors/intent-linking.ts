@@ -75,3 +75,42 @@ export async function resolveTailIntent(
     return null;
   return { intent, sourceCallout };
 }
+
+export async function resolveRebalanceIntent(
+  transaction: Prisma.TransactionClient,
+  input: IntentLinkInput,
+) {
+  const intent = await transaction.calloutIntent.findFirst({
+    where: {
+      chainId: input.chainId,
+      poolId: input.poolId,
+      tag: input.tag,
+      kind: 'rebalance',
+      sourceCalloutId: { not: null },
+      consumedAt: null,
+      createdAt: { lte: input.eventTimestamp },
+      expiresAt: { gte: input.eventTimestamp },
+    },
+  });
+  if (!intent?.sourceCalloutId) return null;
+  const [linkedWallet, sourceCallout] = await Promise.all([
+    transaction.wallet.findUnique({
+      where: { address: input.owner },
+      select: { userId: true },
+    }),
+    transaction.callout.findFirst({
+      where: {
+        id: intent.sourceCalloutId,
+        chainId: input.chainId,
+        poolId: input.poolId,
+        userId: intent.userId,
+        canonical: true,
+        hidden: false,
+        deletedAt: null,
+      },
+      select: { id: true, userId: true },
+    }),
+  ]);
+  if (linkedWallet?.userId !== intent.userId || !sourceCallout) return null;
+  return { intent, sourceCallout };
+}

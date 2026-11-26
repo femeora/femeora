@@ -151,7 +151,9 @@ export function apiCalloutToCallout(
     isDevOrTopHolder: callout.antiShill.isDevOrTopHolder,
     isFreshWallet: callout.antiShill.isFreshWallet,
     updates: callout.updates.map(update => ({
-      text: update.caption ?? update.type,
+      text: update.caption ?? (update.type === 'Rebalanced' && update.lowerBin !== null && update.upperBin !== null
+        ? `Rebalanced into Position #${update.positionId} · bins ${update.lowerBin}–${update.upperBin}`
+        : update.type),
       ago: elapsedLabel(update.timestamp, now),
     })),
     candlesAgo: candleDistance(callout.createdAt, candles),

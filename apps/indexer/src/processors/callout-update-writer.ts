@@ -11,6 +11,7 @@ export interface PersistCalloutUpdateInput {
   readonly blockNumber: bigint;
   readonly type: CalloutUpdateType;
   readonly removalBps?: number;
+  readonly calloutId?: string;
 }
 
 export async function persistCalloutUpdate(
@@ -18,7 +19,9 @@ export async function persistCalloutUpdate(
   input: PersistCalloutUpdateInput,
 ): Promise<string | null> {
   const callout = await transaction.callout.findUnique({
-    where: { chainId_positionId: { chainId: input.chainId, positionId: input.positionId } },
+    where: input.calloutId
+      ? { id: input.calloutId }
+      : { chainId_positionId: { chainId: input.chainId, positionId: input.positionId } },
     select: { id: true, userId: true, pool: { select: { address: true } } },
   });
   if (!callout) return null;
@@ -56,7 +59,7 @@ export async function persistCalloutUpdate(
     },
     update: { canonical: true },
   });
-  const shouldAlertTailers = input.type === 'Closed'
+  const shouldAlertTailers = input.type === 'Closed' || input.type === 'Rebalanced'
     || (input.type === 'Removed' && (input.removalBps ?? 0) >= 2_500);
   if (!existing && shouldAlertTailers) {
     const tails = await transaction.tail.findMany({
@@ -70,7 +73,7 @@ export async function persistCalloutUpdate(
         data: {
           userId: tail.tailerUserId,
           actorUserId: callout.userId,
-          type: input.type === 'Closed' ? 'callout_closed' : 'callout_trimmed',
+          type: input.type === 'Closed' ? 'callout_closed' : input.type === 'Rebalanced' ? 'callout_rebalanced' : 'callout_trimmed',
           entityType: 'callout',
           entityId: callout.id,
           payload: {
@@ -90,7 +93,7 @@ export async function persistCalloutUpdate(
           payload: {
             notificationId: notification.id,
             userId: tail.tailerUserId,
-            type: input.type === 'Closed' ? 'callout_closed' : 'callout_trimmed',
+            type: input.type === 'Closed' ? 'callout_closed' : input.type === 'Rebalanced' ? 'callout_rebalanced' : 'callout_trimmed',
           },
         },
       });

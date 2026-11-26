@@ -12,6 +12,8 @@ import { tokenSymbol } from '@/lib/tokens';
 
 import { executePositionAction } from '../executePositionAction';
 
+import { SmartRangePanel } from './SmartRangePanel';
+
 type ActionKind = 'increase' | 'decrease' | 'close';
 
 export function PositionActionPanel({ position, onConfirmed }: { position: ApiIndexedPosition; onConfirmed: () => Promise<unknown> }) {
@@ -54,7 +56,10 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
   const choose = (next: ActionKind) => { setKind(next); setPreparation(null); setReviewError(null); setHash(null); };
 
   return (
-    <div className="grid gap-3 border-t border-line py-4">
+    <div className="grid gap-5 border-t border-line py-4">
+      <SmartRangePanel position={position} onConfirmed={onConfirmed} />
+      <div className="grid gap-3 border-t border-line pt-4">
+      <p className="t-label text-muted">Manual position actions</p>
       <div className="flex flex-wrap gap-2">{(['increase', 'decrease', 'close'] as const).map(actionKind => (
         <Button key={actionKind} variant={kind === actionKind ? 'primary' : 'ghost'} onClick={() => choose(actionKind)} className="min-h-9 capitalize">{actionKind}</Button>
       ))}</div>
@@ -69,6 +74,7 @@ export function PositionActionPanel({ position, onConfirmed }: { position: ApiIn
       <p role="alert" className="t-label min-h-4 text-down">{reviewError}</p>
       <TxButton label={`${kind[0]!.toUpperCase()}${kind.slice(1)} position`} error={preparation ? null : `Review ${kind} first`} onExecute={execute} pendingLabel={stage} />
       {hash && config ? <a className="t-label break-all text-signal hover:underline" href={`${config.explorerUrl.replace(/\/$/, '')}/tx/${hash}`} target="_blank" rel="noreferrer">View confirmed transaction {hash}</a> : null}
+      </div>
     </div>
   );
 }

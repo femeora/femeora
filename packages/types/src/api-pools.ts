@@ -280,6 +280,9 @@ export const ApiCalloutSchema = z.object({
       id: z.string().uuid(),
       type: z.string(),
       caption: z.string().nullable(),
+      positionId: IntegerStringSchema,
+      lowerBin: z.number().int().nullable(),
+      upperBin: z.number().int().nullable(),
       transactionHash: HashSchema,
       blockNumber: IntegerStringSchema,
       timestamp: z.string().datetime(),
@@ -578,6 +581,36 @@ export const ApiPositionActionPreparationSchema = z.object({
   action: ApiPreparedTransactionSchema,
 });
 export type ApiPositionActionPreparation = z.infer<typeof ApiPositionActionPreparationSchema>;
+
+export const ApiSmartRangeModeSchema = z.enum(['follow-price', 'fee-focus', 'defensive']);
+export type ApiSmartRangeMode = z.infer<typeof ApiSmartRangeModeSchema>;
+
+export const ApiSmartRangeProposalSchema = z.object({
+  positionId: IntegerStringSchema,
+  mode: ApiSmartRangeModeSchema,
+  blockNumber: IntegerStringSchema,
+  activeBin: z.number().int(),
+  current: z.object({
+    lowerBin: z.number().int(),
+    upperBin: z.number().int(),
+    binCount: z.number().int().positive(),
+    inRange: z.boolean(),
+    inRangePercent: z.number().finite().min(0).max(100),
+  }),
+  proposed: z.object({
+    lowerBin: z.number().int(),
+    upperBin: z.number().int(),
+    binCount: z.number().int().positive().max(61),
+    shape: z.enum(['spot', 'curve', 'bid-ask']),
+    amountX: DecimalStringSchema,
+    amountY: DecimalStringSchema,
+    amountXRaw: IntegerStringSchema,
+    amountYRaw: IntegerStringSchema,
+  }),
+  reasoning: z.array(z.string().min(1)).min(1).max(5),
+  warnings: z.array(z.string().min(1)).max(5),
+});
+export type ApiSmartRangeProposal = z.infer<typeof ApiSmartRangeProposalSchema>;
 
 export const ApiTailQuoteSchema = z.object({
   mode: z.enum(['same_range', 'same_shape_now']),

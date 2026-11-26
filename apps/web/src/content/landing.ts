@@ -58,7 +58,7 @@ export const site = {
 } as const;
 
 export const navLinks: readonly NavLink[] = [
-  { label: 'App', href: '/#app' },
+  { label: 'Docs', href: '/docs' },
   { label: 'Callouts', href: '/#callouts' },
   { label: 'Tail', href: '/#tail' },
   { label: 'Integrity', href: '/#integrity' },
@@ -103,12 +103,14 @@ export const appPreview = {
     {
       layer: 'Indexing layer',
       title: 'Canonical Indexer',
-      detail: 'Reads verified on-chain events to bind tags, fees and time in range; never holds user funds',
+      detail:
+        'Reads verified on-chain events to bind tags, fees and time in range; never holds user funds',
     },
     {
       layer: 'Delivery layer',
       title: 'Realtime API',
-      detail: 'Delivers indexed feed data and transaction quotes over SSE; never signs or holds user funds',
+      detail:
+        'Delivers indexed feed data and transaction quotes over SSE; never signs or holds user funds',
     },
     {
       layer: 'Client',
@@ -268,6 +270,8 @@ const footerColumns: readonly FooterColumn[] = [
       { label: 'Pools', href: '/pools' },
       { label: 'Leaderboard', href: '/leaderboard' },
       { label: 'Portfolio', href: '/portfolio' },
+      { label: 'Documentation', href: '/docs' },
+      { label: 'Mainnet contracts', href: '/docs#contracts' },
       { label: 'Testnet guide', href: '/testnet-guide' },
     ],
   },

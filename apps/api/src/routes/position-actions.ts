@@ -1,7 +1,7 @@
 import { dammPoolAbi, dlmmPoolV2Abi, getFomeoraDeployment, positionManagerV2Abi } from '@fomeora/contracts-sdk';
 import { prisma } from '@fomeora/database';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { encodeFunctionData, parseAbi, parseUnits, toHex, type Address } from 'viem';
+import { encodeFunctionData, formatUnits, parseAbi, parseUnits, toHex, type Address } from 'viem';
 import { z } from 'zod';
 
 import type { ApiChainClient } from '../core/chain-client.js';
@@ -15,6 +15,9 @@ const increaseSchema = commonSchema.extend({
   amountY: z.string().regex(/^\d+(?:\.\d+)?$/).max(80),
 });
 const decreaseSchema = commonSchema.extend({ bps: z.number().int().min(1).max(9_999) });
+const smartRangeSchema = commonSchema.pick({ walletAddress: true }).extend({
+  mode: z.enum(['follow-price', 'fee-focus', 'defensive']),
+});
 const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
@@ -48,6 +51,44 @@ function sendError(reply: FastifyReply, error: unknown) {
 
 function shapeName(shape: number): PositionShape {
   return shape === 0 ? 'spot' : shape === 1 ? 'curve' : 'bid-ask';
+}
+
+function centeredRange(activeBin: number, requestedCount: number) {
+  const count = Math.max(1, Math.min(61, requestedCount % 2 === 0 ? requestedCount + 1 : requestedCount));
+  const half = Math.floor(count / 2);
+  let lowerBin = activeBin - half;
+  let upperBin = activeBin + half;
+  if (lowerBin < -10_000) { upperBin += -10_000 - lowerBin; lowerBin = -10_000; }
+  if (upperBin > 10_000) { lowerBin -= upperBin - 10_000; upperBin = 10_000; }
+  return { lowerBin, upperBin, binCount: upperBin - lowerBin + 1 };
+}
+
+async function positionAmountsAtBlock(
+  position: Awaited<ReturnType<typeof loadPosition>> extends infer T ? NonNullable<T> : never,
+  manager: Address,
+  client: ApiChainClient,
+  blockNumber: bigint,
+) {
+  let amount0 = 0n;
+  let amount1 = 0n;
+  if (position.pool.type === 'DLMM') {
+    for (const bin of position.bins) {
+      const [owned, state] = await Promise.all([
+        client.readContract({ address: manager, abi: positionManagerV2Abi, functionName: 'binShares', args: [position.id, bin.binId], blockNumber }),
+        client.readContract({ address: position.pool.address as Address, abi: dlmmPoolV2Abi, functionName: 'binState', args: [bin.binId], blockNumber }),
+      ]);
+      if (state[2] !== 0n) { amount0 += owned * state[0] / state[2]; amount1 += owned * state[1] / state[2]; }
+    }
+  } else {
+    const [owned, reserve0, reserve1, totalShares] = await Promise.all([
+      client.readContract({ address: manager, abi: positionManagerV2Abi, functionName: 'dammShares', args: [position.id], blockNumber }),
+      client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'reserve0', blockNumber }),
+      client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'reserve1', blockNumber }),
+      client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'totalShares', blockNumber }),
+    ]);
+    if (totalShares !== 0n) { amount0 = owned * reserve0 / totalShares; amount1 = owned * reserve1 / totalShares; }
+  }
+  return { amount0, amount1 };
 }
 
 async function exactApprovals(
@@ -86,6 +127,91 @@ export async function registerPositionActionRoutes(
   app: FastifyInstance, chainId: number, client: ApiChainClient,
   blockProvider: (chainId: number) => Promise<bigint> = safeBlock,
 ) {
+  app.post('/v1/positions/:id/smart-range-proposal', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    const body = smartRangeSchema.safeParse(request.body);
+    if (!params.success || !body.success) return reply.status(400).send({ error: 'INVALID_SMART_RANGE_REQUEST' });
+    try {
+      const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, client);
+      if (position.pool.type !== 'DLMM') throw new PositionActionError(409, 'SMART_RANGE_REQUIRES_DLMM');
+      if (position.pool.tokenXDecimals === null || position.pool.tokenYDecimals === null) throw new PositionActionError(409, 'TOKEN_DECIMALS_UNAVAILABLE');
+      const blockNumber = await blockProvider(chainId);
+      const activeBin = await client.readContract({
+        address: position.pool.address as Address,
+        abi: dlmmPoolV2Abi,
+        functionName: 'activeBin',
+        blockNumber,
+      });
+      const currentCount = Math.max(1, position.upperBin - position.lowerBin + 1);
+      const requestedCount = body.data.mode === 'fee-focus'
+        ? Math.min(currentCount, 21)
+        : body.data.mode === 'defensive'
+          ? Math.max(currentCount, 51)
+          : currentCount;
+      const proposed = centeredRange(activeBin, requestedCount);
+      const { amount0, amount1 } = await positionAmountsAtBlock(position, manager, client, blockNumber);
+      if (amount0 === 0n && amount1 === 0n) throw new PositionActionError(409, 'POSITION_VALUE_UNAVAILABLE');
+      const reusable0 = amount0 * 9_950n / 10_000n;
+      const reusable1 = amount1 * 9_950n / 10_000n;
+      const proposedBins = Array.from({ length: proposed.binCount }, (_, index) => proposed.lowerBin + index);
+      const proposedAllocation = allocateRangeAmounts({
+        bins: proposedBins,
+        activeBin,
+        amount0: reusable0,
+        amount1: reusable1,
+        shape: shapeName(position.shape),
+      });
+      const fundedBins = proposedBins.filter((_, index) =>
+        proposedAllocation.amounts0[index] !== 0n || proposedAllocation.amounts1[index] !== 0n
+      );
+      if (fundedBins.length === 0) throw new PositionActionError(409, 'SMART_RANGE_AMOUNT_TOO_SMALL');
+      const executableRange = {
+        lowerBin: fundedBins[0]!,
+        upperBin: fundedBins.at(-1)!,
+        binCount: fundedBins.length,
+      };
+      const openSeconds = BigInt(position.openSeconds.toString());
+      const inRangeSeconds = BigInt(position.inRangeSeconds.toString());
+      const inRangePercent = openSeconds === 0n ? 0 : Number(inRangeSeconds * 10_000n / openSeconds) / 100;
+      const currentInRange = activeBin >= position.lowerBin && activeBin <= position.upperBin;
+      const modeReason = body.data.mode === 'fee-focus'
+        ? 'Uses a tighter range around the active bin to concentrate liquidity and fee exposure.'
+        : body.data.mode === 'defensive'
+          ? 'Uses a wider range around the active bin to reduce how often the position moves out of range.'
+          : 'Keeps the current width and recenters it around the active bin.';
+      return {
+        positionId: position.id.toString(),
+        mode: body.data.mode,
+        blockNumber: blockNumber.toString(),
+        activeBin,
+        current: {
+          lowerBin: position.lowerBin,
+          upperBin: position.upperBin,
+          binCount: currentCount,
+          inRange: currentInRange,
+          inRangePercent,
+        },
+        proposed: {
+          ...executableRange,
+          shape: shapeName(position.shape),
+          amountX: formatUnits(reusable0, position.pool.tokenXDecimals),
+          amountY: formatUnits(reusable1, position.pool.tokenYDecimals),
+          amountXRaw: reusable0.toString(),
+          amountYRaw: reusable1.toString(),
+        },
+        reasoning: [
+          modeReason,
+          currentInRange ? 'The current position is in range at the indexed safe block.' : 'The current position is out of range at the indexed safe block.',
+          'The replacement amounts reserve 0.5% as execution headroom; any remainder stays in your wallet.',
+        ],
+        warnings: [
+          'Rebalancing closes the old position before creating the replacement position.',
+          'Price can move between signatures. Review every wallet request and estimated output.',
+        ],
+      };
+    } catch (error) { return sendError(reply, error); }
+  });
+
   // DAMM and DLMM intentionally share authorization and response invariants.
   // eslint-disable-next-line complexity
   app.post('/v1/positions/:id/increase-prepare', { config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (request, reply) => {
@@ -159,27 +285,9 @@ export async function registerPositionActionRoutes(
       const { position, manager } = await authorizedPosition(chainId, params.data.id, body.data.walletAddress, client);
       const blockNumber = await blockProvider(chainId);
       const bps = close ? 10_000 : (body.data as z.infer<typeof decreaseSchema>).bps;
-      let amount0 = 0n;
-      let amount1 = 0n;
-      if (position.pool.type === 'DLMM') {
-        for (const bin of position.bins) {
-          const [owned, state] = await Promise.all([
-            client.readContract({ address: manager, abi: positionManagerV2Abi, functionName: 'binShares', args: [params.data.id, bin.binId], blockNumber }),
-            client.readContract({ address: position.pool.address as Address, abi: dlmmPoolV2Abi, functionName: 'binState', args: [bin.binId], blockNumber }),
-          ]);
-          const removing = close ? owned : owned * BigInt(bps) / 10_000n;
-          if (state[2] !== 0n) { amount0 += removing * state[0] / state[2]; amount1 += removing * state[1] / state[2]; }
-        }
-      } else {
-        const [owned, reserve0, reserve1, totalShares] = await Promise.all([
-          client.readContract({ address: manager, abi: positionManagerV2Abi, functionName: 'dammShares', args: [params.data.id], blockNumber }),
-          client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'reserve0', blockNumber }),
-          client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'reserve1', blockNumber }),
-          client.readContract({ address: position.pool.address as Address, abi: dammPoolAbi, functionName: 'totalShares', blockNumber }),
-        ]);
-        const removing = close ? owned : owned * BigInt(bps) / 10_000n;
-        if (totalShares !== 0n) { amount0 = removing * reserve0 / totalShares; amount1 = removing * reserve1 / totalShares; }
-      }
+      const fullAmounts = await positionAmountsAtBlock(position, manager, client, blockNumber);
+      const amount0 = close ? fullAmounts.amount0 : fullAmounts.amount0 * BigInt(bps) / 10_000n;
+      const amount1 = close ? fullAmounts.amount1 : fullAmounts.amount1 * BigInt(bps) / 10_000n;
       const min0 = amount0 * BigInt(10_000 - body.data.slippageBps) / 10_000n;
       const min1 = amount1 * BigInt(10_000 - body.data.slippageBps) / 10_000n;
       const deadline = BigInt(Math.floor(Date.now() / 1_000) + DEADLINE_SECONDS);

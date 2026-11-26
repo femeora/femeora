@@ -31,6 +31,7 @@ function notificationCopy(notification: ApiNotification): string {
     return `${symbol} graduated into a Femeora pool`;
   }
   if (notification.type === 'callout_closed') return `${actor} exited a position you tailed`;
+  if (notification.type === 'callout_rebalanced') return `${actor} moved a tailed position into a new range`;
   if (notification.type === 'callout_trimmed') {
     const removalBps = typeof notification.payload.removalBps === 'number'
       ? notification.payload.removalBps

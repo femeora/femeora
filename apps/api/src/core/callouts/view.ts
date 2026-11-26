@@ -1,4 +1,5 @@
 import { prisma, Prisma } from '@fomeora/database';
+import { classifyRangeSide } from '@fomeora/sdk';
 
 export const visibleCalloutWhere = {
   canonical: true,
@@ -56,11 +57,25 @@ export const calloutInclude = {
       createdAt: true,
       positionEvent: {
         select: {
+          positionId: true,
           eventType: true,
+          payload: true,
           transactionHash: true,
           blockNumber: true,
           timestamp: true,
           canonical: true,
+          position: {
+            select: {
+              owner: true,
+              status: true,
+              depositedQuote: true,
+              withdrawnQuote: true,
+              earnedQuote: true,
+              valueQuote: true,
+              inRangeSeconds: true,
+              openSeconds: true,
+            },
+          },
         },
       },
     },
@@ -124,27 +139,40 @@ export function serializeCallout(
   score: string | null = null,
   viewer: CalloutViewerState = anonymousViewer,
 ) {
-  const openSeconds = Number(callout.position.openSeconds);
+  const latestRebalance = [...callout.updates].reverse().find(update =>
+    update.type === 'Rebalanced' && update.positionEvent.canonical
+  );
+  const effectivePosition = latestRebalance?.positionEvent.position ?? callout.position;
+  const rebalancePayload = latestRebalance?.positionEvent.payload;
+  const payload = rebalancePayload && typeof rebalancePayload === 'object' && !Array.isArray(rebalancePayload)
+    ? rebalancePayload as Record<string, Prisma.JsonValue>
+    : null;
+  const replacementLowerBin = typeof payload?.lowerBin === 'number' ? payload.lowerBin : null;
+  const replacementUpperBin = typeof payload?.upperBin === 'number' ? payload.upperBin : null;
+  const replacementShape = typeof payload?.shape === 'number' ? payload.shape : null;
+  const openSeconds = Number(effectivePosition.openSeconds);
   const inRangePercentage = openSeconds === 0
     ? 0
-    : Math.min(100, Number(callout.position.inRangeSeconds) / openSeconds * 100);
+    : Math.min(100, Number(effectivePosition.inRangeSeconds) / openSeconds * 100);
   const { referenceCandles, ...pool } = callout.pool;
   return {
     id: callout.id,
     kind: callout.kind === 'launch_lp' ? 'launch_lp' as const : 'position' as const,
     launchId: callout.launchId?.toString() ?? null,
     chainId: callout.chainId,
-    positionId: callout.positionId.toString(),
+    positionId: (latestRebalance?.positionEvent.positionId ?? callout.positionId).toString(),
     caption: callout.caption,
     captionEditedAt: callout.captionEditedAt?.toISOString() ?? null,
     showSize: callout.showSize,
     mcAtPost: callout.mcAtPost ? decimalString(callout.mcAtPost) : null,
     priceAtPost: callout.priceAtPost ? decimalString(callout.priceAtPost) : null,
     sizeAtPost: callout.sizeAtPost ? decimalString(callout.sizeAtPost) : null,
-    side: callout.side,
-    shape: callout.shape,
-    lowerBin: callout.lowerBin,
-    upperBin: callout.upperBin,
+    side: replacementLowerBin !== null && replacementUpperBin !== null && callout.pool.activeBin !== null
+      ? classifyRangeSide(replacementLowerBin, replacementUpperBin, callout.pool.activeBin)
+      : callout.side,
+    shape: replacementShape ?? callout.shape,
+    lowerBin: replacementLowerBin ?? callout.lowerBin,
+    upperBin: replacementUpperBin ?? callout.upperBin,
     createdAt: callout.createdAt.toISOString(),
     score,
     antiShill: {
@@ -162,14 +190,14 @@ export function serializeCallout(
       currentPrice: referenceCandles[0]?.close ? decimalString(referenceCandles[0].close) : null,
     },
     position: {
-      owner: callout.position.owner,
-      status: callout.position.status,
-      depositedQuote: decimalString(callout.position.depositedQuote),
-      withdrawnQuote: decimalString(callout.position.withdrawnQuote),
-      earnedQuote: decimalString(callout.position.earnedQuote),
-      valueQuote: callout.position.valueQuote ? decimalString(callout.position.valueQuote) : null,
-      inRangeSeconds: callout.position.inRangeSeconds.toString(),
-      openSeconds: callout.position.openSeconds.toString(),
+      owner: effectivePosition.owner,
+      status: effectivePosition.status,
+      depositedQuote: decimalString(effectivePosition.depositedQuote),
+      withdrawnQuote: decimalString(effectivePosition.withdrawnQuote),
+      earnedQuote: decimalString(effectivePosition.earnedQuote),
+      valueQuote: effectivePosition.valueQuote ? decimalString(effectivePosition.valueQuote) : null,
+      inRangeSeconds: effectivePosition.inRangeSeconds.toString(),
+      openSeconds: effectivePosition.openSeconds.toString(),
     },
     stats: {
       likes: callout._count.likes,
@@ -186,6 +214,11 @@ export function serializeCallout(
         id: update.id,
         type: update.type,
         caption: update.caption,
+        positionId: update.positionEvent.positionId.toString(),
+        lowerBin: typeof update.positionEvent.payload === 'object' && update.positionEvent.payload !== null && !Array.isArray(update.positionEvent.payload) && typeof update.positionEvent.payload.lowerBin === 'number'
+          ? update.positionEvent.payload.lowerBin : null,
+        upperBin: typeof update.positionEvent.payload === 'object' && update.positionEvent.payload !== null && !Array.isArray(update.positionEvent.payload) && typeof update.positionEvent.payload.upperBin === 'number'
+          ? update.positionEvent.payload.upperBin : null,
         transactionHash: update.positionEvent.transactionHash,
         blockNumber: update.positionEvent.blockNumber.toString(),
         timestamp: update.positionEvent.timestamp.toISOString(),

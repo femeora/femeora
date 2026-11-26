@@ -8,6 +8,15 @@ export function friendlyErrorMessage(error: string): string {
   if (value.includes('DEPOSIT_TOO_SMALL')) {
     return 'The deposit is too small for the selected range. Narrow the range or increase the token amount, then review again.';
   }
+  if (value.includes('SMART_RANGE_REQUIRES_DLMM')) {
+    return 'Smart Range currently supports DLMM positions. DAMM positions remain manageable with the standard increase, decrease, and close actions.';
+  }
+  if (value.includes('SMART_RANGE_AMOUNT_TOO_SMALL')) {
+    return 'This position is too small to distribute across the proposed range. Keep the current position or add liquidity before requesting another range.';
+  }
+  if (value.includes('POSITION_VALUE_UNAVAILABLE')) {
+    return 'Femeora could not derive reusable token amounts for this position at the indexed safe block. Wait for the indexer to catch up, then try again.';
+  }
   if (value.includes('TOKEN_DECIMALS_UNAVAILABLE')) {
     return "Femeora could not read this token's decimal configuration. Refresh the pool and review the position again.";
   }
