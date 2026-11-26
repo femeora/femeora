@@ -14,6 +14,25 @@ const Transaction = z.object({
     .optional(),
 });
 
+const LaunchpadSocialUser = z.object({
+  id: z.string().uuid(),
+  handle: z.string().min(1),
+  name: z.string().nullable(),
+  avatarUrl: z.string().url().nullable(),
+  xVerified: z.boolean(),
+});
+
+export const ApiLaunchpadReplySchema = z.object({
+  id: z.string().uuid(),
+  launchpadId: Integer,
+  parentId: z.string().uuid().nullable(),
+  kind: z.enum(['reply', 'quote']),
+  body: z.string().min(1),
+  createdAt: z.string().datetime(),
+  user: LaunchpadSocialUser,
+});
+export type ApiLaunchpadReply = z.infer<typeof ApiLaunchpadReplySchema>;
+
 export const ApiLaunchpadSchema = z.object({
   id: Integer,
   owner: Address,
@@ -34,6 +53,18 @@ export const ApiLaunchpadSchema = z.object({
       xVerified: z.boolean(),
     })
     .nullable(),
+  social: z.object({
+    likes: z.number().int().nonnegative(),
+    reposts: z.number().int().nonnegative(),
+    replies: z.number().int().nonnegative(),
+    quotes: z.number().int().nonnegative(),
+    views: z.number().int().nonnegative(),
+  }),
+  viewer: z.object({
+    liked: z.boolean(),
+    reposted: z.boolean(),
+  }),
+  comments: z.array(ApiLaunchpadReplySchema),
   quoteToken: Address,
   tradeFeePips: z.number().int().nonnegative(),
   creatorSharePips: z.number().int().nonnegative(),

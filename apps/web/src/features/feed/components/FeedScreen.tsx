@@ -23,7 +23,10 @@ import { CalloutPost } from '@/features/callouts/components/CalloutPost';
 import { QuoteCalloutPost } from '@/features/callouts/components/QuoteCalloutPost';
 import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
 import { LaunchCard } from '@/features/launch/components/LaunchCard';
-import { LaunchpadCreatedPost } from '@/features/launch/components/LaunchpadCreatedPost';
+import {
+  LaunchpadCreatedPost,
+  LaunchpadQuotePost,
+} from '@/features/launch/components/LaunchpadCreatedPost';
 import { useSession } from '@/features/session/store';
 import { useApiResource } from '@/lib/api/useApiResource';
 
@@ -134,12 +137,23 @@ export function FeedScreen() {
           ? [
               ...(launchpads.data?.data ?? [])
                 .filter(launchpad => !launchpadFilter || launchpad.slug === launchpadFilter)
-                .map(launchpad => ({
-                  kind: 'launchpad' as const,
-                  id: launchpad.id,
-                  createdAt: launchpad.createdAt,
-                  launchpad,
-                })),
+                .flatMap(launchpad => [
+                  {
+                    kind: 'launchpad' as const,
+                    id: launchpad.id,
+                    createdAt: launchpad.createdAt,
+                    launchpad,
+                  },
+                  ...launchpad.comments
+                    .filter(comment => comment.kind === 'quote')
+                    .map(quote => ({
+                      kind: 'launchpad-quote' as const,
+                      id: quote.id,
+                      createdAt: quote.createdAt,
+                      launchpad,
+                      quote,
+                    })),
+                ]),
               ...(launches.data?.data ?? []).flatMap(launch => [
                 {
                   kind: 'launch' as const,
@@ -277,6 +291,15 @@ export function FeedScreen() {
                     key={`launchpad:${item.id}`}
                     launchpad={item.launchpad}
                     quoteAsset={assetsByAddress.get(item.launchpad.quoteToken.toLowerCase())}
+                    onChanged={() => void refresh()}
+                  />
+                ) : item.kind === 'launchpad-quote' ? (
+                  <LaunchpadQuotePost
+                    key={`launchpad-quote:${item.id}`}
+                    launchpad={item.launchpad}
+                    quote={item.quote}
+                    quoteAsset={assetsByAddress.get(item.launchpad.quoteToken.toLowerCase())}
+                    onChanged={() => void refresh()}
                   />
                 ) : item.kind === 'launch' || item.kind === 'graduation' ? (
                   <div key={`${item.kind}:${item.id}`} className="border-b border-line p-4">

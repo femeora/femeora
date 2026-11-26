@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   bondingCurveLaunchAbi,
   graduatorAbi,
@@ -24,6 +26,7 @@ import { z } from 'zod';
 
 import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import type { ApiChainClient } from '../core/chain-client.js';
+import { validateCalloutCaption } from '../core/security/anti-phishing.js';
 
 const address = z
   .string()
@@ -39,6 +42,12 @@ const slug = z
   .min(2)
   .max(80);
 const walletRequest = z.object({ walletAddress: address });
+const launchpadSocialParams = z.object({ id: z.string().regex(/^\d+$/).transform(BigInt) });
+const launchpadReplyParams = launchpadSocialParams.extend({ replyId: z.string().uuid() });
+const launchpadReplyBody = z.object({
+  body: z.string().trim().min(1).max(280),
+  parentId: z.string().uuid().nullable().optional(),
+});
 const createLaunchpadRequest = walletRequest
   .extend({
     feeRecipient: address,
@@ -159,7 +168,6 @@ class LaunchRouteError extends Error {
     super(code);
   }
 }
-
 function sendError(reply: FastifyReply, error: unknown) {
   if (error instanceof LaunchRouteError)
     return reply.status(error.status).send({ error: error.code });
@@ -205,6 +213,13 @@ async function optionalLinkedSession(
     : null;
 }
 
+async function socialSession(cookies: Record<string, string | undefined>) {
+  const session = await resolveSession(cookies[SESSION_COOKIE_NAME]);
+  if (!session) throw new LaunchRouteError(401, 'AUTHENTICATION_REQUIRED');
+  if (session.user.banned) throw new LaunchRouteError(403, 'ACCOUNT_UNAVAILABLE');
+  return session;
+}
+
 function requireDeployment(config: LaunchRouteConfig) {
   if (
     !config.launchpadFactory ||
@@ -224,7 +239,8 @@ function requireDeployment(config: LaunchRouteConfig) {
 
 function launchpadJson(
   record: Awaited<ReturnType<typeof findLaunchpad>>,
-  profiles: ReadonlyMap<string, CreatorProfile> = new Map()
+  profiles: ReadonlyMap<string, CreatorProfile> = new Map(),
+  viewer: { liked: boolean; reposted: boolean } = { liked: false, reposted: false }
 ) {
   if (!record) return null;
   const metadata = decodeLaunchpadMetadata(record.metadataUri);
@@ -241,6 +257,23 @@ function launchpadJson(
     domain: record.domain,
     xHandle: record.xHandle,
     ownerProfile: profiles.get(record.owner.toLowerCase()) ?? null,
+    social: {
+      likes: record._count.likes,
+      reposts: record._count.reposts,
+      replies: record.replies.filter(item => item.kind === 'reply').length,
+      quotes: record.replies.filter(item => item.kind === 'quote').length,
+      views: record._count.views,
+    },
+    viewer,
+    comments: record.replies.map(item => ({
+      id: item.id,
+      launchpadId: record.launchpadId.toString(),
+      parentId: item.parentId,
+      kind: item.kind === 'quote' ? ('quote' as const) : ('reply' as const),
+      body: item.body,
+      createdAt: item.createdAt.toISOString(),
+      user: item.user,
+    })),
     quoteToken: getAddress(record.quoteToken),
     tradeFeePips: record.tradeFeePips,
     creatorSharePips: record.creatorSharePips,
@@ -301,7 +334,25 @@ function decodeLaunchpadMetadata(uri: string): {
   }
 }
 
-const launchpadInclude = { _count: { select: { launches: true } } } as const;
+const launchpadInclude = {
+  _count: {
+    select: {
+      launches: true,
+      likes: true,
+      reposts: true,
+      replies: { where: { hidden: false } },
+      views: true,
+    },
+  },
+  replies: {
+    where: { hidden: false },
+    include: {
+      user: { select: { id: true, handle: true, name: true, avatarUrl: true, xVerified: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 50,
+  },
+} as const;
 async function findLaunchpad(chainId: number, selector: { slug: string } | { id: bigint }) {
   return prisma.launchpad.findFirst({
     where: {
@@ -329,7 +380,6 @@ async function creatorProfiles(addresses: readonly string[]) {
     wallets.map(wallet => [wallet.address.toLowerCase(), wallet.user])
   );
 }
-
 function launchJson(
   record: Awaited<ReturnType<typeof findLaunch>>,
   profiles: ReadonlyMap<string, CreatorProfile> = new Map()
@@ -501,7 +551,37 @@ export async function registerLaunchRoutes(
       take: 100,
     });
     const profiles = await creatorProfiles(records.map(record => record.owner));
-    return { data: records.map(record => launchpadJson(record, profiles)) };
+    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
+    const [likes, reposts] = session
+      ? await Promise.all([
+          prisma.launchpadLike.findMany({
+            where: {
+              userId: session.userId,
+              chainId,
+              launchpadId: { in: records.map(record => record.launchpadId) },
+            },
+            select: { launchpadId: true },
+          }),
+          prisma.launchpadRepost.findMany({
+            where: {
+              userId: session.userId,
+              chainId,
+              launchpadId: { in: records.map(record => record.launchpadId) },
+            },
+            select: { launchpadId: true },
+          }),
+        ])
+      : [[], []];
+    const liked = new Set(likes.map(item => item.launchpadId.toString()));
+    const reposted = new Set(reposts.map(item => item.launchpadId.toString()));
+    return {
+      data: records.map(record =>
+        launchpadJson(record, profiles, {
+          liked: liked.has(record.launchpadId.toString()),
+          reposted: reposted.has(record.launchpadId.toString()),
+        })
+      ),
+    };
   });
 
   app.get('/v1/launchpads/:slug', async (request, reply) => {
@@ -510,6 +590,31 @@ export async function registerLaunchRoutes(
     const record = await findLaunchpad(chainId, { slug: params.data.slug });
     if (!record) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
     const ownerProfiles = await creatorProfiles([record.owner]);
+    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
+    const [liked, reposted] = session
+      ? await Promise.all([
+          prisma.launchpadLike.findUnique({
+            where: {
+              userId_chainId_launchpadId: {
+                userId: session.userId,
+                chainId,
+                launchpadId: record.launchpadId,
+              },
+            },
+            select: { userId: true },
+          }),
+          prisma.launchpadRepost.findUnique({
+            where: {
+              userId_chainId_launchpadId: {
+                userId: session.userId,
+                chainId,
+                launchpadId: record.launchpadId,
+              },
+            },
+            select: { userId: true },
+          }),
+        ])
+      : [null, null];
     const launches = await prisma.launch.findMany({
       where: { chainId, launchpadId: record.launchpadId, canonical: true },
       include: { launchpad: true, graduation: true },
@@ -548,7 +653,7 @@ export async function registerLaunchRoutes(
       protocol: 0n,
     };
     return {
-      ...launchpadJson(record, ownerProfiles),
+      ...launchpadJson(record, ownerProfiles, { liked: Boolean(liked), reposted: Boolean(reposted) }),
       launches: launches.map(item => launchJson(item, profiles)),
       dashboard: {
         launches: launches.length,
@@ -566,6 +671,171 @@ export async function registerLaunchRoutes(
         })),
       },
     };
+  });
+
+  for (const action of ['like', 'repost'] as const) {
+    app.post(`/v1/launchpads/:id/${action}`, async (request, reply) => {
+      const params = launchpadSocialParams.safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_ID' });
+      let session;
+      try {
+        session = await socialSession(request.cookies);
+      } catch (error) {
+        return sendError(reply, error);
+      }
+      const launchpad = await findLaunchpad(chainId, { id: params.data.id });
+      if (!launchpad) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+      if (action === 'like') {
+        await prisma.launchpadLike.upsert({
+          where: {
+            userId_chainId_launchpadId: {
+              userId: session.userId,
+              chainId,
+              launchpadId: launchpad.launchpadId,
+            },
+          },
+          create: { userId: session.userId, chainId, launchpadId: launchpad.launchpadId },
+          update: {},
+        });
+      } else {
+        await prisma.launchpadRepost.upsert({
+          where: {
+            userId_chainId_launchpadId: {
+              userId: session.userId,
+              chainId,
+              launchpadId: launchpad.launchpadId,
+            },
+          },
+          create: { userId: session.userId, chainId, launchpadId: launchpad.launchpadId },
+          update: {},
+        });
+      }
+      return reply.status(201).send({ active: true });
+    });
+
+    app.delete(`/v1/launchpads/:id/${action}`, async (request, reply) => {
+      const params = launchpadSocialParams.safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_ID' });
+      let session;
+      try {
+        session = await socialSession(request.cookies);
+      } catch (error) {
+        return sendError(reply, error);
+      }
+      const where = {
+        userId: session.userId,
+        chainId,
+        launchpadId: params.data.id,
+      };
+      if (action === 'like') await prisma.launchpadLike.deleteMany({ where });
+      else await prisma.launchpadRepost.deleteMany({ where });
+      return { active: false };
+    });
+  }
+
+  for (const kind of ['reply', 'quote'] as const) {
+    const route = kind === 'reply' ? 'replies' : 'quotes';
+    app.post(`/v1/launchpads/:id/${route}`, async (request, reply) => {
+      const params = launchpadSocialParams.safeParse(request.params);
+      const body = launchpadReplyBody.safeParse(request.body);
+      if (!params.success || !body.success || !validateCalloutCaption(body.data.body).isValid) {
+        return reply.status(400).send({ error: `INVALID_${kind.toUpperCase()}` });
+      }
+      let session;
+      try {
+        session = await socialSession(request.cookies);
+      } catch (error) {
+        return sendError(reply, error);
+      }
+      const launchpad = await findLaunchpad(chainId, { id: params.data.id });
+      if (!launchpad) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+      if (body.data.parentId) {
+        const parent = await prisma.launchpadReply.findFirst({
+          where: {
+            id: body.data.parentId,
+            chainId,
+            launchpadId: launchpad.launchpadId,
+            hidden: false,
+            kind: 'reply',
+          },
+          select: { id: true },
+        });
+        if (!parent) return reply.status(404).send({ error: 'PARENT_REPLY_NOT_FOUND' });
+      }
+      const created = await prisma.launchpadReply.create({
+        data: {
+          chainId,
+          launchpadId: launchpad.launchpadId,
+          userId: session.userId,
+          parentId: kind === 'reply' ? (body.data.parentId ?? null) : null,
+          kind,
+          body: body.data.body,
+        },
+        include: {
+          user: {
+            select: { id: true, handle: true, name: true, avatarUrl: true, xVerified: true },
+          },
+        },
+      });
+      return reply.status(201).send({
+        id: created.id,
+        launchpadId: created.launchpadId.toString(),
+        parentId: created.parentId,
+        kind,
+        body: created.body,
+        createdAt: created.createdAt.toISOString(),
+        user: created.user,
+      });
+    });
+  }
+
+  app.post('/v1/launchpads/:id/view', async (request, reply) => {
+    const params = launchpadSocialParams.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'INVALID_LAUNCHPAD_ID' });
+    const launchpad = await findLaunchpad(chainId, { id: params.data.id });
+    if (!launchpad) return reply.status(404).send({ error: 'LAUNCHPAD_NOT_FOUND' });
+    const now = new Date();
+    const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const sessionToken = request.cookies[SESSION_COOKIE_NAME];
+    const fingerprint = sessionToken
+      ? `session:${sessionToken}`
+      : `visitor:${request.ip}:${request.headers['user-agent'] ?? ''}`;
+    const viewerHash = createHash('sha256').update(fingerprint).digest('hex');
+    await prisma.launchpadViewDaily.createMany({
+      data: [{ chainId, launchpadId: launchpad.launchpadId, day, viewerHash }],
+      skipDuplicates: true,
+    });
+    const views = await prisma.launchpadViewDaily.count({
+      where: { chainId, launchpadId: launchpad.launchpadId },
+    });
+    return { views };
+  });
+
+  app.delete('/v1/launchpads/:id/replies/:replyId', async (request, reply) => {
+    const params = launchpadReplyParams.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'INVALID_REPLY_ID' });
+    let session;
+    try {
+      session = await socialSession(request.cookies);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+    const row = await prisma.launchpadReply.findFirst({
+      where: {
+        id: params.data.replyId,
+        chainId,
+        launchpadId: params.data.id,
+        userId: session.userId,
+        hidden: false,
+      },
+      select: { id: true },
+    });
+    if (!row) return reply.status(404).send({ error: 'REPLY_NOT_FOUND_OR_NOT_OWNED' });
+    await prisma.$transaction([
+      prisma.launchpadReply.updateMany({ where: { parentId: row.id }, data: { parentId: null } }),
+      prisma.launchpadReply.delete({ where: { id: row.id } }),
+    ]);
+    return reply.status(204).send();
   });
 
   app.get('/v1/launches', async request => {

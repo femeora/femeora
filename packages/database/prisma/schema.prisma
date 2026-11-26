@@ -139,8 +139,12 @@ model Launchpad {
   createdAt               DateTime @map("created_at")
   canonical               Boolean  @default(true)
 
-  launches Launch[]
+  launches     Launch[]
   statusEvents LaunchpadStatusEvent[]
+  likes        LaunchpadLike[]
+  reposts      LaunchpadRepost[]
+  replies      LaunchpadReply[]
+  views        LaunchpadViewDaily[]
 
   @@id([chainId, launchpadId])
   @@unique([chainId, slug])
@@ -594,6 +598,9 @@ model User {
   notifications      Notification[]        @relation("NotificationRecipient")
   actedNotifications Notification[]        @relation("NotificationActor")
   reports            Report[]
+  launchpadLikes     LaunchpadLike[]
+  launchpadReposts   LaunchpadRepost[]
+  launchpadReplies   LaunchpadReply[]
 
   @@index([xProfileRefreshedAt])
   @@map("users")
@@ -881,6 +888,65 @@ model Reply {
 
   @@index([calloutId, kind, createdAt])
   @@map("replies")
+}
+
+model LaunchpadLike {
+  userId      String   @map("user_id") @db.Uuid
+  chainId     Int      @map("chain_id")
+  launchpadId BigInt   @map("launchpad_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@id([userId, chainId, launchpadId])
+  @@index([chainId, launchpadId, createdAt])
+  @@map("launchpad_likes")
+}
+
+model LaunchpadRepost {
+  userId      String   @map("user_id") @db.Uuid
+  chainId     Int      @map("chain_id")
+  launchpadId BigInt   @map("launchpad_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@id([userId, chainId, launchpadId])
+  @@index([chainId, launchpadId, createdAt])
+  @@map("launchpad_reposts")
+}
+
+model LaunchpadReply {
+  id          String   @id @default(uuid()) @db.Uuid
+  chainId     Int      @map("chain_id")
+  launchpadId BigInt   @map("launchpad_id")
+  userId      String   @map("user_id") @db.Uuid
+  parentId    String?  @map("parent_id") @db.Uuid
+  kind        String   @default("reply") @db.VarChar(16)
+  body        String   @db.VarChar(280)
+  createdAt   DateTime @default(now()) @map("created_at")
+  hidden      Boolean  @default(false)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@index([chainId, launchpadId, kind, createdAt])
+  @@index([parentId])
+  @@map("launchpad_replies")
+}
+
+model LaunchpadViewDaily {
+  chainId     Int      @map("chain_id")
+  launchpadId BigInt   @map("launchpad_id")
+  day         DateTime @db.Date
+  viewerHash  String   @map("viewer_hash") @db.Char(64)
+
+  launchpad Launchpad @relation(fields: [chainId, launchpadId], references: [chainId, launchpadId], onDelete: Cascade)
+
+  @@id([chainId, launchpadId, day, viewerHash])
+  @@map("launchpad_views_daily")
 }
 
 model UserStat {
