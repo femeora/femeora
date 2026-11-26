@@ -77,7 +77,9 @@ export function PriceChart({
   const { containerRef, handles } = useLightweightChart();
   const [hovered, setHovered] = useState<Ohlc | null>(null);
   const [popover, setPopover] = useState<{ callout: Callout; x: number; y: number } | null>(null);
-  const [avatarMarkers, setAvatarMarkers] = useState<readonly { callout: Callout; x: number; y: number }[]>([]);
+  const [avatarMarkers, setAvatarMarkers] = useState<
+    readonly { callout: Callout; x: number; y: number }[]
+  >([]);
   const hasCandles = candles.length > 0;
 
   const convert = (priceUsd: number) => toUnit(priceUsd, unit, pool);
@@ -86,9 +88,9 @@ export function PriceChart({
   const times = useMemo(() => {
     const anchor = Math.floor(Date.now() / 1000 / intervalSeconds) * intervalSeconds;
     return candles.map(
-      (candle, index) => (
-        candle.timestamp ?? anchor - (candles.length - 1 - index) * intervalSeconds
-      ) as UTCTimestamp
+      (candle, index) =>
+        (candle.timestamp ??
+          anchor - (candles.length - 1 - index) * intervalSeconds) as UTCTimestamp
     );
   }, [candles, intervalSeconds]);
 
@@ -143,25 +145,33 @@ export function PriceChart({
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const projected = callouts.flatMap(callout => {
-          const index = calloutCandleIndex(callout, times);
-          const time = times[index];
-          if (index < 0 || time === undefined) return [];
-          const x = chart.timeScale().timeToCoordinate(time);
-          const value = toUnit(callout.mcAtPostUsd, unit, pool);
-          const y = candleSeries.priceToCoordinate(value);
-          if (x === null || y === null) return [];
-          const height = containerRef.current?.clientHeight ?? 0;
-          const markerY = Math.min(Math.max(y - 26, 18), Math.max(18, height - 18));
-          return [{ callout, x, y: markerY }];
-        }).sort((a, b) => a.x - b.x || a.y - b.y);
+        const projected = callouts
+          .flatMap(callout => {
+            const index = calloutCandleIndex(callout, times);
+            const time = times[index];
+            const candle = candles[index];
+            if (index < 0 || time === undefined || !candle) return [];
+            const x = chart.timeScale().timeToCoordinate(time);
+            // Anchor the avatar to the candle at the callout time. Using the
+            // callout market-cap value here placed price-mode markers far away
+            // from their candle when the chart's unit or scale changed.
+            const candleHigh = unit === 'mcap' ? candle.high * pool.supply : candle.high;
+            const y = candleSeries.priceToCoordinate(candleHigh);
+            if (x === null || y === null) return [];
+            const height = containerRef.current?.clientHeight ?? 0;
+            // Avatar is 28px plus its frame. Keep an 8px visual gap above the
+            // wick and reserve the top legend area when the candle is near the edge.
+            const markerY = Math.min(Math.max(y - 24, 42), Math.max(42, height - 18));
+            return [{ callout, x, y: markerY }];
+          })
+          .sort((a, b) => a.x - b.x || a.y - b.y);
         const stacked: { callout: Callout; x: number; y: number }[] = [];
         projected.forEach(marker => {
           let y: number = marker.y;
           for (let previous = stacked.length - 1; previous >= 0; previous -= 1) {
             const other = stacked[previous];
             if (!other || marker.x - other.x > 32) break;
-            if (Math.abs(y - other.y) < 26) y = Math.max(18, other.y - 26);
+            if (Math.abs(y - other.y) < 34) y = Math.max(42, other.y - 34);
           }
           stacked.push({ ...marker, y });
         });
@@ -171,11 +181,22 @@ export function PriceChart({
     update();
     chart.timeScale().subscribeVisibleLogicalRangeChange(update);
     const resize = new ResizeObserver(update);
-    if (containerRef.current) resize.observe(containerRef.current);
+    const container = containerRef.current;
+    if (container) {
+      resize.observe(container);
+      // Reproject after vertical price-scale gestures as well as horizontal
+      // pan/zoom. RAF coalescing inside update keeps pointer movement cheap.
+      container.addEventListener('wheel', update, { passive: true });
+      container.addEventListener('pointermove', update, { passive: true });
+      container.addEventListener('touchmove', update, { passive: true });
+    }
     return () => {
       cancelAnimationFrame(frame);
       resize.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(update);
+      container?.removeEventListener('wheel', update);
+      container?.removeEventListener('pointermove', update);
+      container?.removeEventListener('touchmove', update);
     };
   }, [handles, showCallouts, callouts, candles.length, times, unit, pool, containerRef]);
 
@@ -231,9 +252,12 @@ export function PriceChart({
       const bar = data && 'open' in data ? data : null;
       setHovered(bar);
 
-      const marker = showCallouts && param.point
-        ? avatarMarkers.find(item => Math.hypot(item.x - param.point!.x, item.y - param.point!.y) <= 18)
-        : null;
+      const marker =
+        showCallouts && param.point
+          ? avatarMarkers.find(
+              item => Math.hypot(item.x - param.point!.x, item.y - param.point!.y) <= 18
+            )
+          : null;
       setPopover(marker ? { callout: marker.callout, x: marker.x, y: marker.y } : null);
     };
     chart.subscribeCrosshairMove(onMove);
@@ -263,11 +287,16 @@ export function PriceChart({
     const chartValue = handles.candles.coordinateToPrice(y);
     if (chartValue !== null) {
       const price = unit === 'mcap' ? chartValue / pool.supply : chartValue;
-      onRangeChange(bound, ((price / pool.priceUsd) - 1) * 100);
+      onRangeChange(bound, (price / pool.priceUsd - 1) * 100);
     }
     if (phase === 'end') {
       handles.chart.applyOptions({
-        handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false,
+        },
         handleScale: true,
       });
       handles.chart.priceScale('right').applyOptions({ autoScale: true });
@@ -300,9 +329,11 @@ export function PriceChart({
       <div
         ref={containerRef}
         role="img"
-        aria-label={hasCandles
-          ? `${pool.base} / ${pool.quote} chart, last ${format(current)}. Drag to pan, scroll or pinch to zoom.`
-          : `${pool.base} / ${pool.quote} chart. No indexed price history yet.`}
+        aria-label={
+          hasCandles
+            ? `${pool.base} / ${pool.quote} chart, last ${format(current)}. Drag to pan, scroll or pinch to zoom.`
+            : `${pool.base} / ${pool.quote} chart. No indexed price history yet.`
+        }
         className="h-full w-full font-mono"
       />
 
@@ -320,14 +351,23 @@ export function PriceChart({
               <TokenPair
                 tokenX={pool.baseAddress}
                 tokenY={pool.quoteAddress}
-                tokenXIdentity={{ symbol: pool.base, name: pool.baseName, logoUrl: pool.baseLogoUrl }}
-                tokenYIdentity={{ symbol: pool.quote, name: pool.quoteName, logoUrl: pool.quoteLogoUrl }}
+                tokenXIdentity={{
+                  symbol: pool.base,
+                  name: pool.baseName,
+                  logoUrl: pool.baseLogoUrl,
+                }}
+                tokenYIdentity={{
+                  symbol: pool.quote,
+                  name: pool.quoteName,
+                  logoUrl: pool.quoteLogoUrl,
+                }}
                 compact
               />
             </div>
             <h2 className="mt-4 text-lg font-medium">No price history yet</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              This pool has no confirmed swaps in the selected interval. The chart will appear automatically after the first indexed trade.
+              This pool has no confirmed swaps in the selected interval. The chart will appear
+              automatically after the first indexed trade.
             </p>
             <p className="t-label mt-5 border border-line bg-panel-2 px-3 py-2 text-faint">
               Waiting for the first swap · no demo data
@@ -349,20 +389,22 @@ export function PriceChart({
         />
       ) : null}
 
-      {hasCandles && showCallouts ? avatarMarkers.map(({ callout, x, y }) => (
-        <span
-          key={callout.id}
-          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-bg bg-bg/80 p-0.5 shadow-[0_2px_8px_rgb(0_0_0/0.55)]"
-          style={{ left: x, top: y }}
-        >
-          <Avatar
-            seed={callout.caller.handle}
-            src={callout.caller.avatarUrl}
-            alt=""
-            size="sm"
-          />
-        </span>
-      )) : null}
+      {hasCandles && showCallouts
+        ? avatarMarkers.map(({ callout, x, y }) => (
+            <span
+              key={callout.id}
+              className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-bg bg-bg/80 p-0.5 shadow-[0_2px_8px_rgb(0_0_0/0.55)]"
+              style={{ left: x, top: y }}
+            >
+              <Avatar
+                seed={callout.caller.handle}
+                src={callout.caller.avatarUrl}
+                alt=""
+                size="sm"
+              />
+            </span>
+          ))
+        : null}
 
       {hasCandles && popover ? <CalloutPopover {...popover} /> : null}
 
