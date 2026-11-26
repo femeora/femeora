@@ -11,12 +11,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useId, useMemo, useState } from 'react';
 
-import { useFeedRealtime } from '../hooks/useFeedRealtime';
-import { filterBySide, SIDE_FILTERS, type FeedTab, type SideFilter } from '../model/feed';
-
-import { FeedRail } from './FeedRail';
-import { NewCalloutsPill } from './NewCalloutsPill';
-
 import { ArrowRight } from '@/components/ui/icons';
 import { Tabs } from '@/components/ui/Tabs';
 import { CalloutPost } from '@/features/callouts/components/CalloutPost';
@@ -30,7 +24,11 @@ import {
 import { useSession } from '@/features/session/store';
 import { useApiResource } from '@/lib/api/useApiResource';
 
+import { useFeedRealtime } from '../hooks/useFeedRealtime';
+import { filterBySide, SIDE_FILTERS, type FeedTab, type SideFilter } from '../model/feed';
 
+import { FeedRail } from './FeedRail';
+import { NewCalloutsPill } from './NewCalloutsPill';
 
 const tabItems: readonly { value: FeedTab; label: string }[] = [
   { value: 'callouts', label: 'Callouts' },
