@@ -29,7 +29,15 @@ export interface Eip1193Provider {
     event: 'accountsChanged' | 'chainChanged' | 'disconnect',
     listener: (...args: unknown[]) => void
   ): void;
+  disconnect?(): Promise<void>;
 }
+
+export type WalletConnectSettings = {
+  projectId: string;
+  rpcUrl: string;
+  chainId: number;
+  chainName: string;
+};
 
 export type WalletSnapshot = {
   account: `0x${string}` | null;
@@ -45,6 +53,60 @@ export class WalletAdapterError extends Error {
 
 const WALLET_REQUEST_TIMEOUT_MS = 30_000;
 let selectedProvider: Eip1193Provider | null = null;
+let walletConnectProvider: Eip1193Provider | null = null;
+
+async function resolveWalletConnectProvider(settings: WalletConnectSettings) {
+  if (walletConnectProvider) return walletConnectProvider;
+  const { default: EthereumProvider } = await import('@walletconnect/ethereum-provider');
+  const provider = await EthereumProvider.init({
+    projectId: settings.projectId,
+    chains: [settings.chainId],
+    rpcMap: { [settings.chainId]: settings.rpcUrl },
+    showQrModal: true,
+    metadata: {
+      name: 'Femeora',
+      description: 'Liquidity, launchpads, and proof-backed callouts on Robinhood Chain.',
+      url: window.location.origin,
+      icons: [`${window.location.origin}/icon.png`],
+    },
+  });
+  walletConnectProvider = provider as Eip1193Provider;
+  return walletConnectProvider;
+}
+
+export async function restoreWalletConnect(settings: WalletConnectSettings) {
+  const provider = await resolveWalletConnectProvider(settings);
+  const snapshot = await readWalletSnapshot(provider);
+  if (!snapshot.account) return null;
+  selectedProvider = provider;
+  return { provider, snapshot };
+}
+
+export async function connectWallet(
+  settings?: WalletConnectSettings | null,
+  source: 'auto' | 'injected' | 'walletconnect' = 'auto',
+): Promise<WalletSnapshot> {
+  if (source === 'auto' && selectedProvider) {
+    const active = await readWalletSnapshot(selectedProvider).catch(() => null);
+    if (active?.account) return active;
+  }
+  const injected = preferredProvider(providerCandidates());
+  if (source !== 'walletconnect' && injected) return connectInjectedWallet(injected);
+  if (source === 'injected') throw new WalletAdapterError('WALLET_PROVIDER_NOT_FOUND');
+  if (!settings) throw new WalletAdapterError('WALLETCONNECT_NOT_CONFIGURED');
+  const provider = await resolveWalletConnectProvider(settings);
+  try {
+    await provider.request({ method: 'eth_requestAccounts' });
+    const snapshot = await readWalletSnapshot(provider);
+    if (!snapshot.account) throw new WalletAdapterError('WALLET_ACCOUNT_REQUIRED');
+    selectedProvider = provider;
+    return snapshot;
+  } catch (error) {
+    if (error instanceof WalletAdapterError) throw error;
+    if (providerErrorCode(error) === 4001) throw new WalletAdapterError('WALLET_REQUEST_REJECTED');
+    throw new WalletAdapterError('WALLET_CONNECTION_FAILED');
+  }
+}
 
 function providerErrorCode(error: unknown): number | null {
   if (typeof error !== 'object' || error === null) return null;
@@ -154,15 +216,25 @@ export async function connectInjectedWallet(
   }
 }
 
-export async function disconnectInjectedWallet(provider = injectedProvider()): Promise<void> {
+export async function disconnectWallet(provider = injectedProvider()): Promise<void> {
   if (!provider) return;
+  if (provider === walletConnectProvider && provider.disconnect) {
+    await provider.disconnect().catch(() => undefined);
+    selectedProvider = null;
+    walletConnectProvider = null;
+    return;
+  }
   try {
     await provider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
   } catch {
     // Some EIP-1193 wallets do not implement permission revocation. Clearing
     // Fomeora's local connection still disconnects the current UI session.
   }
+  selectedProvider = null;
 }
+
+/** Backwards-compatible injected disconnect used by adapter unit tests and older callers. */
+export const disconnectInjectedWallet = disconnectWallet;
 
 export async function readErc20Balance(
   token: string,

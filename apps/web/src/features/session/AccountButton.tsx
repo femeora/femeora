@@ -1,5 +1,6 @@
 'use client';
 
+import { QrCode } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -108,10 +109,19 @@ function ConnectedWalletButton({
 /** Wallet-first top bar. X is requested only when social identity is needed. */
 export function AccountButton() {
   const { user, openSignIn, refreshSession } = useSession();
-  const { account, status: walletStatus, connect } = useWallet();
+  const { account, status: walletStatus, connect, walletConnect } = useWallet();
+  const [connectOpen, setConnectOpen] = useState(false);
+  const connectDialogRef = useRef<HTMLDialogElement>(null);
   const showResult = useToast(state => state.show);
-  const connectWallet = async () => {
-    await connect();
+  useEffect(() => {
+    const dialog = connectDialogRef.current;
+    if (!dialog) return;
+    if (connectOpen && !dialog.open) dialog.showModal();
+    if (!connectOpen && dialog.open) dialog.close();
+  }, [connectOpen]);
+  const connectWallet = async (source: 'auto' | 'injected' | 'walletconnect' = 'auto') => {
+    setConnectOpen(false);
+    await connect(source);
     const wallet = useWallet.getState();
     if (wallet.account) {
       if (useSession.getState().user) await refreshSession();
@@ -126,14 +136,44 @@ export function AccountButton() {
 
   if (!account) {
     return (
-      <Button
-        variant="primary"
-        onClick={() => void connectWallet()}
-        disabled={walletStatus === 'connecting'}
-        className="min-h-9 px-3.5"
-      >
-        {walletStatus === 'connecting' ? 'Connecting…' : 'Connect wallet'}
-      </Button>
+      <>
+        <Button
+          variant="primary"
+          onClick={() => walletConnect ? setConnectOpen(true) : void connectWallet('injected')}
+          disabled={walletStatus === 'connecting'}
+          className="min-h-9 px-3.5"
+        >
+          {walletStatus === 'connecting' ? 'Connecting…' : 'Connect wallet'}
+        </Button>
+        <dialog
+          ref={connectDialogRef}
+          onClose={() => setConnectOpen(false)}
+          className="m-auto w-[min(28rem,calc(100vw-2rem))] glass-raised rounded-[2px] p-0 text-fg backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+        >
+          <section className="p-5">
+            <header className="flex items-start justify-between gap-4">
+              <div>
+                <p className="t-label text-muted">Connect wallet</p>
+                <h2 className="mt-1 font-mono text-lg">Choose how to connect</h2>
+              </div>
+              <button type="button" onClick={() => setConnectOpen(false)} aria-label="Close wallet choices" className="grid size-11 place-items-center text-muted hover:text-fg">
+                <Close aria-hidden="true" className="size-5" />
+              </button>
+            </header>
+            <div className="mt-6 grid gap-2">
+              <Button variant="ghost" block onClick={() => void connectWallet('injected')}>
+                <Wallet aria-hidden="true" className="size-4" />
+                Browser wallet
+              </Button>
+              <Button variant="primary" block onClick={() => void connectWallet('walletconnect')}>
+                <QrCode aria-hidden="true" className="size-4" />
+                WalletConnect
+              </Button>
+            </div>
+            <p className="mt-4 text-sm text-muted">Use WalletConnect to open a mobile wallet or scan a QR code from another device.</p>
+          </section>
+        </dialog>
+      </>
     );
   }
 

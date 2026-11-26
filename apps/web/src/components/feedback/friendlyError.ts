@@ -31,7 +31,10 @@ export function friendlyErrorMessage(error: string): string {
     return 'Your wallet is connected to a different network. Switch to the network shown in Femeora and try again.';
   }
   if (includesAny(value, ['WALLET_PROVIDER_NOT_FOUND', 'WALLET_UNAVAILABLE', 'NO_PROVIDER'])) {
-    return 'Femeora could not find a compatible wallet. Open the site in a wallet browser or enable your wallet extension.';
+    return 'Femeora could not find a compatible wallet. Choose WalletConnect or enable your wallet extension, then try again.';
+  }
+  if (value.includes('WALLETCONNECT_NOT_CONFIGURED')) {
+    return 'WalletConnect is not available for this deployment. Enable a wallet extension or try again after the service configuration is updated.';
   }
   if (value.includes('WALLET_REQUEST_PENDING')) {
     return 'A wallet request is already open. Open your wallet extension, finish or cancel that request, then try again.';

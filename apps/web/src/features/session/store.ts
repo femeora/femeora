@@ -10,7 +10,8 @@ import { z } from 'zod';
 import { create } from 'zustand';
 
 import { useToast } from '@/components/feedback/toast';
-import { connectInjectedWallet, signWalletMessage } from '@/features/wallet/adapter';
+import { signWalletMessage } from '@/features/wallet/adapter';
+import { useWallet } from '@/features/wallet/store';
 import { BrowserApiError, browserApiRequest } from '@/lib/api/client';
 
 export interface SessionUser {
@@ -118,7 +119,8 @@ export const useSession = create<SessionState>((set, get) => ({
   linkWallet: async () => {
     set({ error: null });
     try {
-      const { account: walletAddress } = await connectInjectedWallet();
+      await useWallet.getState().connect();
+      const walletAddress = useWallet.getState().account;
       if (!walletAddress) throw new Error('WALLET_ACCOUNT_REQUIRED');
       const challenge = await browserApiRequest(
         '/v1/auth/wallet/challenge',

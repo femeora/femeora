@@ -16,6 +16,7 @@
     "@fomeora/env": "workspace:*",
     "@fomeora/sdk": "workspace:*",
     "@fomeora/types": "workspace:*",
+    "@walletconnect/ethereum-provider": "^2.21.1",
     "clsx": "^2.1.1",
     "lightweight-charts": "^4.2.1",
     "lucide-react": "^0.400.0",

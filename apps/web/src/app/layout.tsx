@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import { SiteFooter } from '@/components/landing/SiteFooter';
+import { PwaBootstrap } from '@/components/pwa/PwaBootstrap';
 import { site } from '@/content/landing';
 
 import './globals.css';
@@ -10,6 +11,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: `${site.name} · ${site.tagline}`,
   description: site.description,
+  applicationName: site.name,
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: site.name,
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -33,6 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
+        <PwaBootstrap />
         <SiteFooter network={network} />
       </body>
     </html>

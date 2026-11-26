@@ -139,6 +139,7 @@ const webSchema = z
     API_BASE_URL: configuredUrl,
     WEB_BASE_URL: publicOrigin,
     HERO_CA_ADDRESS: optionalAddress,
+    WALLETCONNECT_PROJECTID: z.preprocess(emptyToUndefined, configuredString.optional()),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === 'production' && new URL(value.WEB_BASE_URL).protocol !== 'https:') {
