@@ -13,6 +13,14 @@ const WINDOWS = [
   { name: 'all', milliseconds: null },
 ] as const;
 
+function windowCutoff(window: typeof WINDOWS[number], now: Date): Date | null {
+  if (window.name === '7d') {
+    const daysSinceMonday = (now.getUTCDay() + 6) % 7;
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday));
+  }
+  return window.milliseconds === null ? null : new Date(now.getTime() - window.milliseconds);
+}
+
 function quickExitMinutes(callout: {
   createdAt: Date;
   position: { events: readonly { eventType: string; timestamp: Date; payload: Prisma.JsonValue }[] };
@@ -152,7 +160,7 @@ export async function rollupUserStats(chainId: number, now = new Date()): Promis
     rank: number;
   }> = [];
   for (const window of WINDOWS) {
-    const cutoff = window.milliseconds === null ? null : new Date(now.getTime() - window.milliseconds);
+    const cutoff = windowCutoff(window, now);
     const byUser = new Map<string, typeof rows[number]>();
     for (const callout of callouts) {
       if (cutoff && callout.createdAt < cutoff) continue;

@@ -485,6 +485,10 @@ export async function backfillPoolRegistry(
         for (const swap of poolEvents.swaps) {
           const poolId = poolIdByAddress.get(swap.poolAddress.toLowerCase());
           if (!poolId) throw new Error('POOL_ID_MISSING');
+          const existingSwap = await transaction.swap.findUnique({
+            where: { chainId_transactionHash_logIndex: { chainId: chain.chainId, transactionHash: swap.transactionHash, logIndex: swap.logIndex } },
+            select: { logIndex: true },
+          });
           await transaction.swap.upsert({
             where: {
               chainId_transactionHash_logIndex: {
@@ -553,6 +557,37 @@ export async function backfillPoolRegistry(
             },
             update: { canonical: true },
           });
+          if (!existingSwap && swap.activeBinBefore !== null && swap.activeBinAfter !== null) {
+            const callouts = await transaction.callout.findMany({
+              where: { chainId: chain.chainId, poolId, canonical: true, hidden: false, deletedAt: null, position: { status: 'open' } },
+              select: { id: true, userId: true, lowerBin: true, upperBin: true },
+            });
+            for (const callout of callouts) {
+              const wasInRange = swap.activeBinBefore >= callout.lowerBin && swap.activeBinBefore <= callout.upperBin;
+              const isInRange = swap.activeBinAfter >= callout.lowerBin && swap.activeBinAfter <= callout.upperBin;
+              if (wasInRange === isInRange) continue;
+              const type = isInRange ? 'position_in_range' : 'position_out_of_range';
+              const notification = await transaction.notification.create({
+                data: {
+                  userId: callout.userId,
+                  type,
+                  entityType: 'callout',
+                  entityId: callout.id,
+                  payload: { calloutId: callout.id, activeBin: swap.activeBinAfter },
+                },
+              });
+              await transaction.outboxEvent.create({
+                data: {
+                  dedupKey: `notification:${notification.id}`,
+                  topic: 'notification.new',
+                  aggregateId: callout.userId,
+                  chainId: chain.chainId,
+                  blockNumber: swap.blockNumber,
+                  payload: { notificationId: notification.id, userId: callout.userId, type },
+                },
+              });
+            }
+          }
         }
         const swapTimestampsByPool = new Map<string, Date[]>();
         for (const swap of poolEvents.swaps) {
@@ -820,6 +855,32 @@ export async function backfillPoolRegistry(
                   },
                   update: { canonical: true },
                 });
+                const followers = await transaction.follow.findMany({
+                  where: { followeeId: intent.userId },
+                  select: { followerId: true },
+                });
+                for (const follower of followers) {
+                  const notification = await transaction.notification.create({
+                    data: {
+                      userId: follower.followerId,
+                      actorUserId: intent.userId,
+                      type: 'callout_new',
+                      entityType: 'callout',
+                      entityId: callout.id,
+                      payload: { calloutId: callout.id },
+                    },
+                  });
+                  await transaction.outboxEvent.create({
+                    data: {
+                      dedupKey: `notification:${notification.id}`,
+                      topic: 'notification.new',
+                      aggregateId: follower.followerId,
+                      chainId: chain.chainId,
+                      blockNumber: event.blockNumber,
+                      payload: { notificationId: notification.id, userId: follower.followerId, type: 'callout_new' },
+                    },
+                  });
+                }
               }
             }
 
@@ -879,6 +940,33 @@ export async function backfillPoolRegistry(
                   },
                   update: { canonical: true },
                 });
+                const tailNotification = await transaction.notification.create({
+                  data: {
+                    userId: tailLink.sourceCallout.userId,
+                    actorUserId: tailLink.intent.userId,
+                    type: 'tail',
+                    entityType: 'callout',
+                    entityId: tailLink.sourceCallout.id,
+                    payload: {
+                      calloutId: tailLink.sourceCallout.id,
+                      positionId: event.positionId.toString(),
+                    },
+                  },
+                });
+                await transaction.outboxEvent.create({
+                  data: {
+                    dedupKey: `notification:${tailNotification.id}`,
+                    topic: 'notification.new',
+                    aggregateId: tailLink.sourceCallout.userId,
+                    chainId: chain.chainId,
+                    blockNumber: event.blockNumber,
+                    payload: {
+                      notificationId: tailNotification.id,
+                      userId: tailLink.sourceCallout.userId,
+                      type: 'tail',
+                    },
+                  },
+                });
               }
             }
           }
@@ -893,6 +981,7 @@ export async function backfillPoolRegistry(
               logIndex: event.logIndex,
               blockNumber: event.blockNumber,
               type: calloutUpdateType,
+              ...(typeof event.payload.bps === 'number' ? { removalBps: event.payload.bps } : {}),
             });
           }
         }

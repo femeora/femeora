@@ -78,6 +78,23 @@ export async function registerSocialRoutes(app: FastifyInstance, chainId: number
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 20,
     });
+    const trackRows = await prisma.callout.findMany({
+      where: { ...visibleCalloutWhere, chainId, userId: user.id },
+      select: { quickExitMinutes: true, position: { select: { status: true, openSeconds: true, inRangeSeconds: true } } },
+    });
+    const openCallouts = trackRows.filter(row => row.position.status === 'open').length;
+    const closedCallouts = trackRows.filter(row => row.position.status === 'closed').length;
+    const averageHoldSeconds = trackRows.length === 0
+      ? 0
+      : Math.round(trackRows.reduce((sum, row) => sum + Number(row.position.openSeconds), 0) / trackRows.length);
+    const inRangeRatios = trackRows
+      .map(row => Number(row.position.openSeconds) === 0 ? 0 : Number(row.position.inRangeSeconds) * 100 / Number(row.position.openSeconds))
+      .sort((left, right) => left - right);
+    const medianInRange = inRangeRatios.length === 0
+      ? 0
+      : inRangeRatios.length % 2 === 1
+        ? inRangeRatios[Math.floor(inRangeRatios.length / 2)]!
+        : (inRangeRatios[inRangeRatios.length / 2 - 1]! + inRangeRatios[inRangeRatios.length / 2]!) / 2;
     const viewer = await resolveCalloutViewerStates(session?.userId, callouts);
     return {
       user: {
@@ -104,6 +121,13 @@ export async function registerSocialRoutes(app: FastifyInstance, chainId: number
         rank: stat.rank,
         updatedAt: stat.updatedAt.toISOString(),
       })),
+      trackRecord: {
+        openCallouts,
+        closedCallouts,
+        averageHoldSeconds,
+        medianInRange,
+        quickExits: trackRows.filter(row => row.quickExitMinutes !== null).length,
+      },
       callouts: callouts.map(callout => serializeCallout(callout, null, viewer.get(callout.id))),
     };
   });

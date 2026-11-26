@@ -715,6 +715,10 @@ export async function persistLaunchEvents(
   for (const event of batch.graduations) {
     const launch = launchByCurve.get(event.curve.toLowerCase());
     if (!launch) throw new Error('CURVE_LAUNCH_INDEX_MISSING');
+    const existingGraduation = await transaction.graduation.findUnique({
+      where: { chainId_launchId: { chainId, launchId: launch.launchId } },
+      select: { launchId: true },
+    });
     await transaction.graduation.upsert({
       where: { chainId_launchId: { chainId, launchId: launch.launchId } },
       create: {
@@ -812,5 +816,41 @@ export async function persistLaunchEvents(
       },
       update: { canonical: true },
     });
+    if (!existingGraduation) {
+      const trades = await transaction.curveTrade.findMany({
+        where: { chainId, launchId: launch.launchId, canonical: true },
+        select: { side: true, trader: true, recipient: true, tokenAmount: true },
+      });
+      const balances = new Map<string, bigint>();
+      for (const trade of trades) {
+        const address = (trade.side === 'buy' ? trade.recipient : trade.trader).toLowerCase();
+        const delta = BigInt(trade.tokenAmount.toFixed(0)) * (trade.side === 'buy' ? 1n : -1n);
+        balances.set(address, (balances.get(address) ?? 0n) + delta);
+      }
+      for (const [address, balance] of balances) {
+        if (balance <= 0n) continue;
+        const holder = await transaction.wallet.findUnique({ where: { address }, select: { userId: true } });
+        if (!holder) continue;
+        const notification = await transaction.notification.create({
+          data: {
+            userId: holder.userId,
+            type: 'launch_graduated',
+            entityType: 'launch',
+            entityId: launch.token,
+            payload: { token: launch.token, symbol: launch.symbol, pool: event.pool.toLowerCase() },
+          },
+        });
+        await transaction.outboxEvent.create({
+          data: {
+            dedupKey: `notification:${notification.id}`,
+            topic: 'notification.new',
+            aggregateId: holder.userId,
+            chainId,
+            blockNumber: event.blockNumber,
+            payload: { notificationId: notification.id, userId: holder.userId, type: 'launch_graduated' },
+          },
+        });
+      }
+    }
   }
 }

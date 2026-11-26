@@ -23,6 +23,7 @@ export function openApiEventStream(path: string, options: ApiEventStreamOptions)
     'callout.new', 'callout.update', 'callout.stats', 'pool.swap', 'pool.cap', 'pool.reference',
     'position.created', 'position.increased', 'position.decreased', 'position.closed', 'position.transferred',
     'launchpad.new', 'launchpad.update', 'launch.new', 'launch.progress', 'launch.revenue', 'launch.graduated',
+    'notification.new',
   ];
 
   const handle = (event: Event) => {

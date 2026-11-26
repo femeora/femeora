@@ -57,18 +57,22 @@ export function CalloutActions({ callout, own, onChanged, onCalloutDeleted }: { 
   }, [callout.id]);
 
   const share = async () => {
-    const url = `${window.location.origin}/p/${callout.pool.chainId}/${callout.pool.address}#callout-${callout.id}`;
+    const url = `${window.location.origin}/c/${callout.id}`;
+    const caption = callout.caption && callout.caption.length > 160
+      ? `${callout.caption.slice(0, 157).trimEnd()}...`
+      : callout.caption;
+    const text = caption
+      ? `${caption}\n\n@${callout.caller.handle}'s ${callout.pool.base}/${callout.pool.quote} callout on Femeora`
+      : `View @${callout.caller.handle}'s ${callout.pool.base}/${callout.pool.quote} callout on Femeora`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `@${callout.caller.handle} on Femeora`, text: callout.caption ?? 'View this Femeora callout', url });
-        showToast('Callout shared.');
-      } else {
-        await navigator.clipboard.writeText(url);
-        showToast('Callout link copied.');
-      }
+      const intent = new URL('https://x.com/intent/tweet');
+      intent.searchParams.set('text', text);
+      intent.searchParams.set('url', url);
+      const popup = window.open(intent.toString(), '_blank', 'noopener,noreferrer,width=720,height=640');
+      if (!popup) throw new Error('SHARE_POPUP_BLOCKED');
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      showToast('The share menu was unavailable. Copy the callout URL from your browser.', { title: 'Could not share', tone: 'error', userFacing: true });
+      await navigator.clipboard.writeText(url).catch(() => undefined);
+      showToast('The X share window was unavailable. The public callout link was copied instead.', { title: 'Callout link copied', userFacing: true });
     }
   };
 
@@ -178,7 +182,8 @@ export function CalloutActions({ callout, own, onChanged, onCalloutDeleted }: { 
       <button
         type="button"
         onClick={share}
-        aria-label="Copy link to callout"
+        aria-label="Share callout to X"
+        title="Share to X"
         className={actionClass}
       >
         <Share2 aria-hidden="true" className="size-4" strokeWidth={1.75} />

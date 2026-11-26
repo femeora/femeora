@@ -124,6 +124,9 @@ export const getPoolCallouts = (address: string, limit = 50) =>
     SECONDARY_REQUEST_TIMEOUT_MS
   );
 
+export const getCallout = (id: string) =>
+  request(`/v1/callouts/${encodeURIComponent(id)}`, ApiCalloutSchema);
+
 export const getLaunchpads = () => request('/v1/launchpads', apiListSchema(ApiLaunchpadSchema));
 
 export const getLaunchpad = (slug: string) =>

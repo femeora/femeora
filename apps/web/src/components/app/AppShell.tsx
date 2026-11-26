@@ -12,6 +12,7 @@ import { XLogo } from '@/components/ui/icons';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { site } from '@/content/landing';
 import { TailSheet } from '@/features/callouts/components/TailSheet';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { AccountButton } from '@/features/session/AccountButton';
 import { SignInSheet } from '@/features/session/SignInSheet';
 import { useRehydrateStores } from '@/features/session/useRehydrateStores';
@@ -59,7 +60,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <XLogo className="size-3.5" />
             <span>@{site.x.handle}</span>
           </a>
-          <div className="ml-auto lg:ml-0">
+          <div className="ml-auto flex items-center gap-1 lg:ml-0">
+            <NotificationBell />
             <AccountButton />
           </div>
         </div>

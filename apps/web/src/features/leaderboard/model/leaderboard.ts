@@ -4,7 +4,7 @@ export type LeaderboardSort = 'score' | 'earned' | 'tailers' | 'inRange';
 
 export const WINDOWS: readonly { value: LeaderboardWindow; label: string }[] = [
   { value: '24h', label: '24h' },
-  { value: '7d', label: '7d' },
+  { value: '7d', label: 'Season' },
   { value: '30d', label: '30d' },
   { value: 'all', label: 'All' },
 ];

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { PositionStatusSchema, ShapeTypeSchema } from './pool.js';
+import { ApiCalloutSchema } from './api-pools.js';
 
 // Anti-shill & Security validation: Caption rules
 // - Max 280 chars
@@ -59,3 +60,50 @@ export const CalloutCardDTO = z.object({
   viewsCount: z.number().int().nonnegative(),
 });
 export type CalloutCard = z.infer<typeof CalloutCardDTO>;
+
+export const ApiNotificationSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  payload: z.record(z.unknown()),
+  actor: z.object({
+    handle: z.string(),
+    name: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    xVerified: z.boolean(),
+  }).nullable(),
+  createdAt: z.string().datetime(),
+  readAt: z.string().datetime().nullable(),
+});
+export type ApiNotification = z.infer<typeof ApiNotificationSchema>;
+
+export const ApiNotificationListSchema = z.object({
+  data: z.array(ApiNotificationSchema),
+  nextCursor: z.string().uuid().nullable(),
+});
+
+export const ApiNotificationReadSchema = z.object({ read: z.literal(true) });
+
+export const ApiUserProfileSchema = z.object({
+  user: z.object({
+    id: z.string().uuid(), handle: z.string(), name: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(), xVerified: z.boolean(),
+    xFollowers: z.number().int().nonnegative().nullable(), createdAt: z.string().datetime(),
+    followers: z.number().int().nonnegative(), following: z.number().int().nonnegative(),
+    callouts: z.number().int().nonnegative(), followedByMe: z.boolean(),
+  }),
+  stats: z.array(z.object({
+    window: z.string(), callouts: z.number().int().nonnegative(), earnedQuote: z.string(),
+    avgInRange: z.string(), tailers: z.number().int().nonnegative(),
+    quickExits: z.number().int().nonnegative(), score: z.string(),
+    rank: z.number().int().nonnegative(), updatedAt: z.string().datetime(),
+  })),
+  trackRecord: z.object({
+    openCallouts: z.number().int().nonnegative(), closedCallouts: z.number().int().nonnegative(),
+    averageHoldSeconds: z.number().int().nonnegative(), quickExits: z.number().int().nonnegative(),
+    medianInRange: z.number().min(0).max(100),
+  }),
+  callouts: z.array(ApiCalloutSchema),
+});
+export type ApiUserProfile = z.infer<typeof ApiUserProfileSchema>;

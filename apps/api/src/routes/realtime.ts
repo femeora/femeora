@@ -4,7 +4,7 @@ import { prisma } from '@fomeora/database';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { SESSION_COOKIE_NAME } from '../core/auth/session.js';
+import { resolveSession, SESSION_COOKIE_NAME } from '../core/auth/session.js';
 import {
   ConnectionLimiter,
   formatSseEvent,
@@ -101,6 +101,16 @@ async function streamEvents(
 }
 
 export async function registerRealtimeRoutes(app: FastifyInstance, chainId: number, wakeup: OutboxWakeup) {
+  app.get('/v1/notifications/stream', async (request, reply) => {
+    const session = await resolveSession(request.cookies[SESSION_COOKIE_NAME]);
+    if (!session) return reply.status(401).send({ error: 'AUTHENTICATION_REQUIRED' });
+    return streamEvents(request, reply, wakeup, {
+      chainId,
+      topics: ['notification.new'],
+      aggregateId: session.userId,
+    });
+  });
+
   app.get('/v1/feed/stream', async (request, reply) =>
     streamEvents(request, reply, wakeup, {
       chainId,

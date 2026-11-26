@@ -8,6 +8,7 @@ export {
   ArrowUp,
   ArrowUpDown,
   BadgeCheck,
+  Bell,
   CandlestickChart,
   Check,
   Copy,

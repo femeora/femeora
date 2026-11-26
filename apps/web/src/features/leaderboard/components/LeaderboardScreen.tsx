@@ -4,7 +4,7 @@ import { ApiLeaderboardSchema } from '@fomeora/types';
 import { useState } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
-import { BadgeCheck } from '@/components/ui/icons';
+import { BadgeCheck, Trophy } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useApiResource } from '@/lib/api/useApiResource';
 import { cn } from '@/lib/cn';
@@ -24,7 +24,7 @@ const decimal = (value: string, digits = 2) => {
 
 /** Leaderboard (brief 7.3, Phase 4): windows, sort, and the anti-shill column. */
 export function LeaderboardScreen() {
-  const [period, setPeriod] = useState<LeaderboardWindow>('24h');
+  const [period, setPeriod] = useState<LeaderboardWindow>('7d');
   const [sort, setSort] = useState<LeaderboardSort>('score');
   const path = `/v1/leaderboard?window=${period}&sort=${sort}&limit=100`;
   const { data, error, isLoading, mutate } = useApiResource(path, ApiLeaderboardSchema);
@@ -34,8 +34,8 @@ export function LeaderboardScreen() {
     <div className="mx-auto max-w-[64rem] px-gutter py-8">
       <header className="flex flex-col gap-5 border-b border-line pb-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="t-label text-muted">Callers</p>
-          <h1 className="mt-1 text-h2 font-medium">Leaderboard</h1>
+          <p className="t-label text-signal">Weekly season · points have no promised value</p>
+          <h1 className="mt-1 text-h2 font-medium">Caller leaderboard</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <SegmentedControl label="Window" options={WINDOWS} value={period} onChange={setPeriod} />
@@ -62,7 +62,7 @@ export function LeaderboardScreen() {
                 'Tailers',
                 'In range',
                 'Quick exits',
-                'Score',
+                period === '7d' ? 'Season points' : 'Score',
               ].map(head => (
                 <th key={head} scope="col" className="py-3 pr-4 font-normal">
                   {head}
@@ -79,7 +79,8 @@ export function LeaderboardScreen() {
                 <td className={cell}>
                   <span className="flex items-center gap-2 font-sans text-[0.9375rem]">
                     <Avatar seed={row.handle} src={row.avatarUrl} alt={`${row.name ?? row.handle} X avatar`} size="sm" />
-                    @{row.handle.replace(/^@/, '')}
+                    {period === '7d' && row.rank <= 3 ? <Trophy aria-label={`Season rank ${row.rank}`} className="size-4 text-signal" /> : null}
+                    <a href={`/u/${row.handle.replace(/^@/, '')}`} className="hover:text-signal">@{row.handle.replace(/^@/, '')}</a>
                     {row.xVerified ? (
                       <BadgeCheck aria-label="X verified" className="size-4 text-signal" />
                     ) : null}

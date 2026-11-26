@@ -10,6 +10,7 @@ export interface PersistCalloutUpdateInput {
   readonly logIndex: number;
   readonly blockNumber: bigint;
   readonly type: CalloutUpdateType;
+  readonly removalBps?: number;
 }
 
 export async function persistCalloutUpdate(
@@ -18,9 +19,13 @@ export async function persistCalloutUpdate(
 ): Promise<string | null> {
   const callout = await transaction.callout.findUnique({
     where: { chainId_positionId: { chainId: input.chainId, positionId: input.positionId } },
-    select: { id: true, pool: { select: { address: true } } },
+    select: { id: true, userId: true, pool: { select: { address: true } } },
   });
   if (!callout) return null;
+  const existing = await transaction.calloutUpdate.findUnique({
+    where: { positionEventId: input.positionEventId },
+    select: { id: true },
+  });
   const update = await transaction.calloutUpdate.upsert({
     where: { positionEventId: input.positionEventId },
     create: {
@@ -51,5 +56,45 @@ export async function persistCalloutUpdate(
     },
     update: { canonical: true },
   });
+  const shouldAlertTailers = input.type === 'Closed'
+    || (input.type === 'Removed' && (input.removalBps ?? 0) >= 2_500);
+  if (!existing && shouldAlertTailers) {
+    const tails = await transaction.tail.findMany({
+      where: { calloutId: callout.id, tailerUserId: { not: null } },
+      select: { tailerUserId: true },
+      distinct: ['tailerUserId'],
+    });
+    for (const tail of tails) {
+      if (!tail.tailerUserId || tail.tailerUserId === callout.userId) continue;
+      const notification = await transaction.notification.create({
+        data: {
+          userId: tail.tailerUserId,
+          actorUserId: callout.userId,
+          type: input.type === 'Closed' ? 'callout_closed' : 'callout_trimmed',
+          entityType: 'callout',
+          entityId: callout.id,
+          payload: {
+            calloutId: callout.id,
+            positionEventId: input.positionEventId,
+            ...(input.removalBps === undefined ? {} : { removalBps: input.removalBps }),
+          },
+        },
+      });
+      await transaction.outboxEvent.create({
+        data: {
+          dedupKey: `notification:${notification.id}`,
+          topic: 'notification.new',
+          aggregateId: tail.tailerUserId,
+          chainId: input.chainId,
+          blockNumber: input.blockNumber,
+          payload: {
+            notificationId: notification.id,
+            userId: tail.tailerUserId,
+            type: input.type === 'Closed' ? 'callout_closed' : 'callout_trimmed',
+          },
+        },
+      });
+    }
+  }
   return update.id;
 }
