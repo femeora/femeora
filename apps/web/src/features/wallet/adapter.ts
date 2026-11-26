@@ -17,6 +17,10 @@ const erc20BalanceAbi = parseAbi([
 
 export interface Eip1193Provider {
   request(args: { method: string; params?: readonly unknown[] }): Promise<unknown>;
+  connect?(options?: {
+    optionalChains?: number[];
+    rpcMap?: Record<number, string>;
+  }): Promise<void>;
   providers?: Eip1193Provider[];
   isMetaMask?: boolean;
   isRabby?: boolean;
@@ -55,14 +59,29 @@ const WALLET_REQUEST_TIMEOUT_MS = 30_000;
 let selectedProvider: Eip1193Provider | null = null;
 let walletConnectProvider: Eip1193Provider | null = null;
 
+const WALLETCONNECT_METHODS = [
+  'eth_accounts',
+  'eth_requestAccounts',
+  'eth_sendTransaction',
+  'personal_sign',
+  'eth_signTypedData',
+  'eth_signTypedData_v4',
+  'wallet_addEthereumChain',
+  'wallet_switchEthereumChain',
+];
+
 async function resolveWalletConnectProvider(settings: WalletConnectSettings) {
   if (walletConnectProvider) return walletConnectProvider;
   const { default: EthereumProvider } = await import('@walletconnect/ethereum-provider');
   const provider = await EthereumProvider.init({
     projectId: settings.projectId,
-    chains: [settings.chainId],
+    // Robinhood Chain is optional during pairing so wallets that do not yet
+    // list it natively can still connect and add/switch to it afterwards.
+    optionalChains: [settings.chainId],
+    optionalMethods: WALLETCONNECT_METHODS,
     rpcMap: { [settings.chainId]: settings.rpcUrl },
     showQrModal: true,
+    disableProviderPing: true,
     metadata: {
       name: 'Femeora',
       description: 'Liquidity, launchpads, and proof-backed callouts on Robinhood Chain.',
@@ -72,6 +91,12 @@ async function resolveWalletConnectProvider(settings: WalletConnectSettings) {
   });
   walletConnectProvider = provider as Eip1193Provider;
   return walletConnectProvider;
+}
+
+async function discardWalletConnectProvider(provider: Eip1193Provider) {
+  if (provider.disconnect) await provider.disconnect().catch(() => undefined);
+  if (selectedProvider === provider) selectedProvider = null;
+  if (walletConnectProvider === provider) walletConnectProvider = null;
 }
 
 export async function restoreWalletConnect(settings: WalletConnectSettings) {
@@ -96,14 +121,24 @@ export async function connectWallet(
   if (!settings) throw new WalletAdapterError('WALLETCONNECT_NOT_CONFIGURED');
   const provider = await resolveWalletConnectProvider(settings);
   try {
-    await provider.request({ method: 'eth_requestAccounts' });
+    if (provider.connect) {
+      await provider.connect({
+        optionalChains: [settings.chainId],
+        rpcMap: { [settings.chainId]: settings.rpcUrl },
+      });
+    } else {
+      await provider.request({ method: 'eth_requestAccounts' });
+    }
     const snapshot = await readWalletSnapshot(provider);
     if (!snapshot.account) throw new WalletAdapterError('WALLET_ACCOUNT_REQUIRED');
     selectedProvider = provider;
     return snapshot;
   } catch (error) {
+    const errorCode = providerErrorCode(error);
+    await discardWalletConnectProvider(provider);
     if (error instanceof WalletAdapterError) throw error;
-    if (providerErrorCode(error) === 4001) throw new WalletAdapterError('WALLET_REQUEST_REJECTED');
+    if (errorCode === 4001) throw new WalletAdapterError('WALLET_REQUEST_REJECTED');
+    if (errorCode === -32_002) throw new WalletAdapterError('WALLET_REQUEST_PENDING');
     throw new WalletAdapterError('WALLET_CONNECTION_FAILED');
   }
 }
