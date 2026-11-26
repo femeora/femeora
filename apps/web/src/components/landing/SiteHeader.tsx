@@ -6,15 +6,12 @@ import { useEffect, useState } from 'react';
 import { BrandMark, Wordmark } from '@/components/ui/BrandMark';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { ChainBadge } from '@/components/ui/ChainBadge';
+import { XLogo } from '@/components/ui/icons';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { navLinks, site } from '@/content/landing';
-import { useHideOnScroll } from '@/hooks/useHideOnScroll';
-import { cn } from '@/lib/cn';
 
 export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const scrolledAway = useHideOnScroll();
-  const hidden = scrolledAway && !menuOpen;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -30,16 +27,11 @@ export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header
-      className={cn(
-        'fixed inset-x-0 top-0 z-50 h-header border-b border-line bg-bg transition-transform duration-base ease-brand',
-        hidden && '-translate-y-full'
-      )}
-    >
-      <div className="wrap grid h-full grid-cols-[auto_1fr_auto] items-center gap-6">
+    <header className="fixed inset-x-0 top-0 z-50 h-header border-b border-line bg-bg/95 backdrop-blur-md">
+      <div className="wrap grid h-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-4 lg:gap-6">
         <Link href="/" className="inline-flex items-center gap-3" aria-label={`${site.name} home`}>
           <BrandMark />
-          <Wordmark />
+          <Wordmark className="hidden min-[390px]:inline" />
         </Link>
 
         <p className="t-label hidden items-center justify-self-center gap-2.5 whitespace-nowrap text-muted xl:inline-flex">
@@ -47,9 +39,9 @@ export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
           <ChainBadge network={network} />
         </p>
 
-        <div className="flex items-center justify-self-end gap-6 md:gap-8">
+        <div className="flex items-center justify-self-end gap-1 sm:gap-3 md:gap-5 lg:gap-7">
           <nav aria-label="Primary" className="hidden md:block">
-            <ul className="flex gap-8">
+            <ul className="flex gap-5 lg:gap-8">
               {navLinks.map(link => (
                 <li key={link.href}>
                   <Link
@@ -62,6 +54,17 @@ export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
               ))}
             </ul>
           </nav>
+
+          <a
+            href={site.x.href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Follow @${site.x.handle} on X`}
+            className="t-label inline-flex size-11 shrink-0 items-center justify-center gap-2 text-muted transition-colors duration-fast hover:text-fg lg:w-auto lg:px-1"
+          >
+            <XLogo aria-hidden="true" className="size-3.5" />
+            <span className="hidden lg:inline">@{site.x.handle}</span>
+          </a>
 
           <ButtonLink href={site.appCta.href} variant="primary" className="min-h-9 px-3.5">
             {site.appCta.label}
@@ -98,6 +101,15 @@ export function SiteHeader({ network }: { network: 'testnet' | 'mainnet' }) {
           <StatusDot tone="up" />
           <ChainBadge network={network} />
         </p>
+        <a
+          href={site.x.href}
+          target="_blank"
+          rel="noreferrer"
+          onClick={closeMenu}
+          className="wrap t-label mt-5 flex min-h-11 items-center gap-2 text-muted"
+        >
+          <XLogo aria-hidden="true" className="size-3.5" />@{site.x.handle}
+        </a>
       </nav>
     </header>
   );
