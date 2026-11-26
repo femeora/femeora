@@ -42,6 +42,11 @@ const curveUnits = [
   { value: 'mcap', label: 'MCap' },
   { value: 'price', label: 'Price' },
 ] as const;
+const curveSources = [
+  { value: 'combined', label: 'Combined' },
+  { value: 'projection', label: 'Curve projection' },
+  { value: 'trades', label: 'Market trades' },
+] as const;
 const curveIntervalSeconds: Record<CurveInterval, number> = {
   '5m': 300,
   '15m': 900,
@@ -357,6 +362,12 @@ export function CurveTerminal({
           quoteSymbol={quoteSymbol}
           tokenSymbol={launch.symbol}
           totalSupply={totalSupply}
+          curveTokenSupplyRaw={
+            launch.launchpad.curveTokenSupplyRaw ??
+            ((BigInt(launch.totalSupplyRaw) * BigInt(1_000_000 - launch.devHoldingsPips)) / 1_000_000n).toString()
+          }
+          graduationThresholdRaw={launch.launchpad.graduationThresholdRaw}
+          currentProgress={progress}
         />
         <div className="mt-9 border-t border-line pt-5">
           <div className="flex items-end justify-between">
@@ -559,15 +570,22 @@ function CurvePriceChart({
   quoteSymbol,
   tokenSymbol,
   totalSupply,
+  curveTokenSupplyRaw,
+  graduationThresholdRaw,
+  currentProgress,
 }: {
   trades: ApiLaunchDetail['trades'];
   quoteDecimals: number;
   quoteSymbol: string;
   tokenSymbol: string;
   totalSupply: number;
+  curveTokenSupplyRaw: string;
+  graduationThresholdRaw: string;
+  currentProgress: number;
 }) {
   const [interval, setInterval] = useState<CurveInterval>('1h');
   const [unit, setUnit] = useState<'mcap' | 'price'>('mcap');
+  const [source, setSource] = useState<'combined' | 'projection' | 'trades'>('combined');
   const { containerRef, handles } = useLightweightChart();
   const candles = useMemo(() => {
     const seconds = curveIntervalSeconds[interval];
@@ -629,31 +647,76 @@ function CurvePriceChart({
   }, [candles, handles, totalSupply, unit]);
 
   const latest = candles.at(-1);
+  const projection = useMemo(() => {
+    const threshold = Number(formatUnits(BigInt(graduationThresholdRaw), quoteDecimals));
+    const curveSupply = Number(formatUnits(BigInt(curveTokenSupplyRaw), 18));
+    const virtualQuoteSeed = threshold * 0.001;
+    const invariant = curveSupply * virtualQuoteSeed;
+    if (!(threshold > 0) || !(curveSupply > 0) || !(invariant > 0)) return [];
+    return Array.from({ length: 101 }, (_, progressIndex) => {
+      const progress = progressIndex;
+      const quoteReserveAtProgress = threshold * (progress / 100);
+      const virtualQuote = virtualQuoteSeed + quoteReserveAtProgress;
+      const virtualToken = invariant / virtualQuote;
+      const price = virtualQuote / virtualToken;
+      return {
+        progress,
+        value: unit === 'mcap' ? price * totalSupply : price,
+      };
+    });
+  }, [curveTokenSupplyRaw, graduationThresholdRaw, quoteDecimals, totalSupply, unit]);
+  const tradeMarkers = useMemo(
+    () =>
+      [...trades].reverse().flatMap(trade => {
+        const quote = Number(formatUnits(BigInt(trade.quoteAmountRaw), quoteDecimals));
+        const tokens = Number(formatUnits(BigInt(trade.tokenAmountRaw), 18));
+        const price = tokens > 0 ? quote / tokens : Number.NaN;
+        if (!Number.isFinite(price) || price <= 0) return [];
+        return [{
+          progress: trade.progressPips / 10_000,
+          value: unit === 'mcap' ? price * totalSupply : price,
+          side: trade.side,
+        }];
+      }),
+    [quoteDecimals, totalSupply, trades, unit]
+  );
   return (
     <section className="mt-8 min-w-0">
       <div className="flex flex-wrap items-center gap-2 py-3">
+        <SegmentedControl
+          label="Chart source"
+          options={curveSources}
+          value={source}
+          onChange={setSource}
+        />
         <SegmentedControl
           label="Chart unit"
           options={curveUnits}
           value={unit}
           onChange={setUnit}
         />
-        <SegmentedControl
-          label="Chart interval"
-          options={curveIntervals}
-          value={interval}
-          onChange={setInterval}
-        />
+        {source === 'trades' ? (
+          <SegmentedControl
+            label="Chart interval"
+            options={curveIntervals}
+            value={interval}
+            onChange={setInterval}
+          />
+        ) : null}
         <p className="t-label ml-auto hidden text-[0.6875rem] text-faint lg:block">
           Drag to pan · scroll or pinch to zoom
         </p>
       </div>
       <div className="mb-2 flex items-center gap-2 text-[0.6875rem] uppercase tracking-[0.12em] text-faint">
         <span className="inline-block size-1.5 rounded-full bg-signal" />
-        Bonding curve trades · on-chain only ·{' '}
-        {unit === 'mcap' ? `market cap in ${quoteSymbol}` : `${quoteSymbol} per ${tokenSymbol}`}
+        {source === 'trades'
+          ? 'Market trades · confirmed on-chain only'
+          : source === 'combined'
+            ? 'On-chain curve projection · confirmed trades overlaid'
+            : 'On-chain curve projection · no simulated trades'}{' '}
+        · {unit === 'mcap' ? `market cap in ${quoteSymbol}` : `${quoteSymbol} per ${tokenSymbol}`}
       </div>
-      <div className="glass relative h-[320px] overflow-hidden rounded-[2px] sm:h-[440px]">
+      <div className={`glass relative h-[320px] overflow-hidden rounded-[2px] sm:h-[440px] ${source === 'trades' ? '' : 'hidden'}`}>
         {latest ? (
           <p className="t-label pointer-events-none absolute left-2 top-1 z-10 flex flex-wrap gap-x-3 text-muted">
             <span>O <span className="text-fg">{formatChartValue(latest.open, unit, totalSupply)}</span></span>
@@ -681,7 +744,87 @@ function CurvePriceChart({
           </div>
         ) : null}
       </div>
+      {source !== 'trades' ? (
+        <CurveProjectionChart
+          points={projection}
+          markers={source === 'combined' ? tradeMarkers : []}
+          currentProgress={currentProgress}
+          unit={unit}
+          quoteSymbol={quoteSymbol}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function CurveProjectionChart({
+  points,
+  markers,
+  currentProgress,
+  unit,
+  quoteSymbol,
+}: {
+  points: readonly { progress: number; value: number }[];
+  markers: readonly { progress: number; value: number; side: 'buy' | 'sell' }[];
+  currentProgress: number;
+  unit: 'mcap' | 'price';
+  quoteSymbol: string;
+}) {
+  const width = 1_000;
+  const height = 440;
+  const inset = { left: 70, right: 24, top: 24, bottom: 48 };
+  const drawableWidth = width - inset.left - inset.right;
+  const drawableHeight = height - inset.top - inset.bottom;
+  const positiveValues = points.map(point => point.value).filter(value => value > 0);
+  const minimum = Math.min(...positiveValues);
+  const maximum = Math.max(...positiveValues);
+  const logMinimum = Math.log10(minimum);
+  const logSpread = Math.max(Math.log10(maximum) - logMinimum, Number.EPSILON);
+  const x = (progress: number) => inset.left + (Math.min(100, Math.max(0, progress)) / 100) * drawableWidth;
+  const y = (value: number) => inset.top + (1 - (Math.log10(Math.max(value, minimum)) - logMinimum) / logSpread) * drawableHeight;
+  const line = points.map(point => `${x(point.progress)},${y(point.value)}`).join(' ');
+  const area = `${inset.left},${height - inset.bottom} ${line} ${width - inset.right},${height - inset.bottom}`;
+  const valueLabel = (value: number) => unit === 'mcap' ? `${formatCompactValue(value)} ${quoteSymbol}` : `${formatCurvePrice(value)} ${quoteSymbol}`;
+  return (
+    <div className="glass relative h-[320px] overflow-hidden rounded-[2px] sm:h-[440px]">
+      <svg viewBox={`0 0 ${width} ${height}`} className="size-full" role="img" aria-label="On-chain bonding curve projection">
+        <defs>
+          <linearGradient id="launch-curve-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="rgb(var(--signal))" stopOpacity="0.24" />
+            <stop offset="1" stopColor="rgb(var(--signal))" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0, 25, 50, 75, 100].map(progress => (
+          <g key={progress}>
+            <line x1={x(progress)} x2={x(progress)} y1={inset.top} y2={height - inset.bottom} stroke="rgb(var(--fg))" strokeOpacity="0.07" />
+            <text x={x(progress)} y={height - 18} textAnchor="middle" fill="rgb(var(--faint))" fontSize="11" fontFamily="var(--font-mono)">{progress}%</text>
+          </g>
+        ))}
+        {[0, 0.5, 1].map(ratio => {
+          const value = 10 ** (logMinimum + logSpread * ratio);
+          const ordinate = y(value);
+          return (
+            <g key={ratio}>
+              <line x1={inset.left} x2={width - inset.right} y1={ordinate} y2={ordinate} stroke="rgb(var(--fg))" strokeOpacity="0.07" />
+              <text x={inset.left - 10} y={ordinate + 4} textAnchor="end" fill="rgb(var(--faint))" fontSize="10" fontFamily="var(--font-mono)">{unit === 'mcap' ? formatCompactValue(value) : formatCurvePrice(value)}</text>
+            </g>
+          );
+        })}
+        <polygon points={area} fill="url(#launch-curve-area)" />
+        <polyline points={line} fill="none" stroke="rgb(var(--signal))" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <line x1={x(currentProgress)} x2={x(currentProgress)} y1={inset.top} y2={height - inset.bottom} stroke="rgb(var(--metal-hi))" strokeDasharray="5 5" strokeOpacity="0.7" />
+        <circle cx={x(currentProgress)} cy={y(points[Math.min(100, Math.max(0, Math.round(currentProgress)))]?.value ?? minimum)} r="5" fill="rgb(var(--metal-hi))" />
+        {markers.map((marker, index) => (
+          <circle key={`${marker.progress}:${index}`} cx={x(Math.max(marker.progress, 0.35))} cy={y(marker.value)} r="5" fill={`rgb(var(--${marker.side === 'buy' ? 'up' : 'down'}))`} stroke="rgb(var(--bg))" strokeWidth="2"><title>{marker.side.toUpperCase()} · {valueLabel(marker.value)} · {formatProgress(marker.progress)}</title></circle>
+        ))}
+      </svg>
+      <div className="t-label pointer-events-none absolute left-3 top-3 border border-line bg-bg/80 px-2 py-1 text-faint">
+        Log scale · current {formatProgress(currentProgress)}
+      </div>
+      <div className="t-label pointer-events-none absolute bottom-3 right-3 text-faint">
+        Graduation progress
+      </div>
+    </div>
   );
 }
 

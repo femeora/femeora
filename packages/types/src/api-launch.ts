@@ -120,6 +120,7 @@ export const ApiLaunchSchema = z.object({
     quoteToken: Address,
     tradeFeePips: z.number().int().nonnegative(),
     graduationThresholdRaw: Integer,
+    curveTokenSupplyRaw: Integer.optional(),
     protectionEnabled: z.boolean(),
     xRequired: z.boolean(),
   }),

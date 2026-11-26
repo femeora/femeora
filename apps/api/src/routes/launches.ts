@@ -364,6 +364,7 @@ function launchJson(
       quoteToken: getAddress(record.launchpad.quoteToken),
       tradeFeePips: record.launchpad.tradeFeePips,
       graduationThresholdRaw: record.launchpad.graduationThreshold.toFixed(0),
+      curveTokenSupplyRaw: record.launchpad.curveTokenSupply.toFixed(0),
       protectionEnabled: record.launchpad.protectionEnabled,
       xRequired: record.launchpad.xRequired,
     },
