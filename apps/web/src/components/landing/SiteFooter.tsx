@@ -9,15 +9,15 @@ import { footer, site } from '@/content/landing';
 
 export function SiteFooter({ network }: { network: 'testnet' | 'mainnet' }) {
   return (
-    <footer className="relative z-10 border-t border-line bg-bg pb-6 pt-[clamp(3rem,6vw,5rem)]">
+    <footer className="relative z-10 border-t border-line bg-bg pb-[calc(5rem+env(safe-area-inset-bottom))] pt-10 md:pb-6 md:pt-[clamp(3rem,6vw,5rem)]">
       <div className="wrap">
-        <div className="grid-12 gap-y-10">
+        <div className="grid-12 gap-y-8 md:gap-y-10">
           <div className="col-span-12 lg:col-span-4">
             <p className="inline-flex items-center gap-4">
               <BrandMark className="h-9 w-[42px]" />
               <Wordmark className="text-lg" />
             </p>
-            <p className="mt-6 max-w-[18em]">{site.tagline}</p>
+            <p className="mt-4 max-w-[18em] md:mt-6">{site.tagline}</p>
             <a
               href={site.x.href}
               target="_blank"
@@ -54,7 +54,7 @@ export function SiteFooter({ network }: { network: 'testnet' | 'mainnet' }) {
           ))}
         </div>
 
-        <p className="t-label mt-[clamp(3rem,6vw,5rem)] flex flex-wrap items-center gap-x-8 gap-y-2 text-muted">
+        <p className="t-label mt-10 flex flex-wrap items-center gap-x-8 gap-y-2 text-muted md:mt-[clamp(3rem,6vw,5rem)]">
           <span className="inline-flex items-center gap-2">
             <StatusDot live />
             <ChainBadge network={network} />

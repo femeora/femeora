@@ -243,7 +243,7 @@ export function CurveTerminal({
   const marketCap = latestPrice === null ? null : latestPrice * totalSupply;
 
   return (
-    <div className="flex flex-col gap-4 px-gutter py-5">
+    <div className="flex min-w-0 flex-col gap-4 px-gutter py-5">
       <header className="flex flex-col gap-4 border-b border-line pb-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex shrink-0 items-center pl-1">
@@ -304,8 +304,8 @@ export function CurveTerminal({
         </section>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
-      <section className="glass rounded-[2px] p-5 sm:p-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
+      <section className="glass min-w-0 overflow-hidden rounded-[2px] p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="t-label text-signal">Dynamic bonding curve</p>
@@ -433,7 +433,7 @@ export function CurveTerminal({
         </div>
       </section>
 
-      <aside className="glass h-fit rounded-[2px] p-5">
+      <aside className="glass min-w-0 h-fit rounded-[2px] p-4 sm:p-5">
         <p className="t-label text-muted">Trade {launch.symbol}</p>
         {graduated ? (
           <div className="mt-5">
@@ -682,18 +682,20 @@ function CurvePriceChart({
   );
   return (
     <section className="mt-8 min-w-0">
-      <div className="flex flex-wrap items-center gap-2 py-3">
+      <div className="grid grid-cols-2 items-center gap-2 py-3 sm:flex sm:flex-wrap">
         <SegmentedControl
           label="Chart source"
           options={curveSources}
           value={source}
           onChange={setSource}
+          className="col-span-2 w-full sm:w-auto"
         />
         <SegmentedControl
           label="Chart unit"
           options={curveUnits}
           value={unit}
           onChange={setUnit}
+          className="w-full sm:w-auto"
         />
         {source === 'trades' ? (
           <SegmentedControl
@@ -701,6 +703,7 @@ function CurvePriceChart({
             options={curveIntervals}
             value={interval}
             onChange={setInterval}
+            className="col-span-2 w-full sm:w-auto"
           />
         ) : null}
         <p className="t-label ml-auto hidden text-[0.6875rem] text-faint lg:block">

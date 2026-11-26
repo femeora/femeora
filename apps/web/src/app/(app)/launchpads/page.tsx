@@ -43,7 +43,7 @@ export default async function LaunchpadsPage() {
       {launchpads.data.length ? (
         <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {launchpads.data.map(pad => (
-            <li key={pad.id}>
+            <li key={pad.id} className="min-w-0">
               <a
                 href={`/lp/${pad.slug}`}
                 className="glass block min-h-48 overflow-hidden rounded-[2px] transition-colors hover:border-line-strong"
@@ -116,7 +116,7 @@ export default async function LaunchpadsPage() {
       {launches.data.length ? (
         <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {launches.data.map(launch => (
-            <li key={launch.id}>
+            <li key={launch.id} className="min-w-0">
               <LaunchCard launch={launch} />
             </li>
           ))}

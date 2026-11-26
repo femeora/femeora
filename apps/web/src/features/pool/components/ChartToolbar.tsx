@@ -72,18 +72,20 @@ export function ChartToolbar({
   referenceAvailable,
 }: ChartToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 py-3">
+    <div className="grid grid-cols-2 items-center gap-2 py-3 sm:flex sm:flex-wrap">
       <SegmentedControl
         label="Price source"
         options={sourceOptions}
         value={source}
         onChange={value => onSourceChange(value === 'reference' && !referenceAvailable ? 'pool' : value)}
+        className="col-span-2 w-full sm:w-auto"
       />
       <SegmentedControl
         label="Interval"
         options={intervalOptions}
         value={interval}
         onChange={onIntervalChange}
+        className="col-span-2 w-full sm:w-auto"
       />
       {marketCapAvailable ? (
         <SegmentedControl
@@ -91,6 +93,7 @@ export function ChartToolbar({
           options={unitOptions}
           value={unit}
           onChange={onUnitChange}
+          className="w-full sm:w-auto"
         />
       ) : null}
       <SegmentedControl
@@ -98,12 +101,14 @@ export function ChartToolbar({
         options={calloutOptions}
         value={showCallouts ? 'on' : 'off'}
         onChange={value => onShowCalloutsChange(value === 'on')}
+        className="w-full sm:w-auto"
       />
       <SegmentedControl
         label="Liquidity bins"
         options={binOptions}
         value={showBins ? 'on' : 'off'}
         onChange={value => onShowBinsChange(value === 'on')}
+        className="w-full sm:w-auto"
       />
       <p className="t-label ml-auto hidden text-[0.6875rem] text-faint lg:block">
         Drag to pan · scroll or pinch to zoom

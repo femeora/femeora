@@ -281,7 +281,7 @@ export function PoolTerminal({
 
         <aside
           aria-label="Trade panel"
-          className="glass scroll-mt-20 self-start rounded-[2px] xl:sticky xl:top-20 xl:row-span-2"
+          className="glass min-w-0 scroll-mt-20 self-start rounded-[2px] xl:sticky xl:top-20 xl:row-span-2"
         >
           <TradePanel
             pool={pool}

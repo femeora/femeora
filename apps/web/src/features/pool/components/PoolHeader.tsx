@@ -39,7 +39,7 @@ function PoolPriceNotice({
       >
         <TriangleAlert aria-hidden="true" className="size-4" strokeWidth={1.8} />
       </summary>
-      <div className="invisible absolute left-0 top-[calc(100%+0.5rem)] z-50 w-80 max-w-[calc(100vw-3rem)] translate-y-1 border border-down/60 bg-[#101216] p-3 opacity-0 shadow-2xl transition-[opacity,transform,visibility] group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100">
+      <div className="invisible fixed inset-x-4 top-20 z-50 w-auto translate-y-1 border border-down/60 bg-[#101216] p-3 opacity-0 shadow-2xl transition-[opacity,transform,visibility] group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100 sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+0.5rem)] sm:w-80 sm:max-w-[calc(100vw-3rem)]">
         <p className="t-label text-down">Initial pool price warning</p>
         <p className="mt-1 text-xs normal-case tracking-normal text-fg">{summary}.</p>
         <p className="mt-2 text-[0.625rem] leading-relaxed text-muted">
@@ -108,7 +108,7 @@ export function PoolHeader({
   const quoteName = pool.quoteName ?? quote.name;
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-4 xl:flex-row xl:items-end xl:justify-between">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <span className="flex shrink-0 items-center pl-1">
           <TokenIcon
             token={pool.baseAddress}
@@ -123,11 +123,11 @@ export function PoolHeader({
             className="-ml-3 size-11"
           />
         </span>
-        <div>
-          <h1 className="text-2xl font-medium tracking-tight">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-medium tracking-tight">
             {pool.base} <span className="text-muted">/ {pool.quote}</span>
           </h1>
-          <p className="mt-0.5 text-sm text-muted">
+          <p className="mt-0.5 truncate text-sm text-muted">
             {baseName} · {quoteName}
           </p>
           <p className="t-label mt-0.5 flex flex-wrap items-center gap-x-2 text-muted">
@@ -148,7 +148,7 @@ export function PoolHeader({
         </div>
       </div>
 
-      <dl className="grid grid-cols-4 gap-x-6 gap-y-3 sm:grid-cols-8">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 min-[360px]:grid-cols-4 sm:grid-cols-8 sm:gap-x-6">
         {poolStats(pool).map(stat => (
           <div key={stat.label} className="flex flex-col gap-0.5">
             <dt className="t-label text-faint">{stat.label}</dt>

@@ -38,7 +38,7 @@ export function PoolAssetSelect({ label, value, exclude, assets, onChange }: {
         <span className="min-w-0 flex-1"><span className="block font-medium">{selected?.symbol ?? 'Select token'}</span><span className="block truncate text-xs text-muted">{selected?.name ?? 'Search by symbol, name, address, or ISIN'}</span></span>
         <span aria-hidden="true" className="text-muted transition-transform group-open:rotate-180">⌄</span>
       </summary>
-      <div className="asset-select-menu absolute z-40 mt-1 w-full min-w-[19rem] rounded-[2px] p-3 shadow-2xl">
+      <div className="asset-select-menu absolute z-40 mt-1 w-full min-w-0 rounded-[2px] p-3 shadow-2xl sm:min-w-[19rem]">
         <input aria-label={`Search ${label}`} className="glass-control min-h-11 w-full rounded-[2px] px-3" placeholder="Search assets" value={query} onChange={event => setQuery(event.target.value)} />
         <div className="mt-3 flex flex-wrap gap-1.5">{categories.map(item => <button key={item.value} type="button" aria-pressed={category === item.value} onClick={() => setCategory(item.value)} className={`t-label min-h-9 border px-2 ${category === item.value ? 'border-signal bg-signal/10 text-fg' : 'border-line text-muted'}`}>{item.label}</button>)}</div>
         <ul className="mt-3 max-h-72 overflow-y-auto">{matches.map(asset => <li key={`${asset.chainId}:${asset.address}`}>

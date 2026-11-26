@@ -45,13 +45,13 @@ function ConnectedWalletButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="glass-control flex min-h-9 items-center gap-2 rounded-[2px] py-1 pl-1 pr-3 text-left"
+        className="glass-control flex min-h-9 min-w-0 max-w-[10.5rem] items-center gap-2 rounded-[2px] py-1 pl-1 pr-2 text-left sm:max-w-none sm:pr-3"
         aria-label={`Manage connected wallet ${account}`}
       >
         <Avatar seed={seed} src={avatarUrl} alt={`${title} avatar`} size="sm" self />
-        <span className="flex flex-col leading-tight">
-          <span className="font-mono text-[0.8125rem]">{title}</span>
-          <span className="t-label text-[0.625rem] text-muted">{subtitle}</span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate font-mono text-[0.8125rem]">{title}</span>
+          <span className="t-label truncate text-[0.625rem] text-muted">{subtitle}</span>
         </span>
       </button>
       <dialog

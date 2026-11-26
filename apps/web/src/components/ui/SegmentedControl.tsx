@@ -29,7 +29,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn('glass inline-flex rounded-[2px] p-0.5', className)}
+      className={cn('glass mobile-scroll inline-flex rounded-[2px] p-0.5', className)}
     >
       {options.map(option => {
         const selected = option.value === value;
@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               't-label flex-1 whitespace-nowrap transition-colors duration-fast',
-              size === 'sm' ? 'min-h-8 px-2.5' : 'min-h-11 px-4',
+              size === 'sm' ? 'min-h-10 px-2 sm:min-h-8 sm:px-2.5' : 'min-h-11 px-3 sm:px-4',
               selected
                 ? 'rounded-[1px] bg-fg text-bg'
                 : 'text-muted hover:bg-fg/[0.06] hover:text-fg'

@@ -60,6 +60,34 @@
     overflow-x: clip;
   }
 
+  /* Grid tracks otherwise inherit the min-content width of charts, tables, and
+   * segmented controls, which can push an entire mobile page off-screen. */
+  :where(.grid) > * {
+    min-width: 0;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  @media (max-width: 639px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+
   ::selection {
     background: rgb(var(--signal));
     color: rgb(var(--on-signal));
@@ -78,6 +106,11 @@
 
   .grid-12 {
     @apply grid grid-cols-12 gap-4;
+  }
+
+  .mobile-scroll {
+    @apply max-w-full overflow-x-auto overscroll-x-contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Monospace uppercase readout text, the page's secondary voice. */

@@ -17,14 +17,14 @@ export function LaunchCard({
   return (
     <Link
       href={href}
-      className="glass group block rounded-[2px] p-5 transition-colors hover:border-line-strong"
+      className="glass group block w-full min-w-0 overflow-hidden rounded-[2px] p-4 transition-colors hover:border-line-strong sm:p-5"
     >
       {graduation ? (
         <p className="t-label mb-4 border-b border-up/30 pb-3 text-up">
           Graduated to DAMM · Launch LP permanently locked
         </p>
       ) : null}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line-strong bg-panel-2 font-mono text-sm">
             {launch.imageUrl ? (
@@ -46,7 +46,7 @@ export function LaunchCard({
           </div>
         </div>
         <span
-          className={`t-label border px-2 py-1 ${launch.status === 'graduated' ? 'border-up/40 text-up' : 'border-signal/40 text-signal'}`}
+          className={`t-label shrink-0 border px-2 py-1 ${launch.status === 'graduated' ? 'border-up/40 text-up' : 'border-signal/40 text-signal'}`}
         >
           {graduation ? 'Graduation' : launch.status === 'graduated' ? 'Graduated' : 'Curve live'}
         </span>
@@ -85,7 +85,7 @@ export function LaunchCard({
         <span>Graduation progress</span>
         <span>{progress.toFixed(2)}%</span>
       </div>
-      <div className="t-label mt-4 flex justify-between border-t border-line pt-3 text-faint">
+      <div className="t-label mt-4 flex flex-col gap-1 border-t border-line pt-3 text-faint min-[360px]:flex-row min-[360px]:justify-between">
         <span>
           {launch.token.slice(0, 8)}…{launch.token.slice(-6)}
         </span>

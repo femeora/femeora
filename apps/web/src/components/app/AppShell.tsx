@@ -36,14 +36,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={cn('min-h-dvh [--app-header-height:3.5rem]', (testnet || prelaunch) && '[--app-header-height:5.5rem]')}>
       <Ambient />
       <header className="sticky top-0 z-50 border-b border-line bg-bg">
-        <div className="flex h-14 items-center gap-8 px-gutter">
+        <div className="flex h-14 min-w-0 items-center gap-2 px-gutter sm:gap-4 lg:gap-8">
           <Link
             href="/"
-            className="inline-flex shrink-0 items-center gap-3"
+            className="inline-flex min-w-0 shrink items-center gap-2 sm:shrink-0 sm:gap-3"
             aria-label={`${site.name} home`}
           >
             <BrandMark />
-            <Wordmark />
+            <Wordmark className="hidden min-[360px]:block" />
           </Link>
           <AppTopNav />
           <p className="t-label ml-auto hidden items-center gap-2 text-muted lg:flex">
@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <XLogo className="size-3.5" />
             <span>@{site.x.handle}</span>
           </a>
-          <div className="ml-auto flex items-center gap-1 lg:ml-0">
+          <div className="ml-auto flex min-w-0 items-center gap-1 lg:ml-0">
             <NotificationBell />
             <AccountButton />
           </div>
