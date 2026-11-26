@@ -20,6 +20,7 @@ import {
   type Callout,
 } from '../model/callout';
 import { useCallouts } from '../store';
+
 import { ClaimTailRewardsButton } from './ClaimTailRewardsButton';
 
 const STATUS = {
