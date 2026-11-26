@@ -70,7 +70,7 @@ export function CalloutActions({ callout, own, onChanged, onCalloutDeleted }: { 
       intent.searchParams.set('url', url);
       const popup = window.open(intent.toString(), '_blank', 'noopener,noreferrer,width=720,height=640');
       if (!popup) throw new Error('SHARE_POPUP_BLOCKED');
-    } catch (error) {
+    } catch {
       await navigator.clipboard.writeText(url).catch(() => undefined);
       showToast('The X share window was unavailable. The public callout link was copied instead.', { title: 'Callout link copied', userFacing: true });
     }

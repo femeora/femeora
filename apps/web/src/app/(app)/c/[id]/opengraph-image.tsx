@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
-import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
 import { calloutBins, calloutStatus, formatCalloutValue, rangeLabel, sideLabel } from '@/features/callouts/model/callout';
+import { apiFeedCalloutToCallout } from '@/features/callouts/model/fromApi';
 import { getCallout, getPoolAssets } from '@/lib/api/server';
 
 export const alt = 'Femeora proof-backed liquidity callout';
