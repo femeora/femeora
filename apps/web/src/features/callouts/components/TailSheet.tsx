@@ -10,7 +10,6 @@ import { AmountField } from '@/features/pool/components/AmountField';
 import { TxButton } from '@/features/pool/components/TxButton';
 import { useWallet } from '@/features/wallet/store';
 import { browserApiRequest } from '@/lib/api/client';
-import { tokenSymbol } from '@/lib/tokens';
 
 import type { Callout, TailMode } from '../model/callout';
 import { executePreparedTail } from '../model/executeTail';
@@ -23,6 +22,13 @@ const MODES: readonly { value: TailMode; label: string }[] = [
   { value: 'same-shape-now', label: 'Same shape, from now' },
 ];
 const apiMode = (mode: TailMode) => mode === 'same-range' ? 'same_range' as const : 'same_shape_now' as const;
+
+function tailTokenIdentities(callout: Callout) {
+  const base = { symbol: callout.pool.base, name: callout.pool.baseName, logoUrl: callout.pool.baseLogoUrl };
+  const quote = { symbol: callout.pool.quote, name: callout.pool.quoteName, logoUrl: callout.pool.quoteLogoUrl };
+  const tokenXIsBase = callout.pool.tokenX.toLowerCase() === callout.pool.baseAddress.toLowerCase();
+  return tokenXIsBase ? { tokenX: base, tokenY: quote } : { tokenX: quote, tokenY: base };
+}
 
 /** Tail sheet: quote server state, create a bound intent, then let the user sign every transaction. */
 export function TailSheet() {
@@ -52,8 +58,9 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
   const [hash, setHash] = useState<string | null>(null);
   const titleId = useId();
   const { account, config } = useWallet();
-  const tokenX = tokenSymbol(callout.pool.tokenX);
-  const tokenY = tokenSymbol(callout.pool.tokenY);
+  const { tokenX: tokenXIdentity, tokenY: tokenYIdentity } = tailTokenIdentities(callout);
+  const tokenX = tokenXIdentity.symbol;
+  const tokenY = tokenYIdentity.symbol;
   const invalidate = () => { setQuote(null); setQuoteError(null); setHash(null); };
   const requestQuote = async () => {
     setQuoting(true); setQuoteError(null); setHash(null);
@@ -88,8 +95,8 @@ function TailForm({ callout, onDone }: { callout: Callout; onDone: () => void })
       <SegmentedControl label="Tail mode" size="md" className="w-full" options={MODES} value={mode} onChange={value => { setMode(value); invalidate(); }} />
       {quote?.warnings.map(warning => <p key={warning} role="status" className="flex gap-2 rounded-[2px] border border-down/50 p-3 text-[0.9375rem] text-down"><TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" strokeWidth={2} />{warning.replaceAll('_', ' ').toLowerCase()}</p>)}
       {quote ? <div className="glass rounded-[2px] p-3 text-sm"><p>{quote.poolType === 'DLMM' ? `Bins ${quote.lowerBin} to ${quote.upperBin}` : 'Full-range DAMM'}</p><p className="t-label mt-1 text-muted">Shape {quote.shape} · active bin {quote.expectedActiveBin ?? 'n/a'}</p></div> : null}
-      {quote?.requiresTokenX ? <AmountField token={`Amount ${tokenX}`} tokenAddress={callout.pool.tokenX} value={amountX} usdPerToken={1} enabled onChange={value => { setAmountX(value); setHash(null); }} /> : null}
-      {quote?.requiresTokenY ? <AmountField token={`Amount ${tokenY}`} tokenAddress={callout.pool.tokenY} value={amountY} usdPerToken={1} enabled onChange={value => { setAmountY(value); setHash(null); }} /> : null}
+      {quote?.requiresTokenX ? <AmountField token={`Amount ${tokenX}`} tokenAddress={callout.pool.tokenX} tokenName={tokenXIdentity.name} tokenLogoUrl={tokenXIdentity.logoUrl} value={amountX} usdPerToken={1} enabled onChange={value => { setAmountX(value); setHash(null); }} /> : null}
+      {quote?.requiresTokenY ? <AmountField token={`Amount ${tokenY}`} tokenAddress={callout.pool.tokenY} tokenName={tokenYIdentity.name} tokenLogoUrl={tokenYIdentity.logoUrl} value={amountY} usdPerToken={1} enabled onChange={value => { setAmountY(value); setHash(null); }} /> : null}
       <Button block onClick={() => void requestQuote()} disabled={quoting}>{quoting ? 'Reading canonical range…' : 'Review tail range'}</Button>
       <p role="alert" className="t-label min-h-4 text-down">{quoteError}</p>
       <TxButton label="Tail this range" error={amountError} onExecute={execute} pendingLabel={stage} />
