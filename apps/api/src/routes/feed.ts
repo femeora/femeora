@@ -199,7 +199,7 @@ export async function registerFeedRoutes(app: FastifyInstance, chainId: number) 
         take: 500,
         select: { userId: true, score: true },
       });
-      const scores = new Map(stats.map(stat => [stat.userId, stat.score.toString()]));
+      const scores = new Map(stats.map(stat => [stat.userId, stat.score.toFixed()]));
       const rank = new Map(stats.map((stat, index) => [stat.userId, index]));
       const candidates = await prisma.callout.findMany({
         where: { ...baseWhere, userId: { in: stats.map(stat => stat.userId) } },
