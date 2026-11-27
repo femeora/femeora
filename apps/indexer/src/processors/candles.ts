@@ -203,10 +203,13 @@ export async function rebuildTouchedCandles(
   const projected = pool
     ? projectCandles(swaps.map(swap => ({
         ...swap,
-        amountIn: swap.amountIn.toString(),
-        amountOut: swap.amountOut.toString(),
-        reserveXAfter: swap.reserveXAfter?.toString() ?? null,
-        reserveYAfter: swap.reserveYAfter?.toString() ?? null,
+        // Prisma Decimal switches large raw ERC-20 amounts to scientific
+        // notation (for example `1e+21`). BigInt only accepts full integer
+        // strings, so keep raw on-chain units in fixed-point form.
+        amountIn: swap.amountIn.toFixed(0),
+        amountOut: swap.amountOut.toFixed(0),
+        reserveXAfter: swap.reserveXAfter?.toFixed(0) ?? null,
+        reserveYAfter: swap.reserveYAfter?.toFixed(0) ?? null,
       })), pool).filter(candle => targets.has(`${candle.interval}:${candle.bucketStart.toISOString()}`))
     : [];
   await transaction.candle.deleteMany({
