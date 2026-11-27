@@ -31,9 +31,26 @@ class TailPrepareError extends Error {
 }
 
 async function safeBlock(chainId: number): Promise<bigint> {
-  const health = await prisma.indexerHealth.findUnique({ where: { chainId } });
-  if (!health?.lastSuccessAt || Date.now() - health.lastSuccessAt.getTime() > 5 * 60_000) throw new TailPrepareError(503, 'INDEXER_NOT_READY');
-  return health.safeBlock;
+  const [health, cursor] = await Promise.all([
+    prisma.indexerHealth.findUnique({ where: { chainId } }),
+    prisma.chainCursor.findUnique({ where: { chainId } }),
+  ]);
+  const freshnessWindowMs = 5 * 60_000;
+  if (health?.lastSuccessAt && Date.now() - health.lastSuccessAt.getTime() <= freshnessWindowMs) {
+    return health.safeBlock;
+  }
+  // A large catch-up cycle can keep the health summary stale even though every
+  // processed batch advances a canonical, hash-verified cursor. Keep tail and
+  // reward preparation available while that cursor is actively advancing.
+  if (
+    cursor?.lastProcessedBlock !== null &&
+    cursor?.lastProcessedBlock !== undefined &&
+    cursor.lastProcessedHash &&
+    Date.now() - cursor.updatedAt.getTime() <= freshnessWindowMs
+  ) {
+    return cursor.lastProcessedBlock;
+  }
+  throw new TailPrepareError(503, 'INDEXER_NOT_READY');
 }
 
 function centeredRange(lowerBin: number, upperBin: number, activeBin: number) {

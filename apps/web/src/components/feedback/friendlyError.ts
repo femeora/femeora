@@ -17,6 +17,9 @@ export function friendlyErrorMessage(error: string): string {
   if (value.includes('TAIL_REWARD_SIMULATION_FAILED')) {
     return 'No caller reward can be settled from the current indexed pool fees yet. Try again after more pool activity is indexed.';
   }
+  if (value.includes('INDEXER_NOT_READY')) {
+    return 'Femeora is still indexing confirmed pool activity. Wait a moment and try claiming again. Your reward remains safely recorded on-chain.';
+  }
   if (value.includes('SMART_RANGE_REQUIRES_DLMM')) {
     return 'Smart Range currently supports DLMM positions. DAMM positions remain manageable with the standard increase, decrease, and close actions.';
   }
